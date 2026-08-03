@@ -1955,18 +1955,30 @@ function startLogEdit(logId, forceReadonly){
   const meso=mesoById(log.mesoId);
   const idx=S().logs.filter(l=>l.mesoId===log.mesoId).indexOf(log);
   const readonly=forceReadonly || !logEditable(log);
+  // Lifting exercises come from the log; cardio comes from the cardio store for
+  // this workout's date (that's where in-workout cardio was saved), so editing
+  // a past workout shows — and can change — its cardio too.
+  const liftEx=log.exercises.map(e=>({slotId:null, exerciseId:e.exerciseId,
+    target:e.target||{sets:e.sets.length,reps:10,rir:2,rest:0,notes:""},
+    suggestion:null, notes:e.notes||"", skipped:false, rowsReady:true, _edit:true,
+    sets:(e.sets||[]).map(x=>({kg:x.kg, reps:x.reps, rir:x.rir, expReps:x.expReps??x.reps,
+      done:true, touched:true, at:x.at||null}))}));
+  const dayCardio=S().cardio.filter(c=>c.date===log.date && c.mesoId===log.mesoId && c.fromWorkout);
+  const cardioEx=dayCardio.map(c=>{
+    const exId=(S().exercises.find(e=>e.name===c.type)||{}).id || null;
+    return {slotId:null, exerciseId:exId, cardio:true, cardioId:c.id,
+      target:{minutes:c.minutes, targetHR:null, notes:""},
+      notes:c.notes||"", skipped:false, rowsReady:true, done:true, _edit:true,
+      log:{minutes:c.minutes, avgHR:c.avgHR, distanceKm:c.distanceKm, level:c.level, speed:c.speed, incline:c.incline},
+      _cardioName:c.type, sets:[]};
+  });
   S().editSession={
     mode:"edit", readonly, logId:log.id, mesoId:log.mesoId, week:log.week,
     dayId:log.dayId,
     dayIdx:meso? idx%Math.max(1,meso.days.length):0,
     dayName:log.dayName, mesoName:meso?meso.name:"", date:log.date,
     startedAt:Date.now(), notes:log.notes||"", deload:false,
-    exercises:log.exercises.map(e=>({slotId:null, exerciseId:e.exerciseId, cardio:e.cardio||isCardioEx(e.exerciseId),
-      target:e.target||{sets:e.sets.length,reps:10,rir:2,rest:0,notes:""},
-      suggestion:null, notes:e.notes||"", skipped:false, rowsReady:true, _edit:true,
-      log:e.cardio? {minutes:e.sets?.[0]?.minutes||e.target?.minutes||0}:undefined,
-      sets:(e.sets||[]).map(x=>({kg:x.kg, reps:x.reps, rir:x.rir, expReps:x.expReps??x.reps,
-        done:true, touched:true, at:x.at||null}))}))
+    exercises:[...liftEx, ...cardioEx]
   };
   Store.save();
   go("workout");
@@ -2037,13 +2049,32 @@ function saveLogEdit(){
   if(!log){ S().editSession=null; Store.save(); go("workout"); return; }
   const stored=log.durationMin||1;
   askDuration(stored, stored, dur=>{
+    const oldDate=log.date;
     log.notes=s.notes;
     log.date=s.date;
     log.durationMin=dur;
+    // lifting exercises → the log (only those with logged sets)
     log.exercises=s.exercises
-      .filter(e=>e.sets.some(x=>x.done))
+      .filter(e=>!e.cardio && e.sets.some(x=>x.done))
       .map(e=>({exerciseId:e.exerciseId, target:e.target, notes:e.notes,
         sets:e.sets.filter(x=>x.done)}));
+    // cardio → the cardio store. Remove this workout's old cardio for the date,
+    // then re-add whatever cardio cards are present now (auto-capture minutes).
+    const editedIds=new Set(s.exercises.filter(e=>e.cardio && e.cardioId).map(e=>e.cardioId));
+    S().cardio=S().cardio.filter(c=>{
+      // drop the entries we loaded for editing (by id), and any stale ones on the old date for this workout
+      if(c.cardioId) return true;
+      if(editedIds.has(c.id)) return false;
+      if(c.fromWorkout && c.mesoId===log.mesoId && c.date===oldDate) return false;
+      return true;
+    });
+    s.exercises.filter(e=>e.cardio && e.log && e.log.minutes>0).forEach(e=>{
+      const ex=exById(e.exerciseId);
+      S().cardio.push({id:uid(), date:log.date, type:ex?ex.name:(e._cardioName||"Cardio"),
+        minutes:e.log.minutes, avgHR:e.log.avgHR||null, zone:zoneFor(e.log.avgHR),
+        distanceKm:e.log.distanceKm||null, level:e.log.level||null, speed:e.log.speed||null, incline:e.log.incline||null,
+        notes:e.notes||"", mesoId:log.mesoId, fromWorkout:true});
+    });
     S().editSession=null;
     Store.save(); Store.flush();
     toast("Workout updated");
