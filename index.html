@@ -234,6 +234,17 @@ canvas.chart{width:100%; height:180px; display:block}
 .excard.done-card{border-color:rgba(62,207,142,.35)}
 .excard.skipped-card{opacity:.5}
 .excard.cardio-card{border-color:rgba(83,221,208,.35)}
+.mgfilter{display:flex;gap:6px;overflow-x:auto;padding:8px 0 2px;-webkit-overflow-scrolling:touch}
+.mgfilter .typechip{white-space:nowrap;flex:0 0 auto}
+.linkdate{color:var(--accent);font-weight:700;background:none;border:0;padding:0;font:inherit}
+.scale-ends{display:flex;justify-content:space-between;font-size:11px;color:var(--faint);margin:4px 2px 0;font-weight:600}
+.ro-banner{background:var(--raised);border:1px solid var(--line);border-radius:var(--r-sm);
+  padding:10px 12px;margin-bottom:12px;font-size:13px;color:var(--muted);font-weight:600}
+#excards.readonly{opacity:.92}
+#excards.readonly input,#excards.readonly select,#excards.readonly .chk,#excards.readonly .addset,
+#excards.readonly [data-exmenu],#excards.readonly [data-setmenu],#excards.readonly [data-cardiolog]{
+  pointer-events:none; opacity:.6}
+#excards.readonly .chk.on{opacity:1}
 #resttop{position:sticky; top:0; z-index:60}
 #resttop:empty{display:none}
 .rest-bar{display:flex; align-items:center; gap:12px; background:var(--accent);
@@ -384,7 +395,7 @@ const STARTER_CARDIO=[
 STARTER_EXERCISES.push(...STARTER_CARDIO);
 
 /* ---------------- storage ---------------- */
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 /** Sequential migrations: MIGRATIONS[n] upgrades a state at version n to n+1. */
 const MIGRATIONS = {
   1: st => {              // v1 -> v2: guarantee arrays/fields added after launch
@@ -410,6 +421,13 @@ const MIGRATIONS = {
   },
   5: st => {              // v5 -> v6: Serious/Fun mode
     st.settings.mode ??= "fun";
+    return st;
+  },
+  6: st => {              // v6 -> v7: seed starter template plans (once)
+    if(!st._templatesSeeded){
+      seedTemplates(st);
+      st._templatesSeeded=true;
+    }
     return st;
   },
 };
@@ -458,7 +476,7 @@ class StorageManager{
     window.addEventListener("pagehide", ()=>this.flush());
   }
   defaults(){
-    return {
+    const base={
       version:SCHEMA_VERSION,
       settings:{
         unit:"kg", theme:"light", restDefault:150,
@@ -469,9 +487,11 @@ class StorageManager{
       },
       profile:{gender:"", age:null, weightKg:null, heightCm:null, experience:"", goals:"", setupDismissed:false},
       exercises:[...STARTER_EXERCISES],
-      mesocycles:[], logs:[], bodyweight:[], feedback:[], cardio:[],
+      mesocycles:[], logs:[], bodyweight:[], feedback:[], cardio:[], _templatesSeeded:true,
       activeMesoId:null, activeSession:null, editSession:null,
     };
+    seedTemplates(base);       // fresh installs get the starter templates too
+    return base;
   }
   load(){
     try{
@@ -1052,6 +1072,20 @@ function mesoPosition(meso){
   return {week, dayIdx, day:meso.days[dayIdx], finished, done:n, total:totalDays*meso.weeks};
 }
 function isDeload(meso,week){ return meso.deload && week===meso.weeks; }
+/* A logged workout is editable only if it belongs to the ACTIVE meso and is one
+   of the 6 most recent logged workouts in that meso. Everything older, archived,
+   or in a non-active meso is read-only. Future planned workouts are always
+   read-only previews. */
+const EDIT_WINDOW=6;
+function logEditable(log){
+  if(!log) return false;
+  if(log.mesoId!==S().activeMesoId) return false;         // not the active meso
+  const meso=activeMeso(); if(!meso || meso.archived) return false;
+  const mlogs=S().logs.filter(l=>l.mesoId===log.mesoId)
+    .sort((a,b)=>a.date.localeCompare(b.date) || (a.id>b.id?1:-1));
+  const idx=mlogs.findIndex(l=>l.id===log.id);
+  return idx>=0 && idx >= mlogs.length-EDIT_WINDOW;        // within the last 6
+}
 function streakCount(){
   const dates=[...new Set(S().logs.map(l=>l.date))].sort().reverse();
   if(!dates.length) return 0;
@@ -1313,6 +1347,44 @@ function mesoMenu(id){
   });
 }
 
+/* Four starter plans aimed at beginners and general/women's fitness. Built from
+   the built-in exercise library; sensible defaults, not expert prescription. */
+function seedTemplates(st){
+  const ex=id=>st.exercises.find(e=>e.id===id)?id:null;
+  // resolve by name so it works regardless of id scheme
+  const byName=nm=>{ const e=st.exercises.find(x=>x.name.toLowerCase()===nm.toLowerCase()); return e?e.id:null; };
+  const L=(name,sets,reps,rir=2)=>{ const id=byName(name); return id?{id:uid(),exerciseId:id,sets,reps,rir,rest:90,notes:""}:null; };
+  const C=(name,minutes,targetHR=null)=>{ const id=byName(name); return id?{id:uid(),exerciseId:id,cardio:true,minutes,targetHR,notes:""}:null; };
+  const clean=arr=>arr.filter(Boolean);
+  const mk=(name,weeks,days)=>({id:uid(),name,weeks,deload:true,split:"Custom",archived:true,notes:"Starter template — activate or duplicate to use.",rampSets:false,
+    days:days.map(d=>({id:uid(),name:d.name,exercises:clean(d.ex)}))});
+
+  const templates=[
+    mk("Glute Builder", 5, [
+      {name:"Lower A", ex:[L("Hip Thrust",4,12),L("Romanian Deadlift",3,10),L("Goblet Squat",3,12),L("Walking Lunge",3,12),L("Standing Calf Raise",3,15)]},
+      {name:"Upper", ex:[L("Lat Pulldown",3,12),L("DB Shoulder Press",3,12),L("Seated Cable Row",3,12),L("DB Curl",3,12),L("Triceps Pushdown",3,12)]},
+      {name:"Lower B", ex:[L("Bulgarian Split Squat",3,10),L("Hip Thrust",4,10),L("Leg Press",3,12),L("Lying Leg Curl",3,12),L("Hip Abduction Machine",3,15)]},
+      {name:"Cardio + Core", ex:[C("Incline Walk",30,130),L("Plank",3,45),L("Cable Crunch",3,15)]},
+    ]),
+    mk("General Fitness", 5, [
+      {name:"Full Body A", ex:[L("Goblet Squat",3,12),L("Flat DB Press",3,12),L("Lat Pulldown",3,12),L("DB Shoulder Press",3,12),L("Plank",3,45)]},
+      {name:"Cardio", ex:[C("Stationary Bike",30,135)]},
+      {name:"Full Body B", ex:[L("Romanian Deadlift",3,10),L("Incline DB Press",3,12),L("Seated Cable Row",3,12),L("Walking Lunge",3,12),L("Cable Crunch",3,15)]},
+    ]),
+    mk("Cardio + Tone", 4, [
+      {name:"Tone A", ex:[L("Goblet Squat",3,15),L("Push-Up",3,12),L("Lat Pulldown",3,12),L("Lateral Raise",3,15)]},
+      {name:"Cardio Intervals", ex:[C("Rowing Machine",25,145),C("Assault Bike",10,150)]},
+      {name:"Tone B", ex:[L("Hip Thrust",3,15),L("Seated Cable Row",3,12),L("DB Curl",3,15),L("Triceps Pushdown",3,15)]},
+      {name:"Steady Cardio", ex:[C("Incline Walk",40,125)]},
+    ]),
+    mk("Full Body Beginner", 4, [
+      {name:"Day A", ex:[L("Goblet Squat",3,10),L("Flat DB Press",3,10),L("Seated Cable Row",3,10),L("Plank",3,30)]},
+      {name:"Day B", ex:[L("Leg Press",3,12),L("Lat Pulldown",3,10),L("DB Shoulder Press",3,10),L("Standing Calf Raise",3,15)]},
+    ]),
+  ];
+  st.mesocycles.push(...templates);
+}
+
 const SPLITS={
   "Push Pull Legs":["Push","Pull","Legs"],
   "Upper Lower":["Upper A","Lower A","Upper B","Lower B"],
@@ -1504,23 +1576,32 @@ function editSlot(slot, done){
 }
 /** Reusable exercise picker with search + favourites + quick-create. */
 function pickExercise(onPick){
+  let filter="All";
+  // groups present in the library, Cardio surfaced first, then the rest by frequency
+  const present=[...new Set(S().exercises.map(e=>e.muscle))];
+  const order=["Cardio",...MUSCLES.filter(m=>m!=="Cardio")].filter(m=>present.includes(m));
+  const chips=["All",...order];
   function list(q=""){
     const ql=q.toLowerCase();
     return S().exercises
+      .filter(e=>filter==="All" || e.muscle===filter)
       .filter(e=>!q || e.name.toLowerCase().includes(ql) || e.muscle.toLowerCase().includes(ql))
       .sort((a,b)=>(b.fav-a.fav)||a.muscle.localeCompare(b.muscle)||a.name.localeCompare(b.name));
   }
   const mEl=modal(`<h2>Choose exercise</h2>
     <div class="searchbar"><input id="q" placeholder="Search name or muscle…"></div>
-    <div id="pl" style="max-height:52vh;overflow:auto"></div>
+    <div class="mgfilter" id="mgf">${chips.map(c=>`<button class="typechip ${c==="All"?"sel":""}" data-mg="${c}">${c}</button>`).join("")}</div>
+    <div id="pl" style="max-height:46vh;overflow:auto;margin-top:6px"></div>
     <button class="btn btn-ghost btn-block" style="margin-top:10px" data-new>+ Create custom exercise</button>`, box=>{
     const draw=()=>{ $("#pl",box).innerHTML=list($("#q",box).value).map(e=>
       `<div class="listitem" data-pick="${e.id}" style="padding:10px 12px;margin-bottom:8px">
-        <div class="grow"><div class="title">${e.fav?"★ ":""}${esc(e.name)}</div>
+        <div class="grow"><div class="title">${e.fav?"★ ":""}${e.cardio?"🫀 ":""}${esc(e.name)}</div>
         <div class="tag-mg">${e.muscle} · ${e.equipment}</div></div></div>`).join("")||`<div class="empty">Nothing found</div>`; };
     draw();
     $("#q",box).oninput=draw; $("#q",box).focus();
     box.onclick=e=>{
+      const mg=e.target.closest("[data-mg]");
+      if(mg){ filter=mg.dataset.mg; $$("#mgf .typechip",box).forEach(c=>c.classList.toggle("sel",c===mg)); draw(); return; }
       const p=e.target.closest("[data-pick]");
       if(p){ closeModal(); onPick(p.dataset.pick); }
       if(e.target.closest("[data-new]")){ closeModal(); editExercise(null, id=>onPick(id)); }
@@ -1777,30 +1858,36 @@ function renderWorkout(){
   const s=S().editSession||S().activeSession;
   if(!s) return go("home");
   const edit=s.mode==="edit";
+  const ro=!!s.readonly;                       // read-only: locked past or future preview
   const {total,done}=sessionTotals(s);
-  if(!edit && done===0){ s.startedAt=Date.now(); }   // clock starts at the first logged set
+  if(!edit && done===0){ s.startedAt=Date.now(); }
   const mins=Math.floor((Date.now()-s.startedAt)/60000);
+  const dateLbl=s.future? `W${s.week} · planned` : (s.date? fmtDate(s.date):"");
   $("#view").innerHTML=`
     <div class="topbar">
-      <button style="text-align:left" data-a="picker" aria-label="Choose another workout in this mesocycle">
-        <h1 style="letter-spacing:.01em">${edit?'<span style="color:var(--amber)">EDITING</span> ':""}WEEK ${s.week} <span style="color:var(--faint)">DAY ${ (s.dayIdx??0)+1 } ▾</span></h1>
-        <div class="top-sub">${esc(s.dayName)} · ${edit? fmtDate(s.date) : esc(s.mesoName||"")}${s.deload?` · ${term("Deload")}`:""}</div>
+      <button style="text-align:left" data-a="${ro?"":"picker"}" aria-label="Choose another workout">
+        <h1 style="letter-spacing:.01em">${ro?'<span style="color:var(--muted)">'+(s.future?"PREVIEW":"VIEWING")+'</span> ':(edit?'<span style="color:var(--amber)">EDITING</span> ':"")}WEEK ${s.week} <span style="color:var(--faint)">DAY ${ (s.dayIdx??0)+1 }${ro?"":" ▾"}</span></h1>
+        <div class="top-sub">${esc(s.dayName)}${ro? ` · ${dateLbl}` : ` · <button class="linkdate" data-a="setdate" aria-label="Change workout date">${fmtDate(s.date)} ✎</button>`}${!edit&&s.mesoName?` · ${esc(s.mesoName)}`:""}${s.deload?` · ${term("Deload")}`:""}</div>
       </button>
       <div class="row">
-        <button class="iconbtn" data-a="wnotes" aria-label="Workout notes">✎</button>
-        <button class="iconbtn" data-a="quit" aria-label="${edit?"Discard edits":"Leave workout"}">✕</button>
+        ${ro?"":'<button class="iconbtn" data-a="wnotes" aria-label="Workout notes">✎</button>'}
+        <button class="iconbtn" data-a="quit" aria-label="Close">✕</button>
       </div>
     </div>
+    ${ro? `<div class="ro-banner">${s.future
+        ? "🔒 Planned workout — read-only preview. Weights are projections."
+        : "🔒 Read-only — outside the editable window ("+EDIT_WINDOW+" most recent in your active "+term("meso")+")."}</div>`:""}
     <div class="wk-progress" role="progressbar" aria-valuenow="${done}" aria-valuemax="${total}">
       <div class="fill" id="pfill" style="width:${total?Math.round(100*done/total):0}%"></div></div>
     <div class="row split" style="margin-bottom:12px">
-      <span class="faint num" id="ptext">${done}/${total} sets · ${mins} min</span>
+      <span class="faint num" id="ptext">${done}/${total} sets${ro?"":` · ${mins} min`}</span>
       <span class="faint num">${s.exercises.filter(e=>!e.skipped).length} exercises</span></div>
-    <div id="excards">${s.exercises.map((ses,xi)=>exCardHTML(ses,xi)).join("")}</div>
-    <div class="row">
+    <div id="excards" class="${ro?"readonly":""}">${s.exercises.map((ses,xi)=>exCardHTML(ses,xi)).join("")}</div>
+    ${ro? `<button class="btn btn-ghost btn-block" data-a="quit" style="margin-top:6px">Close</button>`
+        : `<div class="row">
       <button class="btn btn-ghost" style="flex:1" data-a="addex">+ Add exercise</button>
       <button class="btn btn-primary" style="flex:2" data-a="finish">${edit?"Save changes":"Complete workout"}</button>
-    </div>
+    </div>`}
 `;
   bindWorkout();
 }
@@ -1817,16 +1904,17 @@ function workoutPicker(){
     const log=logs[i];
     const cur=!log && i===logs.length;
     if(log){
+      const canEdit=logEditable(log);
       rows+=`<div class="listitem" style="padding:10px 14px;margin-bottom:8px">
         <div class="grow" data-editlog="${log.id}"><div class="title num">W${wk} · ${esc(log.dayName)}</div>
         <div class="faint num">${fmtDate(log.date)} · ${log.exercises.reduce((t,e)=>t+e.sets.length,0)} sets</div></div>
-        <span class="pill" data-editlog="${log.id}">Edit</span>
-        <button class="iconbtn" data-dellog="${log.id}" aria-label="Delete workout">✕</button></div>`;
+        <span class="pill" data-editlog="${log.id}">${canEdit?"Edit":"View"}</span>
+        ${canEdit?`<button class="iconbtn" data-dellog="${log.id}" aria-label="Delete workout">✕</button>`:""}</div>`;
     } else if(cur){
       rows+=`<div class="listitem" data-cur style="padding:10px 14px;margin-bottom:8px;border-color:var(--accent)">
         <div class="grow"><div class="title num">W${wk} · ${esc(day.name)}</div>
         <div class="faint">Current workout</div></div><span class="pill acc">Now</span></div>`;
-    } else {
+    } else if(i>logs.length && i<=logs.length+5){   // next 5 upcoming only
       rows+=`<div class="listitem" data-pv="${di}" data-pw="${wk}" style="padding:10px 14px;margin-bottom:8px;opacity:.55">
         <div class="grow"><div class="title num">W${wk} · ${esc(day.name)}</div>
         <div class="faint">Upcoming — tap to preview</div></div><span class="pill">🔒</span></div>`;
@@ -1837,7 +1925,7 @@ function workoutPicker(){
     <div style="max-height:60vh;overflow:auto;margin-top:10px">${rows}</div>`, m=>{
     m.onclick=e=>{
       const pv=e.target.closest("[data-pv]");
-      if(pv){ closeModal(); previewDay(meso, +pv.dataset.pv, +pv.dataset.pw); return; }
+      if(pv){ closeModal(); startFuturePreview(+pv.dataset.pw, +pv.dataset.pv); return; }
       const dl=e.target.closest("[data-dellog]");
       if(dl){ closeModal(); confirmDeleteLog(dl.dataset.dellog); return; }
       const el=e.target.closest("[data-editlog]");
@@ -1852,42 +1940,106 @@ function workoutPicker(){
 }
 
 /** Open a completed log in the workout UI for editing; changes write back on Save. */
-function startLogEdit(logId){
+function startLogEdit(logId, forceReadonly){
   const log=S().logs.find(l=>l.id===logId);
   if(!log) return;
   const meso=mesoById(log.mesoId);
   const idx=S().logs.filter(l=>l.mesoId===log.mesoId).indexOf(log);
+  const readonly=forceReadonly || !logEditable(log);
   S().editSession={
-    mode:"edit", logId:log.id, mesoId:log.mesoId, week:log.week,
+    mode:"edit", readonly, logId:log.id, mesoId:log.mesoId, week:log.week,
     dayId:log.dayId,
     dayIdx:meso? idx%Math.max(1,meso.days.length):0,
     dayName:log.dayName, mesoName:meso?meso.name:"", date:log.date,
     startedAt:Date.now(), notes:log.notes||"", deload:false,
-    exercises:log.exercises.map(e=>({slotId:null, exerciseId:e.exerciseId,
+    exercises:log.exercises.map(e=>({slotId:null, exerciseId:e.exerciseId, cardio:e.cardio||isCardioEx(e.exerciseId),
       target:e.target||{sets:e.sets.length,reps:10,rir:2,rest:0,notes:""},
       suggestion:null, notes:e.notes||"", skipped:false, rowsReady:true, _edit:true,
-      sets:e.sets.map(x=>({kg:x.kg, reps:x.reps, rir:x.rir, expReps:x.expReps??x.reps,
+      log:e.cardio? {minutes:e.sets?.[0]?.minutes||e.target?.minutes||0}:undefined,
+      sets:(e.sets||[]).map(x=>({kg:x.kg, reps:x.reps, rir:x.rir, expReps:x.expReps??x.reps,
         done:true, touched:true, at:x.at||null}))}))
+  };
+  Store.save();
+  go("workout");
+}
+/** Open a FUTURE planned workout (from the meso template) as a full read-only
+    view with projected weights. */
+function startFuturePreview(week, dayIdx){
+  const meso=activeMeso(); if(!meso) return;
+  const day=meso.days[dayIdx]; if(!day) return;
+  const deload=isDeload(meso, week);
+  S().editSession={
+    mode:"edit", readonly:true, future:true, logId:null, mesoId:meso.id, week,
+    dayId:day.id, dayIdx, dayName:day.name, mesoName:meso.name,
+    date:null, startedAt:Date.now(), notes:day.notes||"", deload,
+    exercises:day.exercises.map(slot=>{
+      if(slot.cardio || isCardioEx(slot.exerciseId))
+        return {slotId:slot.id, exerciseId:slot.exerciseId, cardio:true,
+          target:{minutes:slot.minutes||20, targetHR:slot.targetHR||null, notes:slot.notes||""},
+          notes:"", skipped:false, rowsReady:true, done:false,
+          log:{minutes:slot.minutes||20, avgHR:null, distanceKm:null}, sets:[]};
+      const sug=ProgressionEngine.suggest(slot.exerciseId, slot.reps, slot.rir);
+      let kg=sug?sug.kg:0;
+      let nSets=slot.sets + (meso.rampSets && !deload? Math.min(week-1,2):0);
+      if(deload){ nSets=Math.max(1,Math.ceil(slot.sets/2)); if(sug) kg=Math.round((sug.lastKg*0.6)/wStep())*wStep(); }
+      return {slotId:slot.id, exerciseId:slot.exerciseId,
+        target:{sets:nSets, reps:slot.reps, rir:slot.rir, rest:slot.rest, notes:slot.notes},
+        suggestion:sug, notes:"", skipped:false, rowsReady:true, _edit:false,
+        sets:buildGhostRows(slot.exerciseId, nSets, kg, slot.reps, slot.rir, sug, deload)};
+    })
   };
   Store.save();
   go("workout");
 }
 
 /** Write an edit session back into its log. Unchecked sets are removed. */
+/** Change the date of the in-progress or editing session. */
+function pickWorkoutDate(s){
+  modal(`<h2>Workout date</h2>
+    <p class="muted">Set when this workout happened.</p>
+    <input id="wd" type="date" value="${s.date}" max="${todayISO()}">
+    <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>Save date</button>`, m=>{
+    m.onclick=e=>{ if(!e.target.closest("[data-ok]")) return;
+      const v=$("#wd",m).value; if(!v){ toast("Pick a date"); return; }
+      s.date=v; if(s.logId){ const lg=S().logs.find(l=>l.id===s.logId); if(lg) lg.date=v; }
+      Store.save(); closeModal(); renderWorkout();
+    };
+  });
+}
+/** Ask for the real elapsed time. `guess` is what the app estimated; `current`
+    is the value to prefill (the app guess on finish, or the stored value on edit).
+    Calls cb(minutes). */
+function askDuration(guess, current, cb){
+  modal(`<h2>How long did it take?</h2>
+    <p class="muted">We estimated about <b>${guess}</b> min. If that's off (phone locked, logged later), fix it here.</p>
+    <label>Actual duration (minutes)</label>
+    <input id="dur" type="number" inputmode="numeric" min="1" max="600" value="${current}">
+    <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>Save</button>`, m=>{
+    m.onclick=e=>{ if(!e.target.closest("[data-ok]")) return;
+      const v=clamp(parseInt($("#dur",m).value)||current||guess, 1, 600);
+      closeModal(); cb(v);
+    };
+  });
+}
+
 function saveLogEdit(){
   const s=S().editSession;
   const log=S().logs.find(l=>l.id===s.logId);
-  if(log){
+  if(!log){ S().editSession=null; Store.save(); go("workout"); return; }
+  const stored=log.durationMin||1;
+  askDuration(stored, stored, dur=>{
     log.notes=s.notes;
+    log.date=s.date;
+    log.durationMin=dur;
     log.exercises=s.exercises
       .filter(e=>e.sets.some(x=>x.done))
       .map(e=>({exerciseId:e.exerciseId, target:e.target, notes:e.notes,
         sets:e.sets.filter(x=>x.done)}));
-  }
-  S().editSession=null;
-  Store.save(); Store.flush();
-  toast("Workout updated");
-  go("workout");
+    S().editSession=null;
+    Store.save(); Store.flush();
+    toast("Workout updated");
+    go("workout");
+  });
 }
 
 /** Re-render a single exercise card + the progress header (no full redraw). */
@@ -1908,8 +2060,19 @@ function refreshCard(xi){
 function bindWorkout(){
   const s=S().editSession||S().activeSession;
   const edit=s.mode==="edit";
+  const ro=!!s.readonly;
   const save=()=>Store.save();
   const parse=el=>el.dataset.set.split(":").map(Number);
+  if(ro){
+    // Read-only: only wire the close/quit control and swipe; no edits.
+    enableWorkoutSwipe(s);
+    $("#view").onclick=e=>{
+      if(e.target.closest('[data-a="quit"]')){
+        S().editSession=null; Store.save(); go(S().activeSession?"workout":"calendar");
+      }
+    };
+    return;
+  }
 
   // Inline edits on any set field
   $("#view").oninput=e=>{
@@ -1949,7 +2112,7 @@ function bindWorkout(){
     set.rir=clamp(parseInt(el.value)||0,0,5);
     save();
   };
-  enableCardDrag(s);
+  // long-press drag removed — reordering is via the ⋯ menu (Move up/down)
   enableWorkoutSwipe(s);
 
   $("#view").onclick=e=>{
@@ -2067,6 +2230,7 @@ function bindWorkout(){
       });
       return;
     }
+    if(a==="setdate"){ pickWorkoutDate(s); return; }
     if(a==="picker") return workoutPicker();
     if(a==="finish") return edit? saveLogEdit() : finishWorkout();
     if(a==="quit"){
@@ -2255,15 +2419,43 @@ function exerciseMenu(xi){
   const s=S().editSession||S().activeSession, ses=s.exercises[xi];
   const edit=s.mode==="edit";
   const ex=exById(ses.exerciseId)||{name:"(deleted)"};
+  const nEx=s.exercises.length;
   modal(`<h2>${esc(ex.name)}</h2><div class="stack" style="margin-top:12px">
+    <div class="row" style="gap:8px">
+      <button class="btn btn-ghost" style="flex:1" data-m="up" ${xi===0?"disabled style='opacity:.4'":""}>↑ Move up</button>
+      <button class="btn btn-ghost" style="flex:1" data-m="down" ${xi===nEx-1?"disabled style='opacity:.4'":""}>↓ Move down</button>
+    </div>
     <button class="btn btn-ghost" data-m="replace">Replace exercise</button>
     <button class="btn btn-ghost" data-m="hist">View history</button>
     <button class="btn btn-ghost" data-m="notes">Exercise notes</button>
     <button class="btn btn-ghost" data-m="skip">${ses.skipped?"Unskip exercise":"Skip exercise"}</button>
-    <button class="btn btn-ghost" data-m="delset" ${ses.sets.length<=1?"disabled style='opacity:.4'":""}>Remove last set</button>
+    ${ses.cardio?"":`<button class="btn btn-ghost" data-m="delset" ${ses.sets.length<=1?"disabled style='opacity:.4'":""}>Remove last set</button>`}
     <button class="btn btn-danger" data-m="remove">Remove from workout</button></div>`, m=>{
     m.onclick=e=>{
       const a=e.target.closest("[data-m]")?.dataset.m; if(!a) return;
+      if(a==="up"||a==="down"){
+        const dest=xi+(a==="up"?-1:1);
+        if(dest<0||dest>=s.exercises.length){ closeModal(); return; }
+        closeModal();
+        const doMove=()=>{ const [it]=s.exercises.splice(xi,1); s.exercises.splice(dest,0,it);
+          Store.save(); renderWorkout(); };
+        const day=sessionTemplateDay(s);
+        if(day && !edit){
+          scopePrompt("Keep this new order?", sc=>{
+            doMove();
+            if(sc==="future"){
+              // reorder the template slots to match the instance order
+              const order=s.exercises.map(x=>x.slotId).filter(Boolean);
+              day.exercises.sort((a,b)=>{
+                const ia=order.indexOf(a.id), ib=order.indexOf(b.id);
+                return (ia<0?order.length:ia)-(ib<0?order.length:ib);
+              });
+              Store.save(); toast("Future workouts reordered");
+            }
+          });
+        } else doMove();
+        return;
+      }
       if(a==="replace"){
         closeModal();
         pickExercise(newId=>{
@@ -2398,47 +2590,60 @@ function finishWorkout(){
       notes:e.notes||"", mesoId:s.mesoId, fromWorkout:true});
   });
   stopRest();
-  const log={
-    id:s.id, mesoId:s.mesoId, week:s.week, dayId:s.dayId, dayName:s.dayName,
-    date:s.date, notes:s.notes,
-    durationMin:(()=>{
-      // Prefer first->last set timestamps (+3 min for the first set's work);
-      // wall-clock since start is only an upper bound, so long pauses between
-      // resuming sessions don't inflate the number.
-      const ats=s.exercises.flatMap(e=>e.sets.filter(x=>x.done&&x.at).map(x=>x.at));
-      const wall=Math.round((Date.now()-s.startedAt)/60000);
-      if(ats.length>=2){
-        const span=Math.round((Math.max(...ats)-Math.min(...ats))/60000)+3;
-        return Math.max(1, Math.min(span, wall||span));
-      }
-      return Math.max(1, Math.min(wall, 90));
-    })(),
-    exercises:logged.map(e=>({exerciseId:e.exerciseId, target:e.target, notes:e.notes,
-      sets:e.sets.filter(x=>x.done)}))
+  const guess=(()=>{
+    const ats=s.exercises.flatMap(e=>e.sets.filter(x=>x.done&&x.at).map(x=>x.at));
+    const wall=Math.round((Date.now()-s.startedAt)/60000);
+    if(ats.length>=2){
+      const span=Math.round((Math.max(...ats)-Math.min(...ats))/60000)+3;
+      return Math.max(1, Math.min(span, wall||span));
+    }
+    return Math.max(1, Math.min(wall, 90));
+  })();
+  const finalize=dur=>{
+    const log={
+      id:s.id, mesoId:s.mesoId, week:s.week, dayId:s.dayId, dayName:s.dayName,
+      date:s.date, notes:s.notes, durationMin:dur,
+      exercises:logged.map(e=>({exerciseId:e.exerciseId, target:e.target, notes:e.notes,
+        sets:e.sets.filter(x=>x.done)}))
+    };
+    if(logged.length) S().logs.push(log);
+    S().activeSession=null;
+    Store.save(); Store.flush();
+    if(logged.length) feedbackSurvey(log);
+    else { toast(FUN()?"Cardio logged 🫀":"Cardio logged"); go("home"); }
   };
-  if(logged.length) S().logs.push(log);
-  S().activeSession=null;
-  Store.save(); Store.flush();          // workout completion is critical — write now
-  if(logged.length) feedbackSurvey(log);
-  else { toast(FUN()?"Cardio logged 🫀":"Cardio logged"); go("home"); }
+  if(logged.length) askDuration(guess, guess, finalize);
+  else finalize(guess);        // cardio-only: no duration prompt
 }
 /** Post-workout survey feeding the progression modifier. */
 function feedbackSurvey(log){
-  const Qs=[["difficulty","How hard was that?"],["recovery","Recovered from last session?"],
-    ["motivation","Motivation today?"],["sleep","Sleep last night?"],
-    ["jointPain","Joint pain?"],["fatigue","Overall fatigue?"]];
+  // polarity: "highGood" → 5 is green/best; "highBad" → 5 is red/worst.
+  // ends: [label at 1, label at 5]
+  const Qs=[
+    ["difficulty","How hard was that?","highBad",["Easy","Brutal"]],
+    ["recovery","How recovered did you feel?","highGood",["Wrecked","Fresh"]],
+    ["motivation","Motivation today?","highGood",["Low","Fired up"]],
+    ["sleep","Sleep last night?","highGood",["Terrible","Great"]],
+    ["jointPain","Joint pain?","highBad",["None","Bad"]],
+    ["fatigue","Overall fatigue?","highBad",["Fresh","Exhausted"]],
+  ];
+  // colour ramp 0(red)..4(green); map a value 1-5 to a colour index by polarity
+  const colFor=(pol,v)=> pol==="highGood" ? (v-1) : (5-v);   // 0..4
   const ans={};
   modal(`<h2>Workout complete${FUN()?" 💪":""}</h2>
     <p class="muted num">${log.exercises.reduce((t,e)=>t+e.sets.length,0)} sets · ${log.durationMin} min. Quick check-in — this tunes next week's suggestions.</p>
-    ${Qs.map(([k,q])=>`<label>${q}</label><div class="rirrow" data-q="${k}">
-      ${[1,2,3,4,5].map(v=>`<button class="rirchip" data-v="${v}">${v}</button>`).join("")}</div>`).join("")}
+    ${Qs.map(([k,q,pol,ends])=>`<label>${q}</label>
+      <div class="rirrow" data-q="${k}" data-pol="${pol}">
+        ${[1,2,3,4,5].map(v=>`<button class="rirchip" data-v="${v}" data-rir="${colFor(pol,v)}">${v}</button>`).join("")}</div>
+      <div class="scale-ends"><span>${ends[0]}</span><span>${ends[1]}</span></div>`).join("")}
     <button class="btn btn-primary btn-block" style="margin-top:18px" data-done>Save & finish</button>
     <button class="btn btn-ghost btn-block" style="margin-top:8px" data-skip>Skip</button>`, m=>{
     m.onclick=e=>{
       const v=e.target.closest("[data-v]");
       if(v){ const row=v.closest("[data-q]"); ans[row.dataset.q]=+v.dataset.v;
+        // show the selected colour only on the chosen chip
         $$(".rirchip",row).forEach(c=>c.classList.toggle("sel", c===v));
-        v.setAttribute("data-rir", 5-+v.dataset.v>4?4:5-+v.dataset.v); return; }
+        return; }
       if(e.target.closest("[data-done]")){
         S().feedback.push(Object.assign({date:log.date, logId:log.id,
           difficulty:3,recovery:3,motivation:3,sleep:3,jointPain:1,fatigue:3}, ans));
@@ -2508,7 +2713,7 @@ VIEWS.calendar=function(){
     }
     if(e.target.closest("[data-gocur]")){ if(S().editSession){S().editSession=null; Store.save();} go("workout"); return; }
     const pv=e.target.closest("[data-preview]");
-    if(pv){ previewDay(meso, +pv.dataset.preview, pv.dataset.pw?+pv.dataset.pw:null); return; }
+    if(pv){ startFuturePreview(pv.dataset.pw?+pv.dataset.pw:pos.week, +pv.dataset.preview); return; }
     const day=e.target.closest("[data-date]");
     if(day) dayModal(day.dataset.date, logsByDate[day.dataset.date]||[], cardioByDate[day.dataset.date]||[]);
   };
@@ -2543,10 +2748,12 @@ function previewDay(meso, dayIdx, week){
 function dayModal(iso, logs, cardio){
   if(!logs.length && !cardio.length){ toast("Nothing logged on "+fmtDate(iso)); return; }
   modal(`<h2>${fmtDate(iso)}</h2><div class="stack" style="margin-top:12px">
-    ${logs.map(l=>`<div class="row" style="gap:8px">
+    ${logs.map(l=>{ const canEdit=logEditable(l);
+      return `<div class="row" style="gap:8px">
       <button class="btn btn-ghost" style="flex:1;justify-content:flex-start" data-open="${l.id}">
-        ${esc(l.dayName)} · ${l.exercises.reduce((t,e)=>t+e.sets.length,0)} sets · W${l.week}</button>
-      <button class="iconbtn" data-dellog="${l.id}" aria-label="Delete workout">✕</button></div>`).join("")}
+        ${esc(l.dayName)} · ${l.exercises.reduce((t,e)=>t+e.sets.length,0)} sets · W${l.week}
+        <span class="pill" style="margin-left:auto">${canEdit?"Edit":"View"}</span></button>
+      ${canEdit?`<button class="iconbtn" data-dellog="${l.id}" aria-label="Delete workout">✕</button>`:""}</div>`;}).join("")}
     ${cardio.map(c=>`<div class="row" style="gap:8px">
       <div class="setline num" style="flex:1">${esc(c.type)} · ${c.minutes} min${c.zone?` · Z${c.zone}`:""}</div>
       <button class="iconbtn" data-delc="${c.id}" aria-label="Delete cardio">✕</button></div>`).join("")}
