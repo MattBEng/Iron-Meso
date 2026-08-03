@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="Lift Daddy">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="manifest" href='data:application/manifest+json,{"name":"Lift Daddy","short_name":"Lift Daddy","display":"standalone","background_color":"%230B0E14","theme_color":"%230B0E14","start_url":".","icons":[{"src":"icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},{"src":"icon-512.png","sizes":"512x512","type":"image/png","purpose":"any"},{"src":"icon-192-maskable.png","sizes":"192x192","type":"image/png","purpose":"maskable"},{"src":"icon-512-maskable.png","sizes":"512x512","type":"image/png","purpose":"maskable"}]}'>
-<title>Lift Daddy — Mesocycle Training Log</title>
+<title>Lift Daddy — Training Log</title>
 <style>
 /* ============================================================
    LIFT DADDY — design tokens
@@ -32,9 +32,16 @@
   --tap:52px;
 }
 [data-theme="light"]{
-  --bg:#F2F4F8; --surface:#FFFFFF; --raised:#FFFFFF; --line:#DDE3EC;
-  --text:#141A26; --muted:#5B667A; --faint:#93A0B5;
-  --shadow:0 6px 20px rgba(20,30,50,.10);
+  /* Peach brand treatment: cream canvas, white cards, coral accent */
+  --bg:#FFF4EA; --surface:#FFFFFF; --raised:#FFF9F2; --line:#F3DFCE;
+  --accent:#FF7A6E; --accent-soft:rgba(255,122,110,.15);
+  --text:#3A2E2A; --muted:#8A7466; --faint:#C4AD98;
+  --shadow:0 6px 20px rgba(211,148,118,.18);
+  --cyan:#2BBFB3; --green:#34B87E; --amber:#E8A62E; --red:#E85472;
+}
+[data-theme="dark"]{
+  /* Consistent dark: coral accent to match the brand, same surfaces */
+  --accent:#FF7A6E; --accent-soft:rgba(255,122,110,.14);
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0}
@@ -367,7 +374,7 @@ const STARTER_CARDIO=[
 STARTER_EXERCISES.push(...STARTER_CARDIO);
 
 /* ---------------- storage ---------------- */
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 /** Sequential migrations: MIGRATIONS[n] upgrades a state at version n to n+1. */
 const MIGRATIONS = {
   1: st => {              // v1 -> v2: guarantee arrays/fields added after launch
@@ -389,6 +396,10 @@ const MIGRATIONS = {
     st.profile ??= {gender:"", age:null, weightKg:null, heightCm:null, experience:"", goals:"", setupDismissed:false};
     // ensure any cardio exercises created before this version are tagged
     (st.exercises||[]).forEach(e=>{ if(e.muscle==="Cardio") e.cardio=true; });
+    return st;
+  },
+  5: st => {              // v5 -> v6: Serious/Fun mode
+    st.settings.mode ??= "fun";
     return st;
   },
 };
@@ -440,10 +451,11 @@ class StorageManager{
     return {
       version:SCHEMA_VERSION,
       settings:{
-        unit:"kg", theme:"dark", restDefault:150,
+        unit:"kg", theme:"light", restDefault:150,
         incUpper:2.5, incLower:5, incUpperSmall:1, incLowerSmall:2.5,
         backoffPct:5, backupEvery:7, lastBackup:null,
         maxHR:null, age:null,
+        mode:"fun",           // "fun" (default) | "serious"
       },
       profile:{gender:"", age:null, weightKg:null, heightCm:null, experience:"", goals:"", setupDismissed:false},
       exercises:[...STARTER_EXERCISES],
@@ -460,6 +472,7 @@ class StorageManager{
       const have=new Set(st.exercises.map(e=>e.id));
       STARTER_EXERCISES.forEach(e=>{ if(!have.has(e.id)) st.exercises.push(e); });
       st.profile ??= {gender:"", age:null, weightKg:null, heightCm:null, experience:"", goals:"", setupDismissed:false};
+      st.settings.mode ??= "fun";
       return Object.assign(this.defaults(), st,
         {settings:Object.assign(this.defaults().settings, st.settings||{})});
     }catch(e){
@@ -649,6 +662,71 @@ function zoneRowsHTML(zm){
 
 /* ---------------- domain queries ---------------- */
 function exById(id){ return S().exercises.find(e=>e.id===id); }
+/* ---------------- Serious / Fun mode ----------------
+   Fun (default): plain language, feel scale instead of RIR, encouragement.
+   Serious: full RIR + training jargon, no emojis or motivation.
+   The progression engine always works in RIR internally; Fun mode only
+   changes what the user sees. */
+const FUN=()=>S().settings.mode!=="serious";
+const TERMS={
+  meso:["plan","mesocycle"], Meso:["Plan","Mesocycle"], Mesos:["Plans","Mesocycles"],
+  mesoNav:["Plans","Mesos"],
+  deload:["recovery week","deload"], Deload:["Recovery","Deload"],
+  rirHead:["Feel","RIR"], tonnage:["total lifted","tonnage"],
+};
+function term(k){ return TERMS[k][FUN()?0:1]; }
+/* Feel scale: 4 levels mapping onto RIR (engine unchanged underneath). */
+const FEELS=[[4,"\u{1F60C} Easy"],[3,"\u{1F62E}\u200D\u{1F4A8} Comfortable"],[2,"\u{1F4AA} Challenging"],[0,"\u{1F525} All-out"]];
+function feelBucket(rir){ return rir>=4?4 : rir===3?3 : rir>=1?2 : 0; }
+function feelLabel(rir){ return (FEELS.find(f=>f[0]===feelBucket(rir))||FEELS[2])[1]; }
+function feelWord(rir){ return feelLabel(rir).replace(/^[^ ]+ /,""); }   // no emoji
+/** RIR/feel fragment for target strings: "@2RIR" vs "Challenging". */
+function rirTxt(rir){ return FUN()? feelWord(rir) : `@${rir}RIR`; }
+
+/* ---------------- Fun-mode celebration layer ----------------
+   Light-touch: one fun fact + one encouragement after a finished workout,
+   tiny toasts for genuinely notable moments (PRs, extra reps). Serious mode
+   gets none of this. */
+const FUN_WEIGHTS=[   // [name, kg, emoji] — used for "you lifted N of these"
+  ["beagles",10,"🐶"],["bowling balls",7,"🎳"],["house cats",4.5,"🐱"],
+  ["watermelons",9,"🍉"],["car tyres",11,"🛞"],["gold bars",12.4,"🥇"],
+  ["corgis",12,"🐕"],["microwaves",13,"📦"],["koalas",12,"🐨"],
+  ["kegs of beer",58,"🍺"],["red kangaroos",85,"🦘"],["washing machines",70,"🧺"],
+  ["baby elephants",120,"🐘"],["giant pandas",110,"🐼"],["reindeer",150,"🦌"],
+  ["vending machines",300,"🥤"],["grand pianos",340,"🎹"],["grizzly bears",270,"🐻"],
+  ["motorbikes",200,"🏍️"],["dairy cows",680,"🐄"],["polar bears",450,"🐻‍❄️"],
+  ["horses",500,"🐴"],["small cars",1200,"🚗"],["hippos",1500,"🦛"],
+  ["giraffes",900,"🦒"],["great white sharks",1100,"🦈"],["walruses",1000,"🦭"],
+  ["T-rexes",7000,"🦖"],["fire trucks",17000,"🚒"],["humpback whales",30000,"🐋"],
+];
+const FUN_CHEERS=[
+  "Strong work today 💪","Future you says thank you 💖","That's how it's done ✨",
+  "You showed up — that's the whole game 🌟","Certified gym cutie behaviour 💅",
+  "Muscles: under construction 🚧","Look at you go 🥰","Consistency looks good on you 😌",
+  "Another brick in the wall 🧱","Your couch misses you. Too bad 😤","Team strong girl summer 🌞",
+  "Deposit made to the gains account 🏦","Quietly becoming unstoppable 🔥","Nailed it 🎯",
+];
+function funFact(totalKg){
+  if(!(totalKg>0)) return "";
+  const opts=FUN_WEIGHTS.map(([n,kg,em])=>({n,em,count:totalKg/kg}))
+    .filter(o=>o.count>=1.5 && o.count<=400);
+  if(!opts.length) return "";
+  const pick=opts[Math.floor(Math.random()*opts.length)];
+  return `You lifted <b class="num">${Math.round(totalKg).toLocaleString()} kg</b> today — that's like <b class="num">${Math.round(pick.count)}</b> ${pick.n} ${pick.em}`;
+}
+function cheerLine(){ return FUN_CHEERS[Math.floor(Math.random()*FUN_CHEERS.length)]; }
+/** Post-workout celebration (Fun mode): fact + cheer, then home. */
+function celebrate(log){
+  const tot=log.exercises.reduce((t,e)=>t+e.sets.reduce((a,x)=>a+x.kg*x.reps,0),0);
+  const fact=funFact(tot);
+  modal(`<div style="text-align:center;padding:6px 2px">
+    <div style="font-size:44px">🎉</div>
+    <h2 style="margin-top:6px">Workout done!</h2>
+    ${fact?`<p style="margin:12px 0 0;font-size:16px">${fact}</p>`:""}
+    <p class="muted" style="margin:10px 0 0">${cheerLine()}</p>
+    <button class="btn btn-primary btn-block" style="margin-top:18px" data-ok>Yay</button>
+  </div>`, m=>{ m.onclick=e=>{ if(e.target.closest("[data-ok]")){ closeModal(); go("home"); } }; });
+}
 function isCardioEx(id){ const e=exById(id); return !!(e && (e.cardio || e.muscle==="Cardio")); }
 function mesoById(id){ return S().mesocycles.find(m=>m.id===id); }
 function activeMeso(){ return mesoById(S().activeMesoId); }
@@ -927,7 +1005,7 @@ window.addEventListener("popstate", e=>{
   // else: we're at home base and user pressed back again → allow default (exit)
 });
 function renderNav(){
-  const tabs=[["home","⌂","Home"],["mesos","▤","Mesos"],["workout","▶","Train"],["calendar","▦","History"],["exercises","≡","Ex"],["analytics","∿","Stats"],["settings","⚙","More"]];
+  const tabs=[["home","⌂","Home"],["mesos","▤",term("mesoNav")],["workout","▶","Train"],["calendar","▦","History"],["exercises","≡","Ex"],["analytics","∿","Stats"],["settings","⚙","More"]];
   $("#nav").innerHTML=tabs.map(([id,ic,lb])=>
     `<button class="${currentView===id?"active":""}" data-go="${id}" aria-label="${lb}" ${currentView===id?'aria-current="page"':""}><span class="ic" aria-hidden="true">${ic}</span>${lb}</button>`).join("");
   $$("#nav button").forEach(b=>b.onclick=()=>go(b.dataset.go));
@@ -966,8 +1044,8 @@ VIEWS.home=function(){
   const bw=st.bodyweight.slice(-14);
   let mesoCard;
   if(!meso){
-    mesoCard=`<div class="card"><div class="kicker">Mesocycle</div>
-      <h3>No active mesocycle</h3>
+    mesoCard=`<div class="card"><div class="kicker">${term("Meso")}</div>
+      <h3>No active ${term("meso")}</h3>
       <p class="muted">Build a block to unlock progression tracking.</p>
       <button class="btn btn-primary btn-block" data-act="newmeso" style="margin-top:12px">Create mesocycle</button></div>`;
   } else {
@@ -979,7 +1057,7 @@ VIEWS.home=function(){
       return `<span class="${cls.join(" ")}"></span>`;
     }).join("");
     mesoCard=`<div class="card">
-      <div class="row split"><div class="kicker">Current mesocycle</div>
+      <div class="row split"><div class="kicker">Current ${term("meso")}</div>
         <span class="pill acc num">Week ${pos.week}/${meso.weeks}${isDeload(meso,pos.week)?" · Deload":""}</span></div>
       <h2>${esc(meso.name)}</h2>
       <div class="week-dots" style="margin:10px 0 14px">${dots}</div>
@@ -1005,7 +1083,7 @@ VIEWS.home=function(){
   $("#view").innerHTML=`
     <div class="topbar"><div><div class="brand">LIFT <em>DADDY</em></div>
       <div class="top-sub num">${new Date().toLocaleDateString(undefined,{weekday:"long", day:"numeric", month:"long"})}</div></div>
-      <span class="pill acc num">🔥 ${streakCount()}-workout streak</span></div>
+      <span class="pill acc num">${FUN()?"🔥 ":""}${streakCount()}-workout streak</span></div>
     ${st.activeSession? `<div class="card" style="border-color:var(--accent)">
         <div class="row split"><div><div class="kicker">In progress</div><h3>${esc(st.activeSession.dayName)}</h3></div>
         <button class="btn btn-primary" data-act="resume">Resume</button></div></div>`:""}
@@ -1131,7 +1209,7 @@ VIEWS.mesos=function(sub){
   if(sub==="new") return editMeso(null);
   const st=S();
   $("#view").innerHTML=`
-    <div class="topbar"><h1>Mesocycles</h1>
+    <div class="topbar"><h1>${term("Mesos")}</h1>
       <button class="btn btn-primary btn-sm" data-act="new">+ New</button></div>
     ${st.mesocycles.length? st.mesocycles.filter(m=>!m.archived).map(m=>{
       const pos=mesoPosition(m);
@@ -1139,7 +1217,7 @@ VIEWS.mesos=function(sub){
         <div class="grow"><div class="title">${esc(m.name)} ${m.id===st.activeMesoId?'<span class="pill acc">Active</span>':""}</div>
           <div class="muted num">${m.weeks} wks · ${m.days.length} days/wk · ${m.split}${m.deload?" · deload":""} · ${pos.done}/${pos.total} done</div></div>
         <button class="iconbtn" data-menu="${m.id}" aria-label="Mesocycle options">⋯</button></div>`;
-    }).join(""):`<div class="empty">No mesocycles yet.<br>Build your first training block.</div>`}
+    }).join(""):`<div class="empty">No ${term("Mesos").toLowerCase()} yet.<br>Build your first training block.</div>`}
     ${st.mesocycles.some(m=>m.archived)? `<h3 style="margin:18px 2px 10px;color:var(--faint)">Archived</h3>`+
       st.mesocycles.filter(m=>m.archived).map(m=>`<div class="listitem" style="opacity:.6" data-id="${m.id}">
         <div class="grow"><div class="title">${esc(m.name)}</div>
@@ -1167,19 +1245,20 @@ function mesoMenu(id){
       if(a==="activate"){ S().activeMesoId=id; Store.save(); toast("Active mesocycle set"); }
       if(a==="endmeso"){
         closeModal();
-        modal(`<h2 style="color:var(--red)">End this mesocycle?</h2>
-          <p class="muted">It will be archived and deactivated. All logged workouts are kept. Type <b>END MESO</b> to confirm.</p>
-          <input id="endconf" placeholder="END MESO" autocomplete="off" style="margin-top:10px">
-          <button class="btn btn-danger btn-block" style="margin-top:14px" data-endok>End mesocycle</button>`, mm=>{
+        modal(`<h2 style="color:var(--red)">End this ${term("meso")}?</h2>
+          <p class="muted">It will be archived and deactivated. All logged workouts are kept. Type <b>END ${FUN()?"PLAN":"MESO"}</b> to confirm.</p>
+          <input id="endconf" placeholder="END ${FUN()?"PLAN":"MESO"}" autocomplete="off" style="margin-top:10px">
+          <button class="btn btn-danger btn-block" style="margin-top:14px" data-endok>End ${term("meso")}</button>`, mm=>{
           mm.onclick=ev=>{
             if(!ev.target.closest("[data-endok]")) return;
-            if($("#endconf",mm).value.trim().toUpperCase()!=="END MESO"){ toast("Type END MESO to confirm"); return; }
+            const phrase=$("#endconf",mm).value.trim().toUpperCase();
+            if(phrase!=="END MESO" && phrase!=="END PLAN"){ toast(`Type END ${FUN()?"PLAN":"MESO"} to confirm`); return; }
             m.archived=true;
             S().activeMesoId=null;
             if(S().activeSession?.mesoId===id) S().activeSession=null;
             if(S().editSession?.mesoId===id) S().editSession=null;
             Store.save(); Store.flush();
-            closeModal(); toast("Mesocycle ended — workouts kept"); go("mesos");
+            closeModal(); toast(`${term("Meso")} ended — workouts kept`); go("mesos");
           };
         });
         return;
@@ -1196,7 +1275,7 @@ function mesoMenu(id){
         aEl.download=`meso-${m.name.replace(/\W+/g,"-")}.json`; aEl.click();
       }
       if(a==="del"){
-        if(confirm("Delete this mesocycle? Logged workouts are kept.")){
+        if(confirm(`Delete this ${term("meso")}? Logged workouts are kept.`)){
           S().mesocycles=S().mesocycles.filter(x=>x.id!==id);
           if(S().activeMesoId===id) S().activeMesoId=null;
           Store.save();
@@ -1229,7 +1308,7 @@ function editMeso(id){
   function render(){
     $("#view").innerHTML=`
       <div class="topbar"><button class="iconbtn" data-a="back" aria-label="Back">‹</button>
-        <div style="flex:1;margin-left:10px"><h2>${isNew?"New mesocycle":"Edit mesocycle"}</h2>
+        <div style="flex:1;margin-left:10px"><h2>${isNew?`New ${term("meso")}`:`Edit ${term("meso")}`}</h2>
           <div class="faint">Saves automatically</div></div>
         <button class="btn btn-primary btn-sm" data-a="save">Done</button></div>
       <div class="card">
@@ -1239,10 +1318,10 @@ function editMeso(id){
           <div><label>Split</label><select id="msplit">${Object.keys(SPLITS).map(s=>`<option ${m.split===s?"selected":""}>${s}</option>`).join("")}</select></div>
         </div>
         <label style="display:flex;align-items:center;gap:10px;text-transform:none;font-size:15px;margin-top:16px">
-          <input type="checkbox" id="mdeload" style="width:22px;height:22px" ${m.deload?"checked":""}> Final week is a deload</label>
+          <input type="checkbox" id="mdeload" style="width:22px;height:22px" ${m.deload?"checked":""}> Final week is a ${term("deload")}</label>
         <label style="display:flex;align-items:center;gap:10px;text-transform:none;font-size:15px;margin-top:12px">
           <input type="checkbox" id="mramp" style="width:22px;height:22px" ${m.rampSets?"checked":""}> Volume ramp — add one set per exercise each week (caps at +2, deload resets)</label>
-        <label>Mesocycle notes</label><textarea id="mnotes" rows="2" placeholder="Goals, focus, cues…">${esc(m.notes||"")}</textarea>
+        <label>${term("Meso")} notes</label><textarea id="mnotes" rows="2" placeholder="Goals, focus, cues…">${esc(m.notes||"")}</textarea>
       </div>
       <div class="row split" style="margin:6px 2px 10px"><h3>Training days</h3>
         <button class="btn btn-ghost btn-sm" data-a="addday">+ Day</button></div>
@@ -1264,7 +1343,7 @@ function editMeso(id){
           const ex=exById(x.exerciseId);
           const cardio=x.cardio || isCardioEx(x.exerciseId);
           const meta=cardio? `${x.minutes||20} min${x.targetHR?` · target ${x.targetHR}bpm`:""}${x.notes?" · "+esc(x.notes):""}`
-                           : `${x.sets}×${x.reps} @${x.rir}RIR · rest ${x.rest}s${x.notes?" · "+esc(x.notes):""}`;
+                           : `${x.sets}×${x.reps} · ${rirTxt(x.rir)} · rest ${x.rest}s${x.notes?" · "+esc(x.notes):""}`;
           return `<div class="setline dragrow" draggable="true" data-ex="${di}:${xi}">
             <span class="draghandle">⠿</span>
             <div class="grow" style="flex:1;min-width:0">
@@ -1332,10 +1411,10 @@ function editMeso(id){
       if(!t) return;
       if(t.dataset.a==="back"||t.dataset.a==="save"){
         const nm=$("#mname")?.value.trim()||"";
-        if(!nm){ toast("Give the mesocycle a name"); $("#mname")?.focus(); return; }
+        if(!nm){ toast(`Give the ${term("meso")} a name`); $("#mname")?.focus(); return; }
         if(nameExists(S().mesocycles, nm, m.id)){
-          toast("A mesocycle with that name already exists"); $("#mname")?.focus(); return; }
-        autosave(); toast("Mesocycle saved"); go("mesos"); return;
+          toast(`A ${term("meso")} with that name already exists`); $("#mname")?.focus(); return; }
+        autosave(); toast(`${term("Meso")} saved`); go("mesos"); return;
       }
       if(t.dataset.a==="addday"){ collectBasics(); m.days.push({id:uid(),name:"Day "+(m.days.length+1),exercises:[]}); Store.save(); render(); return; }
       if(t.dataset.deld!=null){ collectBasics(); if(confirm("Remove this day?")){ m.days.splice(+t.dataset.deld,1); Store.save(); render(); } return; }
@@ -1358,7 +1437,7 @@ function editSlot(slot, done){
   const ex=exById(slot.exerciseId);
   const cardio=slot.cardio || isCardioEx(slot.exerciseId);
   if(cardio){
-    modal(`<h2>🫀 ${esc(ex.name)}</h2>
+    modal(`<h2>${FUN()?"🫀 ":""}${esc(ex.name)}</h2>
       <div class="grid2">
         <div><label>Target minutes</label><input id="cm" type="number" min="1" value="${slot.minutes||20}"></div>
         <div><label>Target HR (optional)</label><input id="ch" type="number" min="60" max="220" value="${slot.targetHR||""}" placeholder="e.g. 140"></div>
@@ -1379,7 +1458,9 @@ function editSlot(slot, done){
     <div class="grid3">
       <div><label>Sets</label><input id="ss" type="number" min="1" value="${slot.sets}"></div>
       <div><label>Reps</label><input id="sr" type="number" min="1" value="${slot.reps}"></div>
-      <div><label>RIR</label><input id="si" type="number" min="0" max="5" value="${slot.rir}"></div>
+      <div><label>${term("rirHead")}</label>${FUN()
+        ? `<select id="si">${FEELS.map(([v,lb])=>`<option value="${v}" ${feelBucket(slot.rir)===v?"selected":""}>${lb}</option>`).join("")}</select>`
+        : `<input id="si" type="number" min="0" max="5" value="${slot.rir}">`}</div>
     </div>
     <label>Rest (seconds)</label><input id="st" type="number" min="0" step="15" value="${slot.rest}">
     <label>Notes</label><input id="sn" value="${esc(slot.notes||"")}" placeholder="Tempo, grip, cue…">
@@ -1558,12 +1639,12 @@ VIEWS.workout=function(){
   if(!st.activeSession){
     const meso=activeMeso();
     if(!meso){ $("#view").innerHTML=`<div class="topbar"><h1>Train</h1></div>
-      <div class="empty">No active mesocycle.<br><br><button class="btn btn-primary" onclick="go('mesos','new')">Create one</button></div>`; return; }
+      <div class="empty">No active ${term("meso")}.<br><br><button class="btn btn-primary" onclick="go('mesos','new')">Create one</button></div>`; return; }
     const pos=mesoPosition(meso);
     if(!pos.day){ $("#view").innerHTML=`<div class="topbar"><h1>Train</h1></div>
-      <div class="empty">This mesocycle has no training days yet.<br><br><button class="btn btn-primary" onclick="go('mesos')">Edit mesocycle</button></div>`; return; }
+      <div class="empty">This ${term("meso")} has no training days yet.<br><br><button class="btn btn-primary" onclick="go('mesos')">Edit</button></div>`; return; }
     if(pos.finished){ $("#view").innerHTML=`<div class="topbar"><h1>Train</h1></div>
-      <div class="empty">Mesocycle complete 🎉<br>Duplicate it from the Mesos tab to keep going.</div>`; return; }
+      <div class="empty">${term("Meso")} complete${FUN()?" 🎉":""}<br>Duplicate it from the ${term("mesoNav")} tab to keep going.</div>`; return; }
     const deload=isDeload(meso,pos.week);
     st.activeSession={
       id:uid(), mesoId:meso.id, week:pos.week, dayIdx:pos.dayIdx, dayId:pos.day.id, dayName:pos.day.name,
@@ -1583,7 +1664,7 @@ VIEWS.workout=function(){
         if(deload){ nSets=Math.max(1, Math.ceil(slot.sets/2)); if(sug) kg=Math.round((sug.lastKg*0.6)/wStep())*wStep(); }
         return {slotId:slot.id, exerciseId:slot.exerciseId,
           target:{sets:nSets, reps:slot.reps, rir:slot.rir, rest:slot.rest, notes:slot.notes},
-          suggestion: deload&&sug? {...sug, kg, diff:kg-sug.lastKg, reason:"Deload — ~60% load, half the sets."} : sug,
+          suggestion: deload&&sug? {...sug, kg, diff:kg-sug.lastKg, reason:FUN()?"Recovery week — lighter and shorter on purpose.":"Deload — ~60% load, half the sets."} : sug,
           notes:"", skipped:false, rowsReady:true,
           sets:buildGhostRows(slot.exerciseId, nSets, kg, slot.reps, slot.rir, sug, deload)};
       })
@@ -1611,14 +1692,14 @@ function exCardHTML(ses, xi){
   <div class="card excard ${allDone?"done-card":""} ${ses.skipped?"skipped-card":""}" data-card="${xi}">
     <div class="exhead">
       <div><div class="exname">${esc(ex.name)}</div>
-        <div class="exsub num">${esc(ex.equipment)} · target ${t.sets}×${t.reps} @${t.rir}RIR · ${doneN}/${ses.sets.length} sets${ses.skipped?" · skipped":""}</div></div>
+        <div class="exsub num">${esc(ex.equipment)} · target ${t.sets}×${t.reps} · ${rirTxt(t.rir)} · ${doneN}/${ses.sets.length} sets${ses.skipped?" · skipped":""}</div></div>
       <button class="iconbtn" data-exmenu="${xi}" aria-label="Exercise options">⋯</button>
     </div>
     ${t.notes?`<div class="pinned"><span aria-hidden="true">📌</span>${esc(t.notes)}</div>`:""}
     ${ses._edit? "" : sug? `<div class="sugline num"><b>${dispW(sug.kg)}–${dispW(sug.kg+wStep()*2)}${unitLabel()}</b> · last ${sug.lastSummary} · ${sug.reason}</div>`
-         : `<div class="faint" style="margin:6px 0 0">First time — find your ${t.reps}-rep @${t.rir}RIR load.</div>`}
+         : `<div class="faint" style="margin:6px 0 0">${FUN()?`First time — find a weight where ${t.reps} reps feels ${feelWord(t.rir).toLowerCase()}.`:`First time — find your ${t.reps}-rep @${t.rir}RIR load.`}</div>`}
     <div class="setgrid" data-grid="${xi}">
-      <span></span><span class="h">Weight (${unitLabel()})</span><span class="h">Reps</span><span class="h">RIR</span><span class="h">Log</span>
+      <span></span><span class="h">Weight (${unitLabel()})</span><span class="h">Reps</span><span class="h">${term("rirHead")}</span><span class="h">Log</span>
       ${ses.sets.map((x,si)=>setRowHTML(ses,xi,x,si)).join("")}
     </div>
     <button class="addset" data-addset="${xi}">+ Add set</button>
@@ -1630,7 +1711,7 @@ function cardioCardHTML(ses, xi, ex){
   return `${muscleTagHTML("Cardio")}
   <div class="card excard cardio-card ${done?"done-card":""} ${ses.skipped?"skipped-card":""}" data-card="${xi}">
     <div class="exhead">
-      <div><div class="exname">🫀 ${esc(ex.name)}</div>
+      <div><div class="exname">${FUN()?"🫀 ":""}${esc(ex.name)}</div>
         <div class="exsub num">Cardio · target ${t.minutes} min${t.targetHR?` @ ${t.targetHR}bpm`:""}${done?" · logged":""}</div></div>
       <button class="iconbtn" data-exmenu="${xi}" aria-label="Exercise options">⋯</button>
     </div>
@@ -1657,8 +1738,10 @@ function setRowHTML(ses, xi, x, si){
   return `<button class="sn" data-setmenu="${id}" aria-label="Set ${si+1} options"><span class="dots">⋮</span>${si+1}</button>
     <input type="number" inputmode="decimal" step="any" value="${show?dispW(x.kg):""}" placeholder="${dispW(x.kg)}" data-f="kg" data-set="${id}" aria-label="Set ${si+1} weight, expected ${dispW(x.kg)}">
     <input type="number" inputmode="numeric" value="${show?x.reps:""}" placeholder="${x.reps}" data-f="reps" data-set="${id}" aria-label="Set ${si+1} reps, expected ${x.reps}">
-    <select data-f="rir" data-set="${id}" aria-label="Set ${si+1} reps in reserve">
-      ${[0,1,2,3,4,5].map(r=>`<option value="${r}" ${x.rir===r?"selected":""}>${r}</option>`).join("")}
+    <select data-f="rir" data-set="${id}" aria-label="${FUN()?`Set ${si+1} feel`:`Set ${si+1} reps in reserve`}">
+      ${FUN()
+        ? FEELS.map(([v,lb])=>`<option value="${v}" ${feelBucket(x.rir)===v?"selected":""}>${lb}</option>`).join("")
+        : [0,1,2,3,4,5].map(r=>`<option value="${r}" ${x.rir===r?"selected":""}>${r}</option>`).join("")}
     </select>
     <button class="chk ${x.done?"on":""}" data-chk="${id}" aria-label="Log set ${si+1}" aria-pressed="${x.done}">${x.done?"✓":""}</button>`;
 }
@@ -1674,7 +1757,7 @@ function renderWorkout(){
     <div class="topbar">
       <button style="text-align:left" data-a="picker" aria-label="Choose another workout in this mesocycle">
         <h1 style="letter-spacing:.01em">${edit?'<span style="color:var(--amber)">EDITING</span> ':""}WEEK ${s.week} <span style="color:var(--faint)">DAY ${ (s.dayIdx??0)+1 } ▾</span></h1>
-        <div class="top-sub">${esc(s.dayName)} · ${edit? fmtDate(s.date) : esc(s.mesoName||"")}${s.deload?" · Deload":""}</div>
+        <div class="top-sub">${esc(s.dayName)} · ${edit? fmtDate(s.date) : esc(s.mesoName||"")}${s.deload?` · ${term("Deload")}`:""}</div>
       </button>
       <div class="row">
         <button class="iconbtn" data-a="wnotes" aria-label="Workout notes">✎</button>
@@ -1698,7 +1781,7 @@ function renderWorkout(){
 /** Modal listing every workout in the active meso: past (editable), current, upcoming. */
 function workoutPicker(){
   const meso=activeMeso();
-  if(!meso || !meso.days.length){ toast("No active mesocycle"); return; }
+  if(!meso || !meso.days.length){ toast(`No active ${term("meso")}`); return; }
   const logs=S().logs.filter(l=>l.mesoId===meso.id);
   const nDays=meso.days.length;
   let rows="";
@@ -1717,15 +1800,17 @@ function workoutPicker(){
         <div class="grow"><div class="title num">W${wk} · ${esc(day.name)}</div>
         <div class="faint">Current workout</div></div><span class="pill acc">Now</span></div>`;
     } else {
-      rows+=`<div class="listitem" style="padding:10px 14px;margin-bottom:8px;opacity:.45">
+      rows+=`<div class="listitem" data-pv="${di}" data-pw="${wk}" style="padding:10px 14px;margin-bottom:8px;opacity:.55">
         <div class="grow"><div class="title num">W${wk} · ${esc(day.name)}</div>
-        <div class="faint">Upcoming</div></div></div>`;
+        <div class="faint">Upcoming — tap to preview</div></div><span class="pill">🔒</span></div>`;
     }
   }
   modal(`<h2>${esc(meso.name)}</h2>
     <p class="muted">Tap a past workout to edit it — add anything you forgot. Your current workout is untouched.</p>
     <div style="max-height:60vh;overflow:auto;margin-top:10px">${rows}</div>`, m=>{
     m.onclick=e=>{
+      const pv=e.target.closest("[data-pv]");
+      if(pv){ closeModal(); previewDay(meso, +pv.dataset.pv, +pv.dataset.pw); return; }
       const dl=e.target.closest("[data-dellog]");
       if(dl){ closeModal(); confirmDeleteLog(dl.dataset.dellog); return; }
       const el=e.target.closest("[data-editlog]");
@@ -1857,6 +1942,15 @@ function bindWorkout(){
       const [xi,si]=chk.dataset.chk.split(":").map(Number);
       const ses=s.exercises[xi], set=ses.sets[si];
       set.done=!set.done;
+      if(set.done && !edit && FUN()){
+        // PR? compare this set's e1RM against all history for the exercise
+        try{
+          const hist=exerciseHistory(ses.exerciseId);
+          const best=hist.length? Math.max(...hist.map(x=>x.e1rm)):0;
+          if(best>0 && epley(set.kg,set.reps)>best) maybeCelebrate("pr", ses);
+          else if(set.expReps && set.reps>set.expReps) maybeCelebrate("beat", ses);
+        }catch(_){}
+      }
       set.at=set.done? Date.now():null;
       if(set.done){
         set.touched=true;                                  // logged values render solid
@@ -2212,7 +2306,21 @@ function startRest(sec){
 }
 function stopRest(){ clearInterval(restInterval); restInterval=null; const b=$("#restbox"); if(b) b.innerHTML=""; }
 
-function maybeCelebrate(kind, ses){ /* micro-feedback hook — implemented with Fun mode */ }
+function maybeCelebrate(kind, ses, extra){
+  if(!FUN()) return;
+  const s=S().activeSession; if(!s) return;
+  s._cheered ??= {};
+  if(kind==="cardio" && !s._cheered.cardio){
+    s._cheered.cardio=1; toast("Cardio in the bank 🫀"); return;
+  }
+  if(kind==="pr" && !s._cheered["pr_"+ses.exerciseId]){
+    s._cheered["pr_"+ses.exerciseId]=1;
+    toast(`New PR on ${exById(ses.exerciseId)?.name||"that lift"}! 🎉`); return;
+  }
+  if(kind==="beat" && !s._cheered.beat){
+    s._cheered.beat=1; toast("Extra reps! Sneaky strong 💪"); return;
+  }
+}
 function finishWorkout(){
   const s=S().activeSession;
   if(!s) return go("home");
@@ -2257,7 +2365,7 @@ function finishWorkout(){
   S().activeSession=null;
   Store.save(); Store.flush();          // workout completion is critical — write now
   if(logged.length) feedbackSurvey(log);
-  else { toast("Cardio logged 🫀"); go("home"); }
+  else { toast(FUN()?"Cardio logged 🫀":"Cardio logged"); go("home"); }
 }
 /** Post-workout survey feeding the progression modifier. */
 function feedbackSurvey(log){
@@ -2265,7 +2373,7 @@ function feedbackSurvey(log){
     ["motivation","Motivation today?"],["sleep","Sleep last night?"],
     ["jointPain","Joint pain?"],["fatigue","Overall fatigue?"]];
   const ans={};
-  modal(`<h2>Workout complete 💪</h2>
+  modal(`<h2>Workout complete${FUN()?" 💪":""}</h2>
     <p class="muted num">${log.exercises.reduce((t,e)=>t+e.sets.length,0)} sets · ${log.durationMin} min. Quick check-in — this tunes next week's suggestions.</p>
     ${Qs.map(([k,q])=>`<label>${q}</label><div class="rirrow" data-q="${k}">
       ${[1,2,3,4,5].map(v=>`<button class="rirchip" data-v="${v}">${v}</button>`).join("")}</div>`).join("")}
@@ -2279,9 +2387,11 @@ function feedbackSurvey(log){
       if(e.target.closest("[data-done]")){
         S().feedback.push(Object.assign({date:log.date, logId:log.id,
           difficulty:3,recovery:3,motivation:3,sleep:3,jointPain:1,fatigue:3}, ans));
-        Store.save(); closeModal(); go("home"); toast("Session saved");
+        Store.save(); closeModal();
+        if(FUN()) celebrate(log); else { go("home"); toast("Session saved"); }
       }
-      if(e.target.closest("[data-skip]")){ closeModal(); go("home"); toast("Session saved"); }
+      if(e.target.closest("[data-skip]")){ closeModal();
+        if(FUN()) celebrate(log); else { go("home"); toast("Session saved"); } }
     };
   });
 }
@@ -2318,7 +2428,7 @@ VIEWS.calendar=function(){
         <div class="faint">Current workout — tap to train</div></div><span class="pill acc">Now</span></div>
       ${Array.from({length:Math.min(3, pos.total-pos.done-1)},(_,k)=>{
         const i=pos.done+1+k, wk2=Math.floor(i/nDays)+1, day=meso.days[i%nDays];
-        return `<div class="listitem" data-preview="${i%nDays}" style="opacity:.6">
+        return `<div class="listitem" data-preview="${i%nDays}" data-pw="${wk2}" style="opacity:.6">
           <div class="grow"><div class="title num">W${wk2} · ${esc(day.name)}</div>
           <div class="faint">Locked until current workout is done — tap to preview</div></div>
           <span class="pill">🔒</span></div>`;
@@ -2343,19 +2453,35 @@ VIEWS.calendar=function(){
     }
     if(e.target.closest("[data-gocur]")){ if(S().editSession){S().editSession=null; Store.save();} go("workout"); return; }
     const pv=e.target.closest("[data-preview]");
-    if(pv){ previewDay(meso, +pv.dataset.preview); return; }
+    if(pv){ previewDay(meso, +pv.dataset.preview, pv.dataset.pw?+pv.dataset.pw:null); return; }
     const day=e.target.closest("[data-date]");
     if(day) dayModal(day.dataset.date, logsByDate[day.dataset.date]||[], cardioByDate[day.dataset.date]||[]);
   };
 };
 /** Read-only preview of a future workout's template. */
-function previewDay(meso, dayIdx){
+function previewDay(meso, dayIdx, week){
   const day=meso.days[dayIdx];
-  modal(`<h2>${esc(day.name)}</h2><p class="muted">Read-only — unlocks when your current workout is complete.</p>
+  const deload=week!=null && isDeload(meso, week);
+  modal(`<h2>${esc(day.name)}${week?` <span class="muted" style="font-weight:600">· W${week}</span>`:""}</h2>
+    <p class="muted">${deload? `${term("Deload")} — lighter on purpose. `:""}Read-only preview — unlocks when your current workout is done. Weights are projections from your progress and may shift.</p>
     <div class="stack" style="margin-top:12px">
       ${day.exercises.map(x=>{ const ex=exById(x.exerciseId);
+        if(x.cardio || isCardioEx(x.exerciseId))
+          return `<div class="setline num"><div class="grow" style="flex:1">${FUN()?"🫀 ":""}${esc(ex?ex.name:"?")}</div>
+            <span class="muted">${x.minutes||20} min${x.targetHR?` @ ${x.targetHR}bpm`:""}</span></div>`;
+        let nSets=x.sets + (meso.rampSets && week && !deload? Math.min(week-1,2):0);
+        let proj="";
+        try{
+          const sug=ProgressionEngine.suggest(x.exerciseId, x.reps, x.rir);
+          if(sug){
+            let kg=sug.kg;
+            if(deload){ kg=Math.round((sug.lastKg*0.6)/wStep())*wStep(); nSets=Math.max(1,Math.ceil(x.sets/2)); }
+            proj=` · ~${dispW(kg)}${unitLabel()}`;
+          }
+        }catch(_){}
         return `<div class="setline num"><div class="grow" style="flex:1">${esc(ex?ex.name:"?")}</div>
-          <span class="muted">${x.sets}×${x.reps} @${x.rir}RIR</span></div>`; }).join("")||`<div class="empty">No exercises</div>`}
+          <span class="muted">${nSets}×${x.reps} · ${rirTxt(x.rir)}${proj}</span></div>`;
+      }).join("")||`<div class="empty">No exercises</div>`}
     </div>`);
 }
 /** Day detail: open workouts for editing, view/delete cardio, delete workouts. */
@@ -2541,12 +2667,12 @@ VIEWS.analytics=function(){
         <div class="faint num">${meso? `${pos.done}/${pos.total} workouts${missed?` · <span style="color:var(--red)">${missed} missed</span>`:""}`:"workouts all time"}</div></div>
       <div class="card" style="margin-bottom:14px"><div class="kicker">Avg session</div>
         <div class="num" style="font-size:26px;font-weight:900">${logs.length?Math.round(logs.reduce((t,l)=>t+(l.durationMin||0),0)/logs.length):0}<small style="font-size:14px"> min</small></div>
-        <div class="faint num">🔥 ${streakCount()} streak</div></div>
+        <div class="faint num">${FUN()?"🔥 ":""}${streakCount()} streak</div></div>
     </div>
     ${meso? `
-    <div class="card"><div class="kicker">Weekly tonnage (kg)</div><canvas class="chart" id="mt"></canvas></div>
+    <div class="card"><div class="kicker">Weekly ${term("tonnage")} (kg)</div><canvas class="chart" id="mt"></canvas></div>
     <div class="card"><div class="kicker">Weekly sets</div><canvas class="chart" id="ms"></canvas></div>
-    <div class="card"><div class="kicker">Average RIR by week</div><canvas class="chart" id="mr"></canvas></div>
+    <div class="card"><div class="kicker">${FUN()?"Reps left in the tank (weekly avg)":"Average RIR by week"}</div><canvas class="chart" id="mr"></canvas></div>
     <div class="card"><div class="kicker">Sets per muscle · weekly target vs actual</div>
       <div class="stack" style="margin-top:8px">
         ${Object.keys(targetPerMuscle).sort((a,b)=>targetPerMuscle[b]-targetPerMuscle[a]).map(mg=>{
@@ -2560,12 +2686,12 @@ VIEWS.analytics=function(){
         }).join("")||`<div class="faint">No template targets</div>`}
       </div>
       <p class="faint" style="margin:8px 0 0">Colored = actual sets/week · gray = template target.</p></div>
-    ${prList.length? `<div class="card"><div class="kicker">PRs this meso</div>
+    ${prList.length? `<div class="card"><div class="kicker">PRs this ${term("meso")}</div>
       <div class="stack" style="margin-top:8px">${prList.slice(0,6).map(p=>
         `<div class="row split num"><span>${esc(p.name)}</span>
          <span class="pill grn">e1RM ${dispW(p.from)} → ${dispW(p.to)}${unitLabel()}</span></div>`).join("")}</div></div>`:""}
     `:""}
-    ${mesoStats.length>=2? `<div class="card"><div class="kicker">Mesocycle comparison</div>
+    ${mesoStats.length>=2? `<div class="card"><div class="kicker">${term("Meso")} comparison</div>
       <canvas class="chart" id="mc"></canvas>
       <div class="stack" style="margin-top:10px">${mesoStats.slice(-5).map(m=>
         `<div class="row split num"><span>${esc(m.name)}${m.archived?' <span class="faint">· archived</span>':""}</span>
@@ -2678,6 +2804,15 @@ VIEWS.settings=function(){
       </div>
       <label>Back-off when target missed (%)</label><input id="bo" type="number" min="0" max="20" value="${s.backoffPct}">
     </div>
+    <div class="card"><h3>App personality</h3>
+      <div class="row" style="gap:10px;margin-top:6px">
+        <button class="btn ${s.mode!=="serious"?"btn-primary":"btn-ghost"}" style="flex:1" data-mode="fun">Fun 🎀</button>
+        <button class="btn ${s.mode==="serious"?"btn-primary":"btn-ghost"}" style="flex:1" data-mode="serious">Serious</button>
+      </div>
+      <p class="faint" style="margin-top:10px">${s.mode==="serious"
+        ? "Full training jargon: RIR, mesocycles, deloads. No fluff."
+        : "Plain language, a feel scale instead of RIR, and a little encouragement. Your progression maths is identical in both."}</p>
+    </div>
     <div class="card"><h3>Your profile</h3>
       <p class="faint" style="margin:-4px 0 6px">Optional. Age and body metrics only feed cardio heart-rate zones — never your lifting progression.</p>
       <div class="grid2">
@@ -2710,7 +2845,7 @@ VIEWS.settings=function(){
       </div>
       <p class="faint" style="margin-top:10px">Everything is stored locally in this browser. Export regularly.</p>
     </div>
-    <p class="faint" style="text-align:center">Lift Daddy · offline mesocycle tracker</p>`;
+    <p class="faint" style="text-align:center">Lift Daddy · your pocket training buddy</p>`;
   const persist=()=>{
     s.unit=$("#unit").value; s.theme=$("#theme").value;
     s.restDefault=clamp(+$("#rest").value||0,0,900);
@@ -2734,6 +2869,8 @@ VIEWS.settings=function(){
   };
   $$("#view input, #view select").forEach(el=>el.onchange=persist);
   $("#view").onclick=e=>{
+    const md=e.target.closest("[data-mode]");
+    if(md){ s.mode=md.dataset.mode; Store.save(); go("settings"); renderNav(); return; }
     const a=e.target.closest("[data-a]")?.dataset.a; if(!a) return;
     if(a==="export") Store.download();
     if(a==="import"){
@@ -2747,7 +2884,7 @@ VIEWS.settings=function(){
               const c=parsed.meso; c.id=uid();
               c.days.forEach(d=>{d.id=uid(); d.exercises.forEach(x=>x.id=uid());});
               S().mesocycles.push(c); Store.save();
-              toast("Mesocycle imported"); go("mesos"); return;
+              toast(`${term("Meso")} imported`); go("mesos"); return;
             }
             if(!confirm("Importing a full backup replaces ALL current data. Continue?")) return;
             const verified=Store.import(r.result);
