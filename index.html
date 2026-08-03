@@ -2769,18 +2769,42 @@ function applyTheme(){ document.body.dataset.theme=S().settings.theme; }
 window.LiftDaddy=window.IronMeso={Store, ProgressionEngine, ChartManager, HistoryIndex, go, version:SCHEMA_VERSION};
 window.addEventListener("beforeunload", ()=>Store.flush());
 
-/* ---- PWA service worker: only possible when hosted (https/localhost).
-   From file:// the app is inherently offline already. ---- */
+/* ---- PWA service worker + auto-update (hosted https/localhost only).
+   The SW is network-first for the app shell, so a fresh deploy is fetched
+   whenever the user is online; when a new SW takes control we reload once so
+   the user always ends up on the latest build without clearing anything.
+   From file:// there is no SW and the file is already fully offline. ---- */
 if("serviceWorker" in navigator && /^https?:$/.test(location.protocol)
    && (location.protocol==="https:" || location.hostname==="localhost")){
-  try{
-    const swSrc=`self.addEventListener("install",e=>self.skipWaiting());
-self.addEventListener("activate",e=>self.clients.claim());
-self.addEventListener("fetch",e=>{ e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).then(res=>{const c=res.clone();caches.open("liftdaddy-v1").then(x=>x.put(e.request,c));return res;}).catch(()=>caches.match("./"))));});`;
-    // Blob-registration is rejected by browsers; only attempt when a real sw.js exists.
-    fetch("sw.js",{method:"HEAD"}).then(r=>{ if(r.ok) navigator.serviceWorker.register("sw.js"); }).catch(()=>{});
-    window.__swSource=swSrc;   // exposed so a hosted deployment can save it as sw.js
-  }catch(_){}
+  let _reloading=false;
+  // When the active SW changes (a new version took over), reload once.
+  navigator.serviceWorker.addEventListener("controllerchange", ()=>{
+    if(_reloading) return; _reloading=true;
+    location.reload();
+  });
+  const promote=reg=>{
+    const waiting=reg.waiting;
+    if(waiting){ toast("Updating to the latest version ✨"); waiting.postMessage("skipWaiting"); }
+  };
+  fetch("sw.js",{method:"HEAD"}).then(r=>{
+    if(!r.ok) return;                       // no sw.js deployed → skip silently
+    navigator.serviceWorker.register("sw.js").then(reg=>{
+      // If an update is already waiting at load, promote it.
+      if(reg.waiting) promote(reg);
+      // Watch for future updates found while the app is open.
+      reg.addEventListener("updatefound", ()=>{
+        const nw=reg.installing;
+        if(!nw) return;
+        nw.addEventListener("statechange", ()=>{
+          if(nw.state==="installed" && navigator.serviceWorker.controller) promote(reg);
+        });
+      });
+      // Proactively check for a new version on launch and when the app is refocused.
+      const check=()=>reg.update().catch(()=>{});
+      check();
+      document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) check(); });
+    }).catch(()=>{});
+  }).catch(()=>{});
 }
 
 /* ---- Single instance: if the app is opened again while a live instance
