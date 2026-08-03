@@ -32,12 +32,12 @@
   --tap:52px;
 }
 [data-theme="light"]{
-  /* Peach brand treatment: cream canvas, white cards, coral accent */
-  --bg:#FFF4EA; --surface:#FFFFFF; --raised:#FFF9F2; --line:#F3DFCE;
-  --accent:#FF7A6E; --accent-soft:rgba(255,122,110,.15);
-  --text:#3A2E2A; --muted:#8A7466; --faint:#C4AD98;
-  --shadow:0 6px 20px rgba(211,148,118,.18);
-  --cyan:#2BBFB3; --green:#34B87E; --amber:#E8A62E; --red:#E85472;
+  /* Clean neutral canvas with the coral brand accent (not a peach wash) */
+  --bg:#F2F4F8; --surface:#FFFFFF; --raised:#FFFFFF; --line:#DDE3EC;
+  --accent:#FF7A6E; --accent-soft:rgba(255,122,110,.14);
+  --text:#141A26; --muted:#5B667A; --faint:#93A0B5;
+  --shadow:0 6px 20px rgba(20,30,50,.10);
+  --cyan:#20B2A6; --green:#2FB574; --amber:#E0982A; --red:#E85472;
 }
 [data-theme="dark"]{
   /* Consistent dark: coral accent to match the brand, same surfaces */
@@ -234,6 +234,15 @@ canvas.chart{width:100%; height:180px; display:block}
 .excard.done-card{border-color:rgba(62,207,142,.35)}
 .excard.skipped-card{opacity:.5}
 .excard.cardio-card{border-color:rgba(83,221,208,.35)}
+#resttop{position:sticky; top:0; z-index:60}
+#resttop:empty{display:none}
+.rest-bar{display:flex; align-items:center; gap:12px; background:var(--accent);
+  color:#fff; padding:10px 16px; box-shadow:0 4px 14px rgba(0,0,0,.25);
+  padding-top:calc(10px + env(safe-area-inset-top))}
+.rest-bar .lbl{font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; opacity:.9}
+.rest-bar .t{font-size:22px; font-weight:900; font-variant-numeric:tabular-nums; margin-left:auto}
+.rest-bar button{color:#fff; font-weight:800; padding:6px 10px; border-radius:10px; background:rgba(255,255,255,.18)}
+.rest-bar button:active{background:rgba(255,255,255,.32)}
 .excard.cardio-card .exname{color:var(--cyan)}
 .excard.dragging{opacity:.55; outline:2px dashed var(--accent); outline-offset:2px}
 .excard.drop-before{box-shadow:0 -3px 0 0 var(--accent)}
@@ -273,6 +282,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 </style>
 </head>
 <body>
+<div id="resttop"></div>
 <div class="app" id="view"></div>
 <nav class="nav" id="nav"></nav>
 <div id="overlay"></div>
@@ -960,7 +970,7 @@ function go(view, ...args){
   const name=view.split("/")[0];
   if(!VIEWS[name]){ console.warn("Unknown view:", name); return; }
   currentView=name;
-  if(name!=="workout") stopRest();       // never leak a timer across views
+  // rest timer is global now and intentionally persists across views
   try{ window.scrollTo(0,0); }catch(_){}
   try{ VIEWS[name](...args); }
   catch(err){
@@ -975,34 +985,51 @@ function go(view, ...args){
 /** Keep a single synthetic history entry per non-home view, and a base entry
     for home, so the hardware back button maps to in-app navigation instead of
     closing the app on the first press. */
-let _histReady=false, _navigating=false;
+/* ---------------- Deterministic hardware back-button model ----------------
+   Exactly two conceptual states in the history stack:
+     • BASE   (level 0) — home. Pressing back here falls through to the OS
+       (which minimises/closes the installed app).
+     • DETAIL (level 1) — any non-home view. Pressing back pops to BASE → home.
+   We keep AT MOST one DETAIL entry no matter how many screens you visit, so
+   back is always a single, predictable hop to home. All navigation funnels
+   through syncHistory; a guard prevents popstate-driven nav from re-stacking. */
+let _histReady=false, _navigating=false, _atDetail=false;
 function syncHistory(name){
-  if(_navigating) return;               // don't stack entries during popstate-driven nav
+  if(_navigating) return;                       // popstate is driving; don't touch the stack
   try{
     if(!_histReady){
-      history.replaceState({view:name, base:true}, "");
-      _histReady=true;
-      return;
+      history.replaceState({lvl:0}, "");         // establish BASE once, on first render
+      _histReady=true; _atDetail=false;
     }
     if(name==="home"){
-      // collapse to a single base entry when returning home
-      history.replaceState({view:"home", base:true}, "");
+      if(_atDetail){                             // collapse back down to BASE
+        _navigating=true;
+        history.back();                          // pop the single DETAIL entry
+        _navigating=false;
+        _atDetail=false;
+      }
+      // already at BASE → nothing to do
     } else {
-      history.pushState({view:name}, "");
+      if(!_atDetail){                            // entering DETAIL from BASE: push ONE entry
+        history.pushState({lvl:1}, "");
+        _atDetail=true;
+      }
+      // moving DETAIL→DETAIL (e.g. Mesos→Stats): keep the single entry, no push
     }
   }catch(_){}
 }
-window.addEventListener("popstate", e=>{
-  const st=(e.state)||{};
-  if(currentView!=="home" || !st.base){
-    // Any back press that isn't already at home base → go home (don't close app)
+window.addEventListener("popstate", ()=>{
+  // A back-press popped an entry. If we were in a DETAIL view, that pop landed
+  // us on BASE → show home. If we were already at home/BASE, let it be (the OS
+  // handles closing; we don't re-push, so a second back exits).
+  if(_navigating) return;                        // our own history.back() above
+  if(_atDetail || currentView!=="home"){
+    _atDetail=false;
     _navigating=true;
-    // put a base entry back so the NEXT back press can exit
-    try{ history.replaceState({view:"home", base:true}, ""); }catch(_){}
-    go("home");
+    go("home");                                  // render home without touching history
     _navigating=false;
   }
-  // else: we're at home base and user pressed back again → allow default (exit)
+  // else: at BASE and user pressed back → default OS behaviour (close/minimise)
 });
 function renderNav(){
   const tabs=[["home","⌂","Home"],["mesos","▤",term("mesoNav")],["workout","▶","Train"],["calendar","▦","History"],["exercises","≡","Ex"],["analytics","∿","Stats"],["settings","⚙","More"]];
@@ -1774,7 +1801,7 @@ function renderWorkout(){
       <button class="btn btn-ghost" style="flex:1" data-a="addex">+ Add exercise</button>
       <button class="btn btn-primary" style="flex:2" data-a="finish">${edit?"Save changes":"Complete workout"}</button>
     </div>
-    <div id="restbox"></div>`;
+`;
   bindWorkout();
 }
 
@@ -2182,12 +2209,23 @@ function enableWorkoutSwipe(s){
         else toast("This is the first workout");
       } else if(mesoLogs.length) startLogEdit(mesoLogs[mesoLogs.length-1].id);
       else toast("No previous workouts yet");
-    } else {                                   // swipe left -> next
+    } else {                                   // swipe left -> next / peek ahead
       if(edit){
         const i=mesoLogs.findIndex(l=>l.id===s.logId);
         if(i<mesoLogs.length-1) startLogEdit(mesoLogs[i+1].id);
         else { S().editSession=null; Store.save(); go("workout"); }
-      } else toast("Finish this workout to unlock the next one");
+      } else {
+        // From the current workout, swiping forward shows the NEXT planned
+        // workout as a read-only preview (projected weights) — not editable.
+        const meso=activeMeso(), pos=meso? mesoPosition(meso):null;
+        if(meso && pos && !pos.finished){
+          const nDays=meso.days.length;
+          const nextI=pos.done+1;                 // the one after the current
+          if(nextI < pos.total){
+            previewDay(meso, nextI%nDays, Math.floor(nextI/nDays)+1);
+          } else toast(FUN()?"That's the last one in this plan":"End of mesocycle");
+        }
+      }
     }
   };
 }
@@ -2285,26 +2323,43 @@ function checkPR(exId, kg, reps){
   const best=Math.max(...prev.map(x=>x.e1rm));
   if(e1>best) toast(`🏆 New e1RM PR — ${dispW(e1)}${unitLabel()}!`, "pr");
 }
-function startRest(sec){
-  stopRest();
-  if(!sec) return;
-  let left=sec;
-  const draw=()=>{
-    const box=$("#restbox");             // re-query: the view may have re-rendered
-    if(!box) return stopRest();
-    box.innerHTML=`<div class="resttimer" role="timer" aria-label="Rest timer"><span class="muted">Rest</span>
-      <span class="t num">${Math.floor(left/60)}:${String(left%60).padStart(2,"0")}</span>
-      <button class="iconbtn" data-skip aria-label="Skip rest">✕</button></div>`;
-    $("[data-skip]",box).onclick=stopRest;
+/* Rest timer: persists across page changes and phone backgrounding by storing
+   an absolute end-time. The bar lives in #resttop (outside #view) so navigating
+   never destroys it; a single interval redraws from the wall clock, so even if
+   the OS suspends JS while backgrounded, on return it shows the true remaining
+   time (or fires completion) instead of a frozen count. */
+let _restEnd=0, _restFired=false;
+function renderRest(){
+  const box=$("#resttop"); if(!box) return;
+  if(!_restEnd){ box.innerHTML=""; return; }
+  const left=Math.round((_restEnd-Date.now())/1000);
+  if(left<=0){
+    box.innerHTML="";
+    if(!_restFired){ _restFired=true; toast("Rest over — go! 💪"); try{ navigator.vibrate?.(200); }catch(e){} }
+    _restEnd=0; clearInterval(restInterval); restInterval=null;
+    return;
+  }
+  box.innerHTML=`<div class="rest-bar" role="timer" aria-label="Rest timer">
+    <span class="lbl">Rest</span>
+    <button data-rest="add" aria-label="Add 30 seconds">+30s</button>
+    <span class="t">${Math.floor(left/60)}:${String(left%60).padStart(2,"0")}</span>
+    <button data-rest="skip" aria-label="Skip rest">Skip ✕</button></div>`;
+  const bar=box.querySelector(".rest-bar");
+  bar.onclick=e=>{ const a=e.target.closest("[data-rest]")?.dataset.rest;
+    if(a==="skip") stopRest();
+    if(a==="add"){ _restEnd+=30000; _restFired=false; renderRest(); }
   };
-  draw();
-  restInterval=setInterval(()=>{
-    left--;
-    if(left<=0){ stopRest(); toast("Rest over — go!"); try{ navigator.vibrate?.(200); }catch(e){} }
-    else draw();
-  },1000);
 }
-function stopRest(){ clearInterval(restInterval); restInterval=null; const b=$("#restbox"); if(b) b.innerHTML=""; }
+function startRest(sec){
+  clearInterval(restInterval); restInterval=null;
+  if(!sec){ _restEnd=0; renderRest(); return; }
+  _restEnd=Date.now()+sec*1000; _restFired=false;
+  renderRest();
+  restInterval=setInterval(renderRest, 500);   // 500ms keeps it smooth without drift
+}
+function stopRest(){ clearInterval(restInterval); restInterval=null; _restEnd=0; _restFired=false; renderRest(); }
+// Re-sync the moment the app is refocused (JS may have been suspended while backgrounded)
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && _restEnd) renderRest(); });
 
 function maybeCelebrate(kind, ses, extra){
   if(!FUN()) return;
