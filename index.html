@@ -226,6 +226,8 @@ canvas.chart{width:100%; height:180px; display:block}
 .excard{padding:12px 14px; margin-bottom:10px}
 .excard.done-card{border-color:rgba(62,207,142,.35)}
 .excard.skipped-card{opacity:.5}
+.excard.cardio-card{border-color:rgba(83,221,208,.35)}
+.excard.cardio-card .exname{color:var(--cyan)}
 .excard.dragging{opacity:.55; outline:2px dashed var(--accent); outline-offset:2px}
 .excard.drop-before{box-shadow:0 -3px 0 0 var(--accent)}
 .excard.drop-after{box-shadow:0 3px 0 0 var(--accent)}
@@ -287,7 +289,7 @@ const esc = s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const epley=(w,r)=>r>0? w*(1+r/30):0;
 
-const MUSCLES = ["Chest","Back","Shoulders","Biceps","Triceps","Quads","Hamstrings","Glutes","Calves","Abs","Forearms","Traps"];
+const MUSCLES = ["Cardio","Chest","Back","Shoulders","Biceps","Triceps","Quads","Hamstrings","Glutes","Calves","Abs","Forearms","Traps"];
 const LOWER = new Set(["Quads","Hamstrings","Glutes","Calves"]);
 const EQUIP = ["Barbell","Dumbbell","Machine","Cable","Bodyweight","Smith","Kettlebell","Other"];
 
@@ -355,9 +357,17 @@ const STARTER_EXERCISES = [
  ["DB Shrug","Traps","Dumbbell"],["Cable Shrug","Traps","Cable"],["Smith Shrug","Traps","Smith"],
  ["Reverse Wrist Curl","Forearms","Dumbbell"],["Farmer Carry","Forearms","Dumbbell"]
 ].map(([name,mg,eq])=>({id:"b_"+name.toLowerCase().replace(/[^a-z]+/g,"_"),name,muscle:mg,equipment:eq,notes:"",builtin:true,fav:false}));
+// cardio exercises — logged as duration + HR, never counted as lifting volume
+const STARTER_CARDIO=[
+ ["Treadmill Run","Machine"],["Incline Walk","Machine"],["Outdoor Run","Bodyweight"],
+ ["Stationary Bike","Machine"],["Spin Bike","Machine"],["Outdoor Cycle","Bodyweight"],
+ ["Rowing Machine","Machine"],["Stair Climber","Machine"],["Elliptical","Machine"],
+ ["Swimming","Bodyweight"],["Jump Rope","Other"],["Assault Bike","Machine"]
+].map(([name,eq])=>({id:"c_"+name.toLowerCase().replace(/[^a-z]+/g,"_"),name,muscle:"Cardio",equipment:eq,notes:"",builtin:true,fav:false,cardio:true}));
+STARTER_EXERCISES.push(...STARTER_CARDIO);
 
 /* ---------------- storage ---------------- */
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 /** Sequential migrations: MIGRATIONS[n] upgrades a state at version n to n+1. */
 const MIGRATIONS = {
   1: st => {              // v1 -> v2: guarantee arrays/fields added after launch
@@ -373,6 +383,12 @@ const MIGRATIONS = {
   },
   3: st => {              // v3 -> v4: mesocycle lifecycle (archive flag)
     (st.mesocycles||[]).forEach(m=>{ m.archived ??= false; });
+    return st;
+  },
+  4: st => {              // v4 -> v5: user profile + cardio-as-exercise
+    st.profile ??= {gender:"", age:null, weightKg:null, heightCm:null, experience:"", goals:"", setupDismissed:false};
+    // ensure any cardio exercises created before this version are tagged
+    (st.exercises||[]).forEach(e=>{ if(e.muscle==="Cardio") e.cardio=true; });
     return st;
   },
 };
@@ -429,6 +445,7 @@ class StorageManager{
         backoffPct:5, backupEvery:7, lastBackup:null,
         maxHR:null, age:null,
       },
+      profile:{gender:"", age:null, weightKg:null, heightCm:null, experience:"", goals:"", setupDismissed:false},
       exercises:[...STARTER_EXERCISES],
       mesocycles:[], logs:[], bodyweight:[], feedback:[], cardio:[],
       activeMesoId:null, activeSession:null, editSession:null,
@@ -442,6 +459,7 @@ class StorageManager{
       st=migrate(st);
       const have=new Set(st.exercises.map(e=>e.id));
       STARTER_EXERCISES.forEach(e=>{ if(!have.has(e.id)) st.exercises.push(e); });
+      st.profile ??= {gender:"", age:null, weightKg:null, heightCm:null, experience:"", goals:"", setupDismissed:false};
       return Object.assign(this.defaults(), st,
         {settings:Object.assign(this.defaults().settings, st.settings||{})});
     }catch(e){
@@ -561,7 +579,7 @@ function nameExists(list, name, exceptId){
 }
 
 /* ---------------- muscle group colors (RP-style tags) ---------------- */
-const MUSCLE_COLORS={Chest:"#E05EC3",Back:"#5B8DEF",Shoulders:"#B36BFF",Biceps:"#4FD1C5",
+const MUSCLE_COLORS={Cardio:"#53DDD0",Chest:"#E05EC3",Back:"#5B8DEF",Shoulders:"#B36BFF",Biceps:"#4FD1C5",
   Triceps:"#FF8A5C",Quads:"#FFC24B",Hamstrings:"#3ECF8E",Glutes:"#FF5C7A",Calves:"#53DDD0",
   Abs:"#8BD46B",Forearms:"#9CA3AF",Traps:"#C084FC"};
 function muscleTagHTML(mg){
@@ -576,9 +594,10 @@ function muscleTagHTML(mg){
 const CARDIO_TYPES=["Incline walk","Run","Bike","Row","Stairs","Swim","Other"];
 const ZCOLORS={1:"--z1",2:"--z2",3:"--z3",4:"--z4",5:"--z5"};
 function effMaxHR(){
-  const s=S().settings;
+  const s=S().settings, p=S().profile||{};
   if(s.maxHR) return s.maxHR;
-  if(s.age) return 220-s.age;
+  const age=s.age || p.age;
+  if(age) return 220-age;
   return null;
 }
 /** HR -> training zone (1-5) against effective max HR. Null when max HR unknown. */
@@ -630,6 +649,7 @@ function zoneRowsHTML(zm){
 
 /* ---------------- domain queries ---------------- */
 function exById(id){ return S().exercises.find(e=>e.id===id); }
+function isCardioEx(id){ const e=exById(id); return !!(e && (e.cardio || e.muscle==="Cardio")); }
 function mesoById(id){ return S().mesocycles.find(m=>m.id===id); }
 function activeMeso(){ return mesoById(S().activeMesoId); }
 
@@ -956,6 +976,11 @@ VIEWS.home=function(){
     ${st.activeSession? `<div class="card" style="border-color:var(--accent)">
         <div class="row split"><div><div class="kicker">In progress</div><h3>${esc(st.activeSession.dayName)}</h3></div>
         <button class="btn btn-primary" data-act="resume">Resume</button></div></div>`:""}
+    ${(!st.profile?.setupDismissed && !st.profile?.age)? `<div class="card" style="border-color:var(--accent)">
+        <div class="row split"><div style="flex:1"><div class="kicker">Quick setup</div>
+          <h3>Set up your profile</h3><p class="muted" style="margin:4px 0 0">Add your age and body metrics for accurate cardio zones. Optional — takes 20 seconds.</p></div></div>
+        <div class="row" style="margin-top:12px"><button class="btn btn-ghost" style="flex:1" data-act="skipsetup">Skip</button>
+          <button class="btn btn-primary" style="flex:1" data-act="setup">Set up</button></div></div>`:""}
     ${mesoCard}
     ${lastCard}
     <div class="card">
@@ -986,6 +1011,8 @@ VIEWS.home=function(){
     if(act==="start"||act==="resume") go("workout");
     if(act==="logbw") promptBodyweight();
     if(act==="logcardio") logCardioModal();
+    if(act==="setup") go("settings");
+    if(act==="skipsetup"){ S().profile.setupDismissed=true; Store.save(); go("home"); }
   };
 };
 
@@ -1202,11 +1229,14 @@ function editMeso(id){
       <div class="stack" data-exlist="${di}">
         ${d.exercises.map((x,xi)=>{
           const ex=exById(x.exerciseId);
+          const cardio=x.cardio || isCardioEx(x.exerciseId);
+          const meta=cardio? `${x.minutes||20} min${x.targetHR?` · target ${x.targetHR}bpm`:""}${x.notes?" · "+esc(x.notes):""}`
+                           : `${x.sets}×${x.reps} @${x.rir}RIR · rest ${x.rest}s${x.notes?" · "+esc(x.notes):""}`;
           return `<div class="setline dragrow" draggable="true" data-ex="${di}:${xi}">
             <span class="draghandle">⠿</span>
             <div class="grow" style="flex:1;min-width:0">
-              <div>${esc(ex?ex.name:"?")}</div>
-              <div class="faint num">${x.sets}×${x.reps} @${x.rir}RIR · rest ${x.rest}s${x.notes?" · "+esc(x.notes):""}</div></div>
+              <div>${cardio?"🫀 ":""}${esc(ex?ex.name:"?")}</div>
+              <div class="faint num">${meta}</div></div>
             <button class="iconbtn" data-editx="${di}:${xi}" aria-label="Edit exercise targets">✎</button>
             <button class="iconbtn" data-delx="${di}:${xi}" aria-label="Remove exercise">✕</button></div>`;
         }).join("")}
@@ -1277,7 +1307,10 @@ function editMeso(id){
       if(t.dataset.a==="addday"){ collectBasics(); m.days.push({id:uid(),name:"Day "+(m.days.length+1),exercises:[]}); Store.save(); render(); return; }
       if(t.dataset.deld!=null){ collectBasics(); if(confirm("Remove this day?")){ m.days.splice(+t.dataset.deld,1); Store.save(); render(); } return; }
       if(t.dataset.addx!=null){ collectBasics(); pickExercise(exId=>{
-        m.days[+t.dataset.addx].exercises.push({id:uid(), exerciseId:exId, sets:3, reps:10, rir:2, rest:S().settings.restDefault, notes:""});
+        const slot=isCardioEx(exId)
+          ? {id:uid(), exerciseId:exId, cardio:true, minutes:20, targetHR:null, notes:""}
+          : {id:uid(), exerciseId:exId, sets:3, reps:10, rir:2, rest:S().settings.restDefault, notes:""};
+        m.days[+t.dataset.addx].exercises.push(slot);
         Store.save(); render();
       }); return; }
       if(t.dataset.delx!=null){ collectBasics(); const [di,xi]=t.dataset.delx.split(":").map(Number);
@@ -1290,6 +1323,25 @@ function editMeso(id){
 }
 function editSlot(slot, done){
   const ex=exById(slot.exerciseId);
+  const cardio=slot.cardio || isCardioEx(slot.exerciseId);
+  if(cardio){
+    modal(`<h2>🫀 ${esc(ex.name)}</h2>
+      <div class="grid2">
+        <div><label>Target minutes</label><input id="cm" type="number" min="1" value="${slot.minutes||20}"></div>
+        <div><label>Target HR (optional)</label><input id="ch" type="number" min="60" max="220" value="${slot.targetHR||""}" placeholder="e.g. 140"></div>
+      </div>
+      <label>Notes</label><input id="sn" value="${esc(slot.notes||"")}" placeholder="Zone 2, easy pace…">
+      <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>Done</button>`, mEl=>{
+      mEl.onclick=e=>{ if(!e.target.closest("[data-ok]")) return;
+        slot.cardio=true;
+        slot.minutes=clamp(+$("#cm",mEl).value||20,1,600);
+        const th=parseInt($("#ch",mEl).value); slot.targetHR=(th>=60&&th<=220)?th:null;
+        slot.notes=$("#sn",mEl).value;
+        closeModal(); done();
+      };
+    });
+    return;
+  }
   modal(`<h2>${esc(ex.name)}</h2>
     <div class="grid3">
       <div><label>Sets</label><input id="ss" type="number" min="1" value="${slot.sets}"></div>
@@ -1484,6 +1536,13 @@ VIEWS.workout=function(){
       id:uid(), mesoId:meso.id, week:pos.week, dayIdx:pos.dayIdx, dayId:pos.day.id, dayName:pos.day.name,
       mesoName:meso.name, date:todayISO(), startedAt:Date.now(), notes:"", deload,
       exercises:pos.day.exercises.map(slot=>{
+        if(slot.cardio || isCardioEx(slot.exerciseId)){
+          // cardio item: duration + HR, logged into the cardio store on finish
+          return {slotId:slot.id, exerciseId:slot.exerciseId, cardio:true,
+            target:{minutes:slot.minutes||20, targetHR:slot.targetHR||null, notes:slot.notes||""},
+            notes:"", skipped:false, rowsReady:true, done:false,
+            log:{minutes:slot.minutes||20, avgHR:null, distanceKm:null}, sets:[]};
+        }
         const sug=ProgressionEngine.suggest(slot.exerciseId, slot.reps, slot.rir);
         let kg=sug? sug.kg : 0;
         // volume ramp: +1 set per week after week 1 (capped +2); deload halves sets
@@ -1504,13 +1563,14 @@ VIEWS.workout=function(){
 
 function sessionTotals(s){
   const active=s.exercises.filter(e=>!e.skipped);
-  const total=active.reduce((t,e)=>t+e.sets.length,0);
-  const done=active.reduce((t,e)=>t+e.sets.filter(x=>x.done).length,0);
+  const total=active.reduce((t,e)=>t+(e.cardio?1:e.sets.length),0);
+  const done=active.reduce((t,e)=>t+(e.cardio?(e.done?1:0):e.sets.filter(x=>x.done).length),0);
   return {total, done};
 }
 
 function exCardHTML(ses, xi){
   const ex=exById(ses.exerciseId) || {name:"(deleted exercise)", muscle:"", equipment:""};
+  if(ses.cardio) return cardioCardHTML(ses, xi, ex);
   const t=ses.target, sug=ses.suggestion;
   const doneN=ses.sets.filter(x=>x.done).length;
   const allDone=doneN===ses.sets.length && ses.sets.length>0;
@@ -1529,6 +1589,28 @@ function exCardHTML(ses, xi){
       ${ses.sets.map((x,si)=>setRowHTML(ses,xi,x,si)).join("")}
     </div>
     <button class="addset" data-addset="${xi}">+ Add set</button>
+  </div>`;
+}
+function cardioCardHTML(ses, xi, ex){
+  const t=ses.target, lg=ses.log, done=ses.done;
+  const z=zoneFor(lg.avgHR);
+  return `${muscleTagHTML("Cardio")}
+  <div class="card excard cardio-card ${done?"done-card":""} ${ses.skipped?"skipped-card":""}" data-card="${xi}">
+    <div class="exhead">
+      <div><div class="exname">🫀 ${esc(ex.name)}</div>
+        <div class="exsub num">Cardio · target ${t.minutes} min${t.targetHR?` @ ${t.targetHR}bpm`:""}${done?" · logged":""}</div></div>
+      <button class="iconbtn" data-exmenu="${xi}" aria-label="Exercise options">⋯</button>
+    </div>
+    ${t.notes?`<div class="pinned"><span aria-hidden="true">📌</span>${esc(t.notes)}</div>`:""}
+    <div class="grid3" style="margin-top:8px">
+      <div><label>Minutes</label><input type="number" inputmode="numeric" value="${lg.minutes||""}" placeholder="${t.minutes}" data-cf="minutes" data-card-in="${xi}"></div>
+      <div><label>Avg HR</label><input type="number" inputmode="numeric" value="${lg.avgHR||""}" placeholder="${t.targetHR||"bpm"}" data-cf="avgHR" data-card-in="${xi}"></div>
+      <div><label>Dist km</label><input type="number" inputmode="decimal" step="0.1" value="${lg.distanceKm||""}" placeholder="opt" data-cf="distanceKm" data-card-in="${xi}"></div>
+    </div>
+    <div class="row split" style="margin-top:10px;align-items:center">
+      <span class="zchip" data-z="${z||""}" id="cz-${xi}">${z?`Zone ${z}`:"Zone —"}</span>
+      <button class="btn ${done?"btn-ghost":"btn-primary"}" style="min-height:44px;padding:0 20px" data-cardiolog="${xi}">${done?"✓ Logged — edit":"Log cardio"}</button>
+    </div>
   </div>`;
 }
 function setRowHTML(ses, xi, x, si){
@@ -1681,6 +1763,16 @@ function bindWorkout(){
 
   // Inline edits on any set field
   $("#view").oninput=e=>{
+    const cel=e.target.closest("[data-card-in]");
+    if(cel){
+      const xi=+cel.dataset.cardIn, ses=s.exercises[xi]; if(!ses||!ses.cardio) return;
+      const f=cel.dataset.cf, v=parseFloat(cel.value);
+      if(cel.value==="") ses.log[f]=null;
+      else if(isFinite(v)) ses.log[f]= f==="distanceKm"? Math.round(v*100)/100 : Math.round(v);
+      const zc=$(`#cz-${xi}`);
+      if(zc){ const z=zoneFor(ses.log.avgHR); zc.dataset.z=z||""; zc.textContent=z?`Zone ${z}`:"Zone —"; }
+      save(); return;
+    }
     const el=e.target.closest("[data-set]");
     if(!el) return;
     const [xi,si]=parse(el);
@@ -1709,6 +1801,16 @@ function bindWorkout(){
   enableWorkoutSwipe(s);
 
   $("#view").onclick=e=>{
+    // Log / unlog a cardio item
+    const cl=e.target.closest("[data-cardiolog]");
+    if(cl){
+      const xi=+cl.dataset.cardiolog, ses=s.exercises[xi];
+      if(!ses.log.minutes || ses.log.minutes<1){ toast("Enter the minutes first"); return; }
+      ses.done=!ses.done;
+      save(); refreshCard(xi);
+      if(ses.done && !edit) maybeCelebrate("cardio", ses);
+      return;
+    }
     // Log / unlog a set
     const chk=e.target.closest("[data-chk]");
     if(chk){
@@ -2066,14 +2168,27 @@ function startRest(sec){
 }
 function stopRest(){ clearInterval(restInterval); restInterval=null; const b=$("#restbox"); if(b) b.innerHTML=""; }
 
+function maybeCelebrate(kind, ses){ /* micro-feedback hook — implemented with Fun mode */ }
 function finishWorkout(){
   const s=S().activeSession;
   if(!s) return go("home");
-  const logged=s.exercises.filter(e=>e.sets.some(x=>x.done));   // skip never discards logged sets
-  if(!logged.length){
-    toast("No sets logged — session discarded");
+  const liftLogged=s.exercises.filter(e=>!e.cardio && e.sets.some(x=>x.done));
+  const cardioLogged=s.exercises.filter(e=>e.cardio && e.done);
+  if(!liftLogged.length && !cardioLogged.length){
+    toast("Nothing logged — session discarded");
     S().activeSession=null; Store.save(); stopRest(); return go("home");
   }
+  const logged=liftLogged;
+  // Cardio items logged during the workout go into the cardio store, tagged
+  // with this meso/day so cardio analytics can attribute them — never mixed
+  // into lifting volume.
+  cardioLogged.forEach(e=>{
+    const ex=exById(e.exerciseId);
+    S().cardio.push({id:uid(), date:s.date, type:ex?ex.name:"Cardio",
+      minutes:e.log.minutes, avgHR:e.log.avgHR||null, zone:zoneFor(e.log.avgHR),
+      distanceKm:e.log.distanceKm||null, notes:e.notes||"",
+      mesoId:s.mesoId, fromWorkout:true});
+  });
   stopRest();
   const log={
     id:s.id, mesoId:s.mesoId, week:s.week, dayId:s.dayId, dayName:s.dayName,
@@ -2093,10 +2208,11 @@ function finishWorkout(){
     exercises:logged.map(e=>({exerciseId:e.exerciseId, target:e.target, notes:e.notes,
       sets:e.sets.filter(x=>x.done)}))
   };
-  S().logs.push(log);
+  if(logged.length) S().logs.push(log);
   S().activeSession=null;
   Store.save(); Store.flush();          // workout completion is critical — write now
-  feedbackSurvey(log);
+  if(logged.length) feedbackSurvey(log);
+  else { toast("Cardio logged 🫀"); go("home"); }
 }
 /** Post-workout survey feeding the progression modifier. */
 function feedbackSurvey(log){
@@ -2327,6 +2443,45 @@ VIEWS.analytics=function(){
     });
     prList.sort((a,b)=>(b.to-b.from)-(a.to-a.from));
   }
+  // ---- Cross-mesocycle comparison (all mesos, oldest->newest) ----
+  const mesoStats=[];
+  S().mesocycles.forEach(mz=>{
+    const mlogs=st.logs.filter(l=>l.mesoId===mz.id);
+    if(!mlogs.length) return;
+    let vol=0, sets=0; const e1rms={};
+    mlogs.forEach(l=>l.exercises.forEach(e=>{
+      e.sets.forEach(x=>{ vol+=x.kg*x.reps; sets++; });
+      const best=e.sets.reduce((a,b)=>epley(b.kg,b.reps)>epley(a?.kg||0,a?.reps||0)?b:a,null);
+      if(best){ const v=epley(best.kg,best.reps); e1rms[e.exerciseId]=Math.max(e1rms[e.exerciseId]||0,v); }
+    }));
+    mesoStats.push({name:mz.name, workouts:mlogs.length, vol:Math.round(vol), sets,
+      avgVol:Math.round(vol/mlogs.length), start:mlogs[0].date, e1rms, archived:mz.archived});
+  });
+  mesoStats.sort((a,b)=>a.start.localeCompare(b.start));
+  // ---- Monthly trends: strength (total volume) + cardio (minutes & avg zone) ----
+  const byMonth={};
+  st.logs.forEach(l=>{ const k=l.date.slice(0,7);
+    const m=(byMonth[k]??={vol:0, cardioMin:0, cardioN:0, zoneSum:0});
+    l.exercises.forEach(e=>e.sets.forEach(x=>m.vol+=x.kg*x.reps));
+  });
+  st.cardio.forEach(c=>{ const k=c.date.slice(0,7);
+    const m=(byMonth[k]??={vol:0, cardioMin:0, cardioN:0, zoneSum:0});
+    m.cardioMin+=c.minutes; if(c.zone){ m.cardioN++; m.zoneSum+=c.zone; }
+  });
+  const months=Object.keys(byMonth).sort().slice(-6);
+  const monLabel=k=>{ const[y,mo]=k.split("-"); return new Date(y,mo-1,1).toLocaleDateString(undefined,{month:"short"}); };
+  // ---- Per-lift progression across mesos (top movers) ----
+  const liftProg=[];
+  if(mesoStats.length>=2){
+    const first=mesoStats[0].e1rms, last=mesoStats[mesoStats.length-1].e1rms;
+    Object.keys(last).forEach(exId=>{
+      if(first[exId] && last[exId]>first[exId]){
+        liftProg.push({name:exById(exId)?.name||"?", from:first[exId], to:last[exId],
+          pct:Math.round((last[exId]/first[exId]-1)*100)});
+      }
+    });
+    liftProg.sort((a,b)=>b.pct-a.pct);
+  }
   // fatigue indicator: recent feedback strain avg
   const recentFb=st.feedback.slice(-3);
   const strain=recentFb.length? recentFb.reduce((t,f)=>t+(f.fatigue+f.jointPain+(6-f.recovery)+(6-f.sleep))/4,0)/recentFb.length : null;
@@ -2365,6 +2520,21 @@ VIEWS.analytics=function(){
         `<div class="row split num"><span>${esc(p.name)}</span>
          <span class="pill grn">e1RM ${dispW(p.from)} → ${dispW(p.to)}${unitLabel()}</span></div>`).join("")}</div></div>`:""}
     `:""}
+    ${mesoStats.length>=2? `<div class="card"><div class="kicker">Mesocycle comparison</div>
+      <canvas class="chart" id="mc"></canvas>
+      <div class="stack" style="margin-top:10px">${mesoStats.slice(-5).map(m=>
+        `<div class="row split num"><span>${esc(m.name)}${m.archived?' <span class="faint">· archived</span>':""}</span>
+         <span class="muted">${m.workouts} workouts · ${(m.vol/1000).toFixed(1)}t</span></div>`).join("")}</div>
+      <p class="faint" style="margin:8px 0 0">Average volume per workout, oldest to newest.</p></div>`:""}
+    ${liftProg.length? `<div class="card"><div class="kicker">Strength progression across blocks</div>
+      <div class="stack" style="margin-top:8px">${liftProg.slice(0,6).map(p=>
+        `<div class="row split num"><span>${esc(p.name)}</span>
+         <span class="pill grn">+${p.pct}% · ${dispW(p.from)}→${dispW(p.to)}${unitLabel()}</span></div>`).join("")}</div>
+      <p class="faint" style="margin:8px 0 0">Estimated 1RM change, first block to latest.</p></div>`:""}
+    ${months.length>=2? `<div class="card"><div class="kicker">Monthly strength trend (total volume)</div>
+      <canvas class="chart" id="mvol"></canvas></div>
+      <div class="card"><div class="kicker" style="color:var(--cyan)">Monthly cardio trend (minutes)</div>
+      <canvas class="chart" id="mcard"></canvas></div>`:""}
     <div class="card"><div class="kicker">Weekly volume (kg)</div><canvas class="chart" id="cv"></canvas></div>
     <div class="card"><div class="kicker">Weekly sets</div><canvas class="chart" id="cs"></canvas></div>
     <div class="card"><div class="kicker">Training frequency (workouts/week)</div><canvas class="chart" id="cf"></canvas></div>
@@ -2407,6 +2577,12 @@ VIEWS.analytics=function(){
     ChartManager.draw($("#ms"), mWeeks.map(w=>({x:"W"+w, y:byMesoWeek[w].sets})), {type:"bar", color:cyan});
     ChartManager.draw($("#mr"), mWeeks.map(w=>({x:"W"+w, y:byMesoWeek[w].rirN?Math.round(byMesoWeek[w].rirSum/byMesoWeek[w].rirN*10)/10:0})), {color:green});
   }
+  if(mesoStats.length>=2)
+    ChartManager.draw($("#mc"), mesoStats.slice(-6).map(m=>({x:m.name.slice(0,6), y:m.avgVol})), {type:"bar"});
+  if(months.length>=2){
+    ChartManager.draw($("#mvol"), months.map(k=>({x:monLabel(k), y:Math.round(byMonth[k].vol)})), {type:"bar"});
+    ChartManager.draw($("#mcard"), months.map(k=>({x:monLabel(k), y:byMonth[k].cardioMin})), {type:"bar", color:cyan});
+  }
   // cardio weekly stacked zones (last 12 weeks with data)
   const czWeeks={};
   st.cardio.forEach(c=>{
@@ -2439,7 +2615,7 @@ VIEWS.analytics=function(){
 
 /* ================= VIEW: SETTINGS ================= */
 VIEWS.settings=function(){
-  const s=S().settings;
+  const s=S().settings, P=S().profile||{};
   $("#view").innerHTML=`
     <div class="topbar"><h1>Settings</h1></div>
     <div class="card"><h3>Units & appearance</h3>
@@ -2457,10 +2633,24 @@ VIEWS.settings=function(){
       </div>
       <label>Back-off when target missed (%)</label><input id="bo" type="number" min="0" max="20" value="${s.backoffPct}">
     </div>
+    <div class="card"><h3>Your profile</h3>
+      <p class="faint" style="margin:-4px 0 6px">Optional. Age and body metrics only feed cardio heart-rate zones — never your lifting progression.</p>
+      <div class="grid2">
+        <div><label>Gender</label><select id="pgender">
+          ${["","Female","Male","Other","Prefer not to say"].map(g=>`<option value="${g}" ${(P.gender||"")===g?"selected":""}>${g||"—"}</option>`).join("")}</select></div>
+        <div><label>Age</label><input id="page" type="number" min="10" max="100" value="${P.age??""}" placeholder="Optional"></div>
+        <div><label>Weight (${unitLabel()})</label><input id="pweight" type="number" step="0.1" value="${P.weightKg!=null?dispW(P.weightKg):""}" placeholder="Optional"></div>
+        <div><label>Height (cm)</label><input id="pheight" type="number" min="100" max="230" value="${P.heightCm??""}" placeholder="Optional"></div>
+        <div><label>Experience</label><select id="pexp">
+          ${["","Beginner","Intermediate","Advanced"].map(x=>`<option value="${x}" ${(P.experience||"")===x?"selected":""}>${x||"—"}</option>`).join("")}</select></div>
+        <div><label>Goal</label><select id="pgoal">
+          ${["","Build muscle","Get stronger","Lose fat","General fitness","Endurance"].map(x=>`<option value="${x}" ${(P.goals||"")===x?"selected":""}>${x||"—"}</option>`).join("")}</select></div>
+      </div>
+    </div>
     <div class="card"><h3>Cardio</h3>
       <div class="grid2">
         <div><label>Max heart rate</label><input id="mhr" type="number" min="120" max="230" value="${s.maxHR??""}" placeholder="Known max"></div>
-        <div><label>Age (fallback: 220−age)</label><input id="cage" type="number" min="10" max="100" value="${s.age??""}" placeholder="Optional"></div>
+        <div><label>Age (fallback: 220−age)</label><input id="cage" type="number" min="10" max="100" value="${s.age??P.age??""}" placeholder="From profile"></div>
       </div>
       <p class="faint" style="margin-top:8px">Zones: Z1 &lt;60% · Z2 60–70% · Z3 70–80% · Z4 80–90% · Z5 90%+ of max HR.
         Effective max: <b class="num">${effMaxHR()??"not set"}</b></p>
@@ -2485,6 +2675,14 @@ VIEWS.settings=function(){
     s.backupEvery=Math.max(0,+$("#bk").value||0);
     const mhr=parseInt($("#mhr").value); s.maxHR=(mhr>=120&&mhr<=230)? mhr : null;
     const age=parseInt($("#cage").value); s.age=(age>=10&&age<=100)? age : null;
+    // profile
+    const P=S().profile;
+    P.gender=$("#pgender").value;
+    const pa=parseInt($("#page").value); P.age=(pa>=10&&pa<=100)?pa:null;
+    const pw=parseFloat($("#pweight").value); P.weightKg=(isFinite(pw)&&pw>0)?Math.round(toKg(pw)*10)/10:null;
+    const ph=parseInt($("#pheight").value); P.heightCm=(ph>=100&&ph<=230)?ph:null;
+    P.experience=$("#pexp").value; P.goals=$("#pgoal").value;
+    P.setupDismissed=true;   // touching settings counts as acknowledging setup
     // re-zone existing sessions if max HR changed
     S().cardio.forEach(c=>{ c.zone=zoneFor(c.avgHR); });
     applyTheme(); Store.save();
