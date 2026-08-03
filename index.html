@@ -891,8 +891,41 @@ function go(view, ...args){
       <p class="muted">This screen failed to load (${esc(err.message)}). Your data is safe.</p>
       <button class="btn btn-ghost" onclick="go('home')">Back to Home</button></div>`;
   }
+  syncHistory(name);
   renderNav();
 }
+/** Keep a single synthetic history entry per non-home view, and a base entry
+    for home, so the hardware back button maps to in-app navigation instead of
+    closing the app on the first press. */
+let _histReady=false, _navigating=false;
+function syncHistory(name){
+  if(_navigating) return;               // don't stack entries during popstate-driven nav
+  try{
+    if(!_histReady){
+      history.replaceState({view:name, base:true}, "");
+      _histReady=true;
+      return;
+    }
+    if(name==="home"){
+      // collapse to a single base entry when returning home
+      history.replaceState({view:"home", base:true}, "");
+    } else {
+      history.pushState({view:name}, "");
+    }
+  }catch(_){}
+}
+window.addEventListener("popstate", e=>{
+  const st=(e.state)||{};
+  if(currentView!=="home" || !st.base){
+    // Any back press that isn't already at home base → go home (don't close app)
+    _navigating=true;
+    // put a base entry back so the NEXT back press can exit
+    try{ history.replaceState({view:"home", base:true}, ""); }catch(_){}
+    go("home");
+    _navigating=false;
+  }
+  // else: we're at home base and user pressed back again → allow default (exit)
+});
 function renderNav(){
   const tabs=[["home","⌂","Home"],["mesos","▤","Mesos"],["workout","▶","Train"],["calendar","▦","History"],["exercises","≡","Ex"],["analytics","∿","Stats"],["settings","⚙","More"]];
   $("#nav").innerHTML=tabs.map(([id,ic,lb])=>
@@ -1541,7 +1574,7 @@ VIEWS.workout=function(){
           return {slotId:slot.id, exerciseId:slot.exerciseId, cardio:true,
             target:{minutes:slot.minutes||20, targetHR:slot.targetHR||null, notes:slot.notes||""},
             notes:"", skipped:false, rowsReady:true, done:false,
-            log:{minutes:slot.minutes||20, avgHR:null, distanceKm:null}, sets:[]};
+            log:{minutes:slot.minutes||20, avgHR:null, distanceKm:null, level:null, speed:null, incline:null}, sets:[]};
         }
         const sug=ProgressionEngine.suggest(slot.exerciseId, slot.reps, slot.rir);
         let kg=sug? sug.kg : 0;
@@ -1603,9 +1636,14 @@ function cardioCardHTML(ses, xi, ex){
     </div>
     ${t.notes?`<div class="pinned"><span aria-hidden="true">📌</span>${esc(t.notes)}</div>`:""}
     <div class="grid3" style="margin-top:8px">
-      <div><label>Minutes</label><input type="number" inputmode="numeric" value="${lg.minutes||""}" placeholder="${t.minutes}" data-cf="minutes" data-card-in="${xi}"></div>
-      <div><label>Avg HR</label><input type="number" inputmode="numeric" value="${lg.avgHR||""}" placeholder="${t.targetHR||"bpm"}" data-cf="avgHR" data-card-in="${xi}"></div>
-      <div><label>Dist km</label><input type="number" inputmode="decimal" step="0.1" value="${lg.distanceKm||""}" placeholder="opt" data-cf="distanceKm" data-card-in="${xi}"></div>
+      <div><label>Duration (min)</label><input type="number" inputmode="numeric" value="${lg.minutes||""}" placeholder="${t.minutes}" data-cf="minutes" data-card-in="${xi}"></div>
+      <div><label>Avg HR (opt)</label><input type="number" inputmode="numeric" value="${lg.avgHR||""}" placeholder="${t.targetHR||"bpm"}" data-cf="avgHR" data-card-in="${xi}"></div>
+      <div><label>Distance km (opt)</label><input type="number" inputmode="decimal" step="0.1" value="${lg.distanceKm||""}" placeholder="opt" data-cf="distanceKm" data-card-in="${xi}"></div>
+    </div>
+    <div class="grid3" style="margin-top:8px">
+      <div><label>Level (opt)</label><input type="number" inputmode="numeric" value="${lg.level||""}" placeholder="e.g. 8" data-cf="level" data-card-in="${xi}"></div>
+      <div><label>Speed (opt)</label><input type="number" inputmode="decimal" step="0.1" value="${lg.speed||""}" placeholder="km/h" data-cf="speed" data-card-in="${xi}"></div>
+      <div><label>Incline % (opt)</label><input type="number" inputmode="decimal" step="0.5" value="${lg.incline||""}" placeholder="opt" data-cf="incline" data-card-in="${xi}"></div>
     </div>
     <div class="row split" style="margin-top:10px;align-items:center">
       <span class="zchip" data-z="${z||""}" id="cz-${xi}">${z?`Zone ${z}`:"Zone —"}</span>
@@ -1768,7 +1806,9 @@ function bindWorkout(){
       const xi=+cel.dataset.cardIn, ses=s.exercises[xi]; if(!ses||!ses.cardio) return;
       const f=cel.dataset.cf, v=parseFloat(cel.value);
       if(cel.value==="") ses.log[f]=null;
-      else if(isFinite(v)) ses.log[f]= f==="distanceKm"? Math.round(v*100)/100 : Math.round(v);
+      else if(isFinite(v)){
+        ses.log[f]= (f==="distanceKm"||f==="speed"||f==="incline")? Math.round(v*100)/100 : Math.round(v);
+      }
       const zc=$(`#cz-${xi}`);
       if(zc){ const z=zoneFor(ses.log.avgHR); zc.dataset.z=z||""; zc.textContent=z?`Zone ${z}`:"Zone —"; }
       save(); return;
@@ -1878,24 +1918,28 @@ function bindWorkout(){
     const a=e.target.closest("[data-a]")?.dataset.a;
     if(a==="addex"){
       pickExercise(exId=>{
-        const sug=edit? null : ProgressionEngine.suggest(exId, 10, 2);
-        const kg=sug?sug.kg:0;
-        const nSets=edit?1:3;
-        const inst={slotId:null, exerciseId:exId,
-          target:{sets:nSets, reps:10, rir:2, rest:S().settings.restDefault, notes:""},
-          suggestion:sug, notes:"", skipped:false, rowsReady:true, _edit:edit,
-          sets:buildSetRows(nSets, kg, 10, 2)};
+        const cardio=isCardioEx(exId);
+        let inst, mkSlot;
+        if(cardio){
+          inst={slotId:null, exerciseId:exId, cardio:true,
+            target:{minutes:20, targetHR:null, notes:""},
+            notes:"", skipped:false, rowsReady:true, done:false, _edit:edit,
+            log:{minutes:20, avgHR:null, distanceKm:null, level:null, speed:null, incline:null}, sets:[]};
+          mkSlot=()=>({id:uid(), exerciseId:exId, cardio:true, minutes:20, targetHR:null, notes:""});
+        } else {
+          const sug=edit? null : ProgressionEngine.suggest(exId, 10, 2);
+          const nSets=edit?1:3;
+          inst={slotId:null, exerciseId:exId,
+            target:{sets:nSets, reps:10, rir:2, rest:S().settings.restDefault, notes:""},
+            suggestion:sug, notes:"", skipped:false, rowsReady:true, _edit:edit,
+            sets:buildSetRows(nSets, sug?sug.kg:0, 10, 2)};
+          mkSlot=()=>({id:uid(), exerciseId:exId, sets:3, reps:10, rir:2, rest:S().settings.restDefault, notes:""});
+        }
         const finish=()=>{ save(); renderWorkout(); toast("Exercise added"); };
         const day=sessionTemplateDay(s);
         if(day){
           scopePrompt(`Add ${exById(exId).name} to this day?`, sc=>{
-            if(sc==="future"){
-              const slot={id:uid(), exerciseId:exId, sets:3, reps:10, rir:2,
-                rest:S().settings.restDefault, notes:""};
-              day.exercises.push(slot);
-              inst.slotId=slot.id;
-              toast("Added to future workouts too");
-            }
+            if(sc==="future"){ const slot=mkSlot(); day.exercises.push(slot); inst.slotId=slot.id; toast("Added to future workouts too"); }
             s.exercises.push(inst); finish();
           });
         } else { s.exercises.push(inst); finish(); }
@@ -2186,8 +2230,9 @@ function finishWorkout(){
     const ex=exById(e.exerciseId);
     S().cardio.push({id:uid(), date:s.date, type:ex?ex.name:"Cardio",
       minutes:e.log.minutes, avgHR:e.log.avgHR||null, zone:zoneFor(e.log.avgHR),
-      distanceKm:e.log.distanceKm||null, notes:e.notes||"",
-      mesoId:s.mesoId, fromWorkout:true});
+      distanceKm:e.log.distanceKm||null,
+      level:e.log.level||null, speed:e.log.speed||null, incline:e.log.incline||null,
+      notes:e.notes||"", mesoId:s.mesoId, fromWorkout:true});
   });
   stopRest();
   const log={
