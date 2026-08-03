@@ -807,26 +807,31 @@ class ProgressionEngine{
       if(strain>=3.5) recovMod=0;
       else if(strain>=2.5) recovMod=.5;
     }
-    const bigInc = lower? st.incLower : st.incUpper;
-    const smallInc = lower? st.incLowerSmall : st.incUpperSmall;
+    // Assisted exercises (assisted pull-up/dip machines) invert the logic:
+    // LESS assistance weight = harder = progress. We flip the sign of every
+    // load change so suggestions move the right way, and clamp at 0 (unassisted).
+    const assisted = !!(ex && ex.assisted);
+    const dir = assisted? -1 : 1;
+    const bigInc = (lower? st.incLower : st.incUpper) * dir;
+    const smallInc = (lower? st.incLowerSmall : st.incUpperSmall) * dir;
     let kg=lastKg, reason;
     if(hitAll && avgRIR>targetRIR && minRIR>=targetRIR){
-      // every set beat the rep target with RIR in hand
-      if(recovMod===1){ kg=lastKg+bigInc; reason="All sets beat target with reps in reserve — add load."; }
-      else if(recovMod===.5){ kg=lastKg+smallInc; reason="All sets beat target, but recovery is poor — smaller jump."; }
-      else { reason="All sets beat target, but recovery is poor — hold and consolidate."; }
+      if(recovMod===1){ kg=lastKg+bigInc; reason=assisted?"All sets strong — drop the assistance a notch.":"All sets beat target with reps in reserve — add load."; }
+      else if(recovMod===.5){ kg=lastKg+smallInc; reason=assisted?"Strong sets, but recovery is poor — small assistance drop.":"All sets beat target, but recovery is poor — smaller jump."; }
+      else { reason="All sets strong, but recovery is poor — hold here."; }
     } else if(hitAll){
-      // hit every set but right at the limit
-      if(recovMod===1){ kg=lastKg+smallInc; reason="Every set hit target at the limit — small increase."; }
-      else { reason="Target met at the limit — repeat this load."; }
+      if(recovMod===1){ kg=lastKg+smallInc; reason=assisted?"Hit target at the limit — small assistance drop.":"Every set hit target at the limit — small increase."; }
+      else { reason="Target met at the limit — repeat this."; }
     } else if(hitMost && nearAll){
-      reason="Most sets hit target — repeat this load and complete every set.";
+      reason="Most sets hit target — repeat and complete every set.";
     } else {
-      kg=lastKg*(1-st.backoffPct/100);
-      reason=`Sets fell short of target — back off ${st.backoffPct}% and rebuild.`;
+      // fell short: assisted → ADD assistance (easier); normal → back off load
+      kg = assisted? lastKg*(1+st.backoffPct/100) : lastKg*(1-st.backoffPct/100);
+      reason=assisted?`Short of target — add ${st.backoffPct}% assistance and rebuild.`:`Sets fell short of target — back off ${st.backoffPct}% and rebuild.`;
     }
     kg=Math.round(kg/wStep())*wStep();
     kg=Math.round(kg*100)/100;
+    if(assisted) kg=Math.max(0,kg);      // can't have negative assistance
     const bs=last.best;
     return {kg, lastKg, diff:Math.round((kg-lastKg)*100)/100, reason,
       lastSummary:`${dispW(lastKg)}${unitLabel()} × ${work.map(s=>s.reps).join("/")} @~${Math.round(avgRIR*10)/10}RIR`};
@@ -1650,6 +1655,9 @@ function editExercise(id, done){
       <div><label>Muscle group</label><select id="em">${MUSCLES.map(m=>`<option ${ex.muscle===m?"selected":""}>${m}</option>`).join("")}</select></div>
       <div><label>Equipment</label><select id="ee">${EQUIP.map(m=>`<option ${ex.equipment===m?"selected":""}>${m}</option>`).join("")}</select></div>
     </div>
+    <label style="display:flex;align-items:center;gap:10px;text-transform:none;font-size:15px;margin-top:14px">
+      <input type="checkbox" id="eassist" style="width:22px;height:22px" ${ex.assisted?"checked":""}>
+      Assisted (more weight = easier, e.g. assisted pull-up)</label>
     <label>Notes</label><textarea id="eno" rows="2">${esc(ex.notes||"")}</textarea>
     <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>Save exercise</button>`, m=>{
     $("#en",m).focus();
@@ -1660,6 +1668,7 @@ function editExercise(id, done){
         toast("An exercise with that name already exists"); $("#en",m).focus(); return; }
       ex.name=name;
       ex.muscle=$("#em",m).value; ex.equipment=$("#ee",m).value; ex.notes=$("#eno",m).value;
+      ex.assisted=$("#eassist",m).checked;
       if(!id) S().exercises.push(ex);
       Store.save(); closeModal(); done(ex.id);
     };
@@ -1676,7 +1685,7 @@ VIEWS.history=function(exId){
     <div class="topbar"><button class="iconbtn" data-back aria-label="Back">‹</button>
       <div style="flex:1;margin-left:10px"><h2>${esc(ex.name)}</h2>
       <div class="tag-mg">${ex.muscle} · ${ex.equipment}</div></div>
-      ${ex.builtin?"":`<button class="btn btn-ghost btn-sm" data-edit>Edit</button>`}</div>
+      <button class="btn btn-ghost btn-sm" data-edit>Edit</button></div>
     ${pr? `<div class="card"><div class="kicker">Personal record</div>
       <div class="row split"><div class="num" style="font-size:24px;font-weight:900">${dispW(pr.best.kg)}${unitLabel()} × ${pr.best.reps}</div>
       <span class="pill grn num">e1RM ${dispW(pr.e1rm)}${unitLabel()}</span></div>
@@ -1804,7 +1813,7 @@ function exCardHTML(ses, xi){
       <button class="iconbtn" data-exmenu="${xi}" aria-label="Exercise options">⋯</button>
     </div>
     ${t.notes?`<div class="pinned"><span aria-hidden="true">📌</span>${esc(t.notes)}</div>`:""}
-    ${ses._edit? "" : sug? `<div class="sugline num"><b>${dispW(sug.kg)}–${dispW(sug.kg+wStep()*2)}${unitLabel()}</b> · last ${sug.lastSummary} · ${sug.reason}</div>`
+    ${ses._edit? "" : sug? `<div class="sugline num"><b>${(exById(ses.exerciseId)?.assisted)? `${dispW(Math.max(0,sug.kg-wStep()*2))}–${dispW(sug.kg)}` : `${dispW(sug.kg)}–${dispW(sug.kg+wStep()*2)}`}${unitLabel()}${(exById(ses.exerciseId)?.assisted)?" assist":""}</b> · last ${sug.lastSummary} · ${sug.reason}</div>`
          : `<div class="faint" style="margin:6px 0 0">${FUN()?`First time — find a weight where ${t.reps} reps feels ${feelWord(t.rir).toLowerCase()}.`:`First time — find your ${t.reps}-rep @${t.rir}RIR load.`}</div>`}
     <div class="setgrid" data-grid="${xi}">
       <span></span><span class="h">Weight (${unitLabel()})</span><span class="h">Reps</span><span class="h">${term("rirHead")}</span><span class="h">Log</span>
@@ -1836,7 +1845,7 @@ function cardioCardHTML(ses, xi, ex){
     </div>
     <div class="row split" style="margin-top:10px;align-items:center">
       <span class="zchip" data-z="${z||""}" id="cz-${xi}">${z?`Zone ${z}`:"Zone —"}</span>
-      <button class="btn ${done?"btn-ghost":"btn-primary"}" style="min-height:44px;padding:0 20px" data-cardiolog="${xi}">${done?"✓ Logged — edit":"Log cardio"}</button>
+      <button class="btn ${done?"btn-ghost":"btn-primary"}" style="min-height:44px;padding:0 20px" data-cardiolog="${xi}">${done?"✓ Logged":"Log this cardio"}</button>
     </div>
   </div>`;
 }
@@ -2572,6 +2581,9 @@ function finishWorkout(){
   const s=S().activeSession;
   if(!s) return go("home");
   const liftLogged=s.exercises.filter(e=>!e.cardio && e.sets.some(x=>x.done));
+  // Auto-capture: a cardio card with minutes entered counts as done even if the
+  // user didn't tap "Log cardio" — entering the data is intent enough.
+  s.exercises.forEach(e=>{ if(e.cardio && !e.done && e.log && e.log.minutes>0) e.done=true; });
   const cardioLogged=s.exercises.filter(e=>e.cardio && e.done);
   if(!liftLogged.length && !cardioLogged.length){
     toast("Nothing logged — session discarded");
