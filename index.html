@@ -487,7 +487,7 @@ class StorageManager{
     const base={
       version:SCHEMA_VERSION,
       settings:{
-        unit:"kg", theme:"light", restDefault:150,
+        unit:"kg", theme:"light", restDefault:150, restBuzz:true,
         incUpper:2.5, incLower:5, incUpperSmall:1, incLowerSmall:2.5,
         backoffPct:5, backupEvery:7, lastBackup:null,
         maxHR:null, age:null,
@@ -511,6 +511,7 @@ class StorageManager{
       STARTER_EXERCISES.forEach(e=>{ if(!have.has(e.id)) st.exercises.push(e); });
       st.profile ??= {gender:"", age:null, weightKg:null, heightCm:null, experience:"", goals:"", setupDismissed:false};
       st.settings.mode ??= "fun";
+      st.settings.restBuzz ??= true;
       return Object.assign(this.defaults(), st,
         {settings:Object.assign(this.defaults().settings, st.settings||{})});
     }catch(e){
@@ -2522,6 +2523,7 @@ function exerciseMenu(xi){
       <button class="btn btn-ghost" style="flex:1" data-m="down" ${xi===nEx-1?"disabled style='opacity:.4'":""}>↓ Move down</button>
     </div>
     <button class="btn btn-ghost" data-m="replace">Replace exercise</button>
+    ${ses.cardio?"":`<button class="btn btn-ghost" data-m="rest">Rest time (${(ses.target.rest??0)>=60?Math.floor(ses.target.rest/60)+"m"+(ses.target.rest%60?ses.target.rest%60+"s":""):(ses.target.rest||0)+"s"})</button>`}
     <button class="btn btn-ghost" data-m="hist">View history</button>
     <button class="btn btn-ghost" data-m="notes">Exercise notes</button>
     <button class="btn btn-ghost" data-m="skip">${ses.skipped?"Unskip exercise":"Skip exercise"}</button>
@@ -2550,6 +2552,36 @@ function exerciseMenu(xi){
             }
           });
         } else doMove();
+        return;
+      }
+      if(a==="rest"){
+        closeModal();
+        const cur=ses.target.rest??0;
+        modal(`<h2>Rest time</h2>
+          <p class="muted">Applies to every set of ${esc(ex.name)} in this workout.</p>
+          <label>Seconds between sets</label>
+          <input id="rt" type="number" inputmode="numeric" min="0" max="900" step="15" value="${cur}">
+          <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">
+            ${[30,60,90,120,150,180].map(v=>`<button class="typechip" data-rq="${v}">${v>=60?(v/60)+"m"+(v%60?" "+(v%60)+"s":""):v+"s"}</button>`).join("")}
+          </div>
+          <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>Save</button>`, mm=>{
+          mm.onclick=ev=>{
+            const q=ev.target.closest("[data-rq]");
+            if(q){ $("#rt",mm).value=q.dataset.rq; return; }
+            if(!ev.target.closest("[data-ok]")) return;
+            const secs=clamp(parseInt($("#rt",mm).value)||0,0,900);
+            const applyOne=()=>{ ses.target.rest=secs; Store.save(); renderWorkout(); };
+            const day=sessionTemplateDay(s);
+            const slot=day && ses.slotId? day.exercises.find(x=>x.id===ses.slotId):null;
+            if(slot && !edit){
+              closeModal();
+              scopePrompt("Use this rest time for future workouts too?", sc=>{
+                applyOne();
+                if(sc==="future"){ slot.rest=secs; Store.save(); toast("Rest time saved for future workouts"); }
+              });
+            } else { applyOne(); closeModal(); }
+          };
+        });
         return;
       }
       if(a==="replace"){
@@ -2617,13 +2649,18 @@ function checkPR(exId, kg, reps){
    the OS suspends JS while backgrounded, on return it shows the true remaining
    time (or fires completion) instead of a frozen count. */
 let _restEnd=0, _restFired=false;
+function restAlert(){
+  // Vibration only — no audio, ever. (Works in foreground on Android.)
+  if(!S().settings.restBuzz) return;
+  try{ navigator.vibrate?.([120,60,120,60,200]); }catch(e){}
+}
 function renderRest(){
   const box=$("#resttop"); if(!box) return;
   if(!_restEnd){ box.innerHTML=""; return; }
   const left=Math.round((_restEnd-Date.now())/1000);
   if(left<=0){
     box.innerHTML="";
-    if(!_restFired){ _restFired=true; toast("Rest over — go! 💪"); try{ navigator.vibrate?.(200); }catch(e){} }
+    if(!_restFired){ _restFired=true; toast("Rest over — go! 💪"); restAlert(); }
     _restEnd=0; clearInterval(restInterval); restInterval=null;
     return;
   }
@@ -2647,7 +2684,12 @@ function startRest(sec){
 }
 function stopRest(){ clearInterval(restInterval); restInterval=null; _restEnd=0; _restFired=false; renderRest(); }
 // Re-sync the moment the app is refocused (JS may have been suspended while backgrounded)
-document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && _restEnd) renderRest(); });
+document.addEventListener("visibilitychange", ()=>{
+  if(!document.hidden && _restEnd){
+    // if it completed while we were away, renderRest() will fire the alert now
+    renderRest();
+  }
+});
 
 function maybeCelebrate(kind, ses, extra){
   if(!FUN()) return;
@@ -3313,7 +3355,9 @@ VIEWS.settings=function(){
     <div class="card"><h3>Units & appearance</h3>
       <label>Units</label><select id="unit"><option value="kg" ${s.unit==="kg"?"selected":""}>Metric (kg)</option><option value="lb" ${s.unit==="lb"?"selected":""}>Imperial (lb)</option></select>
       <label>Theme</label><select id="theme"><option value="dark" ${s.theme==="dark"?"selected":""}>Dark</option><option value="light" ${s.theme==="light"?"selected":""}>Light</option></select>
-      <label>Default rest timer (seconds)</label><input id="rest" type="number" step="15" min="0" value="${s.restDefault}">
+      <label>Default rest for new exercises (seconds)</label><input id="rest" type="number" step="15" min="0" value="${s.restDefault}">
+      <p class="faint" style="margin:4px 0 0">Existing exercises keep their own rest — set it per exercise from the ⋯ menu on the Train screen.</p>
+      <label style="display:flex;align-items:center;gap:10px;text-transform:none;font-size:15px;margin-top:12px"><input type="checkbox" id="rbuzz" style="width:22px;height:22px" ${s.restBuzz?"checked":""}> Buzz when rest ends</label>
     </div>
     <div class="card"><h3>Progression rules</h3>
       <p class="muted">Increments applied when targets are beaten (kg). Small increments used when targets are met exactly or recovery is poor.</p>
@@ -3370,6 +3414,7 @@ VIEWS.settings=function(){
   const persist=()=>{
     s.unit=$("#unit").value; s.theme=$("#theme").value;
     s.restDefault=clamp(+$("#rest").value||0,0,900);
+    s.restBuzz=$("#rbuzz").checked;
     s.incUpper=+$("#iu").value||2.5; s.incLower=+$("#il").value||5;
     s.incUpperSmall=+$("#ius").value||1; s.incLowerSmall=+$("#ils").value||2.5;
     s.backoffPct=clamp(+$("#bo").value||5,0,20);
