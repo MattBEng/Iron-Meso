@@ -2928,6 +2928,15 @@ function cutieScore(logs, meso){
 }
 function cutieTitle(score){ return CUTIE_TITLES[Math.min(CUTIE_TITLES.length-1, Math.floor(score/1500))]; }
 function cutieMsg(){ return CUTIE_MSGS[Math.floor(Math.random()*CUTIE_MSGS.length)]; }
+const CUTIE_FOOTERS=[
+ "You got this, babe 💕","Damn, you're gonna look good this summer 😏🔥","Keep going, gorgeous 💋",
+ "Summer body loading… 🩱✨","She's on a mission 💅","Trust the process, hot stuff 😘",
+ "Every rep's a little glow-up 🌟","Sexy never took a rest day 😉","Future you is already obsessed 💖",
+ "Making it look too easy 😌","The grind looks good on you 🔥","Soft life, strong body 🌸",
+ "You're that girl, keep proving it 💫","One workout closer to unstoppable 🚀","Confidence is your cardio 💃",
+ "Glow different, lift heavier 😍","Sweat now, sparkle always ✨","Babe, you're built for this 💪",
+ "Look at you being consistent 🥰","Effort this cute should be illegal 😈"];
+function cutieFooter(){ return CUTIE_FOOTERS[Math.floor(Math.random()*CUTIE_FOOTERS.length)]; }
 function cutieCardHTML(logs, meso, pos){
   if(!cutieOn()) return "";
   const score=cutieScore(logs, meso);
@@ -2937,7 +2946,7 @@ function cutieCardHTML(logs, meso, pos){
     <div class="num" style="font-size:30px;font-weight:900;color:#E0559C">${score.toLocaleString()}</div>
     <div style="margin-top:4px;font-weight:600">${cutieMsg()}</div>
     <canvas class="chart" id="cutiechart" style="margin-top:10px"></canvas>
-    <p class="faint" style="margin:6px 0 0">Just for fun — it only ever goes up. Keep showing up 🌸</p></div>`;
+    <p class="faint" style="margin:6px 0 0">${cutieFooter()}</p></div>`;
 }
 function drawCutie(logs, meso){
   if(!cutieOn()) return;
