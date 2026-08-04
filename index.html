@@ -981,6 +981,9 @@ function modal(html, onMount){
     }
   });
   $("#overlay").appendChild(bg);
+  // Push a history entry so the hardware/browser back button closes the modal
+  // instead of navigating the page underneath it.
+  try{ if(!_modalHistory){ history.pushState({modal:true},""); _modalHistory=true; } }catch(_){}
   const m=bg.firstElementChild;
   // focus first field, else first button
   const first=m.querySelector("input, select, textarea") || m.querySelector("button");
@@ -988,12 +991,21 @@ function modal(html, onMount){
   if(onMount) onMount(m);
   return m;
 }
-function closeModal(){
+function closeModal(fromPop){
+  const wasOpen=!!$("#overlay").innerHTML;
   $("#overlay").innerHTML="";
   if(_modalReturnFocus && document.contains(_modalReturnFocus)){
     try{ _modalReturnFocus.focus(); }catch(_){}
   }
   _modalReturnFocus=null;
+  // Balance the history entry the modal pushed.
+  //  • closed by hardware back (fromPop): the entry is already gone — just clear the flag.
+  //  • closed by button/backdrop: consume the entry with history.back(); the guarded
+  //    popstate that follows is a no-op because the modal is already gone and the flag is clear.
+  if(_modalHistory){
+    _modalHistory=false;
+    if(!fromPop){ _navigating=true; try{ history.back(); }catch(_){} _navigating=false; }
+  }
 }
 
 /* ---------------- router + nav ---------------- */
@@ -1026,7 +1038,7 @@ function go(view, ...args){
    We keep AT MOST one DETAIL entry no matter how many screens you visit, so
    back is always a single, predictable hop to home. All navigation funnels
    through syncHistory; a guard prevents popstate-driven nav from re-stacking. */
-let _histReady=false, _navigating=false, _atDetail=false;
+let _histReady=false, _navigating=false, _atDetail=false, _modalHistory=false;
 function syncHistory(name){
   if(_navigating) return;                       // popstate is driving; don't touch the stack
   try{
@@ -1056,6 +1068,8 @@ window.addEventListener("popstate", ()=>{
   // us on BASE → show home. If we were already at home/BASE, let it be (the OS
   // handles closing; we don't re-push, so a second back exits).
   if(_navigating) return;                        // our own history.back() above
+  // A modal is open → back closes the modal, nothing else moves.
+  if($("#overlay").innerHTML){ closeModal(true); return; }
   // If a read-only/future preview is open, back dismisses THAT first and returns
   // to the current workout — never leaves the preview overlaid on home.
   const es=S().editSession;
@@ -2929,13 +2943,106 @@ function cutieScore(logs, meso){
 function cutieTitle(score){ return CUTIE_TITLES[Math.min(CUTIE_TITLES.length-1, Math.floor(score/1500))]; }
 function cutieMsg(){ return CUTIE_MSGS[Math.floor(Math.random()*CUTIE_MSGS.length)]; }
 const CUTIE_FOOTERS=[
- "You got this, babe 💕","Damn, you're gonna look good this summer 😏🔥","Keep going, gorgeous 💋",
- "Summer body loading… 🩱✨","She's on a mission 💅","Trust the process, hot stuff 😘",
- "Every rep's a little glow-up 🌟","Sexy never took a rest day 😉","Future you is already obsessed 💖",
- "Making it look too easy 😌","The grind looks good on you 🔥","Soft life, strong body 🌸",
- "You're that girl, keep proving it 💫","One workout closer to unstoppable 🚀","Confidence is your cardio 💃",
- "Glow different, lift heavier 😍","Sweat now, sparkle always ✨","Babe, you're built for this 💪",
- "Look at you being consistent 🥰","Effort this cute should be illegal 😈"];
+ "You got this, babe 💕",
+ "Damn, you're gonna look good this summer 😏🔥",
+ "Keep going, gorgeous 💋",
+ "Summer body loading… 🩱✨",
+ "She's on a mission 💅",
+ "Trust the process, hot stuff 😘",
+ "Every rep's a little glow-up 🌟",
+ "Sexy never took a rest day 😉",
+ "Future you is already obsessed 💖",
+ "Making it look too easy 😌",
+ "The grind looks good on you 🔥",
+ "Soft life, strong body 🌸",
+ "You're that girl, keep proving it 💫",
+ "One workout closer to unstoppable 🚀",
+ "Confidence is your cardio 💃",
+ "Glow different, lift heavier 😍",
+ "Sweat now, sparkle always ✨",
+ "Babe, you're built for this 💪",
+ "Look at you being consistent 🥰",
+ "Effort this cute should be illegal 😈",
+ "Snatched and self-made 💅",
+ "Hot girl workout complete 🔥",
+ "Strong is the new pretty 💖",
+ "Serving body-ody-ody 🎶",
+ "Bikini season won't know what hit it 🩱",
+ "Little sweat, big glow ✨",
+ "You're literally goals 😍",
+ "Keep that fine form 💋",
+ "Muscle mommy in training 💪",
+ "Beach ready and unbothered 🏖️",
+ "Do it for the summer selfies 📸",
+ "She lifts, she slays, she leaves 💅",
+ "That post-gym glow is unreal ✨",
+ "Getting hotter by the session 🔥",
+ "You're a whole snack, keep cooking 😋",
+ "Discipline is so attractive on you 😘",
+ "Glutes of steel incoming 🍑",
+ "Werk it, queen 👑",
+ "Your confidence is showing (good) 💫",
+ "Toned and totally that girl 💕",
+ "Sweat is just liquid confidence 💦",
+ "Give them something to stare at 😏",
+ "Strong arms, softer life 🌸",
+ "Summer you says thank you ☀️",
+ "Keep slaying, sweetheart 💖",
+ "Fine wine only gets better 🍷",
+ "Built by burpees and bad-assery 💪",
+ "Radiating main-character energy 🎬",
+ "You're a certified stunner 😍",
+ "Lift like nobody's watching 🏋️‍♀️",
+ "Cardio queen, take a bow 👑",
+ "Cute now, unstoppable soon 🚀",
+ "Sculpting the summer silhouette ✨",
+ "You make sweat look sexy 😘",
+ "Progress looks gorgeous on you 📈",
+ "Keep blooming, babe 🌷",
+ "Fierce, fit, and flirty 😈",
+ "One more rep, future baddie 🔥",
+ "So hot it's basically cardio 🥵",
+ "Glow up in full swing 💫",
+ "She came to slay, not to play 💅",
+ "Your dedication is stunning 😍",
+ "Making magic in leggings ✨",
+ "Strong girl, soft heart, hot bod 💗",
+ "Keep that streak sizzling 🔥",
+ "Poolside confident already 🏊‍♀️",
+ "You're doing amazing, sweetie 💕",
+ "Toned goddess in the making 👑",
+ "Serving looks and squats 🍑",
+ "Sweat today, slay tomorrow 💦",
+ "Gorgeous inside and out 💖",
+ "Keep being iconic, babe 💫",
+ "Summer fling? No, summer strong ☀️",
+ "You're the upgrade 💅",
+ "Effortlessly becoming that girl 😌",
+ "Flex now, flaunt later 💪",
+ "Cute face, strong pace 🏃‍♀️",
+ "Your glow could power a city ✨",
+ "Keep cooking, hot stuff 🔥",
+ "She's soft but she squats heavy 🍑",
+ "Beach body? You're the whole ocean 🌊",
+ "Getting fitter and finer daily 😍",
+ "Own it, gorgeous 💋",
+ "Sweaty selfie worthy 📸",
+ "Strong is undeniably sexy 😏",
+ "Keep that momentum, mama 💕",
+ "You're glowing, keep going 🌟",
+ "Fit, fabulous, and ferocious 🔥",
+ "Little legend, big glow ✨",
+ "Confidence level: main character 🎬",
+ "Bloom into that summer baddie 🌸",
+ "You + consistency = dangerous (cute) 💫",
+ "Serving strength with a wink 😉",
+ "Keep being deliciously disciplined 😋",
+ "Hotter than your pre-workout 🔥",
+ "Radiant, resilient, ravishing 💖",
+ "Summer's gonna be jealous ☀️",
+ "Keep shining, snack queen 👑",
+ "Unbothered, moisturised, mid-squat 🍑",
+ "Certified fine and functional 💅"];
 function cutieFooter(){ return CUTIE_FOOTERS[Math.floor(Math.random()*CUTIE_FOOTERS.length)]; }
 function cutieCardHTML(logs, meso, pos){
   if(!cutieOn()) return "";
