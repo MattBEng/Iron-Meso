@@ -2107,7 +2107,7 @@ function askDuration(guess, current, cb){
     <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>Save</button>`, m=>{
     m.onclick=e=>{ if(!e.target.closest("[data-ok]")) return;
       const v=clamp(parseInt($("#dur",m).value)||current||guess, 1, 600);
-      closeModal(); cb(v);
+      closeModal(); cb(v);           // synchronous: cb opens the survey; modal() cancels the pop timer
     };
   });
 }
@@ -2537,12 +2537,35 @@ function exerciseMenu(xi){
       <button class="btn btn-ghost" style="flex:1" data-m="down" ${xi===nEx-1?"disabled style='opacity:.4'":""}>↓ Move down</button>
     </div>
     <button class="btn btn-ghost" data-m="replace">Replace exercise</button>
-    ${ses.cardio?"":`<button class="btn btn-ghost" data-m="rest">Rest time (${(ses.target.rest??0)>=60?Math.floor(ses.target.rest/60)+"m"+(ses.target.rest%60?ses.target.rest%60+"s":""):(ses.target.rest||0)+"s"})</button>`}
+    ${ses.cardio?"":`<div class="row split" style="gap:10px;align-items:center;padding:4px 2px">
+      <label style="text-transform:none;margin:0;font-size:15px">Rest time (seconds)</label>
+      <input id="restsecs" type="number" inputmode="numeric" min="0" max="900" step="5" value="${ses.target.rest??0}" style="width:96px;text-align:center">
+    </div>`}
     <button class="btn btn-ghost" data-m="hist">View history</button>
     <button class="btn btn-ghost" data-m="notes">Exercise notes</button>
     <button class="btn btn-ghost" data-m="skip">${ses.skipped?"Unskip exercise":"Skip exercise"}</button>
     ${ses.cardio?"":`<button class="btn btn-ghost" data-m="delset" ${ses.sets.length<=1?"disabled style='opacity:.4'":""}>Remove last set</button>`}
     <button class="btn btn-danger" data-m="remove">Remove from workout</button></div>`, m=>{
+    // Inline rest-time field: commits on change (blur/enter), then offers to apply
+    // the value to future workouts if this exercise came from a plan template.
+    const restIn=$("#restsecs",m);
+    if(restIn){
+      restIn.onchange=()=>{
+        const secs=clamp(parseInt(restIn.value)||0,0,900);
+        restIn.value=secs;
+        if(secs===(ses.target.rest??0)) return;      // no change
+        ses.target.rest=secs; Store.save();
+        const day=sessionTemplateDay(s);
+        const slot=day && ses.slotId? day.exercises.find(x=>x.id===ses.slotId):null;
+        if(slot && !edit){
+          closeModal();
+          scopePrompt("Also use this rest time for future workouts?", sc=>{
+            if(sc==="future"){ slot.rest=secs; Store.save(); toast("Saved for future workouts"); }
+            renderWorkout();
+          });
+        }
+      };
+    }
     m.onclick=e=>{
       const a=e.target.closest("[data-m]")?.dataset.m; if(!a) return;
       if(a==="up"||a==="down"){
@@ -2566,35 +2589,6 @@ function exerciseMenu(xi){
             }
           });
         } else doMove();
-        return;
-      }
-      if(a==="rest"){
-        const cur=ses.target.rest??0;
-        modal(`<h2>Rest time</h2>
-          <p class="muted">Applies to every set of ${esc(ex.name)} in this workout.</p>
-          <label>Seconds between sets</label>
-          <input id="rt" type="number" inputmode="numeric" min="0" max="900" step="15" value="${cur}">
-          <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">
-            ${[30,60,90,120,150,180].map(v=>`<button class="typechip" data-rq="${v}">${v>=60?(v/60)+"m"+(v%60?" "+(v%60)+"s":""):v+"s"}</button>`).join("")}
-          </div>
-          <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>Save</button>`, mm=>{
-          mm.onclick=ev=>{
-            const q=ev.target.closest("[data-rq]");
-            if(q){ $("#rt",mm).value=q.dataset.rq; return; }
-            if(!ev.target.closest("[data-ok]")) return;
-            const secs=clamp(parseInt($("#rt",mm).value)||0,0,900);
-            const applyOne=()=>{ ses.target.rest=secs; Store.save(); renderWorkout(); };
-            const day=sessionTemplateDay(s);
-            const slot=day && ses.slotId? day.exercises.find(x=>x.id===ses.slotId):null;
-            if(slot && !edit){
-              closeModal();
-              scopePrompt("Use this rest time for future workouts too?", sc=>{
-                applyOne();
-                if(sc==="future"){ slot.rest=secs; Store.save(); toast("Rest time saved for future workouts"); }
-              });
-            } else { applyOne(); closeModal(); }
-          };
-        });
         return;
       }
       if(a==="replace"){
