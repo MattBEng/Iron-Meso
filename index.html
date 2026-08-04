@@ -237,6 +237,7 @@ canvas.chart{width:100%; height:180px; display:block}
 .mgfilter{display:flex;gap:6px;overflow-x:auto;padding:8px 0 2px;-webkit-overflow-scrolling:touch}
 .mgfilter .typechip{white-space:nowrap;flex:0 0 auto}
 .linkdate{color:var(--accent);font-weight:700;background:none;border:0;padding:0;font:inherit}
+.cutie-card{border-color:rgba(224,85,156,.35);background:linear-gradient(180deg,rgba(224,85,156,.06),transparent)}
 .scale-ends{display:flex;justify-content:space-between;font-size:11px;color:var(--faint);margin:4px 2px 0;font-weight:600}
 .ro-banner{background:var(--raised);border:1px solid var(--line);border-radius:var(--r-sm);
   padding:10px 12px;margin-bottom:12px;font-size:13px;color:var(--muted);font-weight:600}
@@ -383,8 +384,11 @@ const STARTER_EXERCISES = [
  ["Reverse Crunch","Abs","Bodyweight"],["Russian Twist","Abs","Other"],["Roman Chair Leg Raise","Abs","Bodyweight"],
  ["Plank","Abs","Bodyweight"],
  ["DB Shrug","Traps","Dumbbell"],["Cable Shrug","Traps","Cable"],["Smith Shrug","Traps","Smith"],
- ["Reverse Wrist Curl","Forearms","Dumbbell"],["Farmer Carry","Forearms","Dumbbell"]
+ ["Reverse Wrist Curl","Forearms","Dumbbell"],["Farmer Carry","Forearms","Dumbbell"],
+ ["Kettlebell Halo","Shoulders","Kettlebell"],["Kettlebell Press","Shoulders","Kettlebell"],
+ ["Pallof Press","Abs","Cable"]
 ].map(([name,mg,eq])=>({id:"b_"+name.toLowerCase().replace(/[^a-z]+/g,"_"),name,muscle:mg,equipment:eq,notes:"",builtin:true,fav:false}));
+// assisted movement: more weight = easier, engine inverts progression
 // cardio exercises — logged as duration + HR, never counted as lifting volume
 const STARTER_CARDIO=[
  ["Treadmill Run","Machine"],["Incline Walk","Machine"],["Outdoor Run","Bodyweight"],
@@ -393,6 +397,8 @@ const STARTER_CARDIO=[
  ["Swimming","Bodyweight"],["Jump Rope","Other"],["Assault Bike","Machine"]
 ].map(([name,eq])=>({id:"c_"+name.toLowerCase().replace(/[^a-z]+/g,"_"),name,muscle:"Cardio",equipment:eq,notes:"",builtin:true,fav:false,cardio:true}));
 STARTER_EXERCISES.push(...STARTER_CARDIO);
+// mark known assisted movements so the engine inverts their progression
+STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|dip|chin)/i.test(e.name)) e.assisted=true; });
 
 /* ---------------- storage ---------------- */
 const SCHEMA_VERSION = 7;
@@ -428,6 +434,8 @@ const MIGRATIONS = {
       seedTemplates(st);
       st._templatesSeeded=true;
     }
+    // flag existing assisted movements so progression inverts correctly
+    (st.exercises||[]).forEach(e=>{ if(/assisted (pull|dip|chin)/i.test(e.name)) e.assisted=true; });
     return st;
   },
 };
@@ -1048,6 +1056,18 @@ window.addEventListener("popstate", ()=>{
   // us on BASE → show home. If we were already at home/BASE, let it be (the OS
   // handles closing; we don't re-push, so a second back exits).
   if(_navigating) return;                        // our own history.back() above
+  // If a read-only/future preview is open, back dismisses THAT first and returns
+  // to the current workout — never leaves the preview overlaid on home.
+  const es=S().editSession;
+  if(es && es.readonly){
+    const wasFuture=es.future;
+    S().editSession=null; Store.save();
+    _atDetail=false; _navigating=true;
+    if(wasFuture && S().activeSession) go("workout");
+    else go("home");
+    _navigating=false;
+    return;
+  }
   if(_atDetail || currentView!=="home"){
     _atDetail=false;
     _navigating=true;
@@ -1131,11 +1151,13 @@ VIEWS.home=function(){
         ? `<p class="muted">Block complete 🎉 Duplicate it or start a new one.</p>`
         : !pos.day
         ? `<p class="muted">This block has no training days yet — edit it to add some.</p>`
-        : `<div class="row split"><div><div class="faint">Next up</div>
-             <div style="font-weight:800">${esc(pos.day.name)}</div>
-             <div class="muted">${pos.day.exercises.length} exercises</div></div>
-           <button class="btn btn-primary" data-act="start">Start workout</button></div>
-           <div class="faint" style="margin-top:10px">Then: ${esc(meso.days[(pos.dayIdx+1)%meso.days.length].name)}</div>`}
+        : (()=>{ const resuming=st.activeSession && st.activeSession.mesoId===meso.id;
+            return `<div class="row split"><div><div class="faint">${resuming?"In progress":"Next up"}</div>
+             <div style="font-weight:800">${esc(resuming?st.activeSession.dayName:pos.day.name)}</div>
+             <div class="muted">${resuming?"Pick up where you left off":pos.day.exercises.length+" exercises"}</div></div>
+           <button class="btn btn-primary" data-act="${resuming?"resume":"start"}">${resuming?"Resume":"Start workout"}</button></div>
+           ${resuming?"":`<div class="faint" style="margin-top:10px">Then: ${esc(meso.days[(pos.dayIdx+1)%meso.days.length].name)}</div>`}`;
+          })()}
     </div>`;
   }
   const lastCard = lastLog? `<div class="card">
@@ -1150,9 +1172,6 @@ VIEWS.home=function(){
     <div class="topbar"><div><div class="brand">LIFT <em>DADDY</em></div>
       <div class="top-sub num">${new Date().toLocaleDateString(undefined,{weekday:"long", day:"numeric", month:"long"})}</div></div>
       <span class="pill acc num">${FUN()?"🔥 ":""}${streakCount()}-workout streak</span></div>
-    ${st.activeSession? `<div class="card" style="border-color:var(--accent)">
-        <div class="row split"><div><div class="kicker">In progress</div><h3>${esc(st.activeSession.dayName)}</h3></div>
-        <button class="btn btn-primary" data-act="resume">Resume</button></div></div>`:""}
     ${(!st.profile?.setupDismissed && !st.profile?.age)? `<div class="card" style="border-color:var(--accent)">
         <div class="row split"><div style="flex:1"><div class="kicker">Quick setup</div>
           <h3>Set up your profile</h3><p class="muted" style="margin:4px 0 0">Add your age and body metrics for accurate cardio zones. Optional — takes 20 seconds.</p></div></div>
@@ -1446,7 +1465,7 @@ function editMeso(id){
         ${d.exercises.map((x,xi)=>{
           const ex=exById(x.exerciseId);
           const cardio=x.cardio || isCardioEx(x.exerciseId);
-          const meta=cardio? `${x.minutes||20} min${x.targetHR?` · target ${x.targetHR}bpm`:""}${x.notes?" · "+esc(x.notes):""}`
+          const meta=cardio? `${x.tabataOn&&x.tabata?`Tabata ${x.tabata.rounds}×${x.tabata.work}/${x.tabata.rest}s · `:""}${x.minutes||20} min${x.targetHR?` · target ${x.targetHR}bpm`:""}${x.notes?" · "+esc(x.notes):""}`
                            : `${x.sets}×${x.reps} · ${rirTxt(x.rir)} · rest ${x.rest}s${x.notes?" · "+esc(x.notes):""}`;
           return `<div class="setline dragrow" draggable="true" data-ex="${di}:${xi}">
             <span class="draghandle">⠿</span>
@@ -1541,16 +1560,36 @@ function editSlot(slot, done){
   const ex=exById(slot.exerciseId);
   const cardio=slot.cardio || isCardioEx(slot.exerciseId);
   if(cardio){
+    const tb=slot.tabata||{};
     modal(`<h2>${FUN()?"🫀 ":""}${esc(ex.name)}</h2>
-      <div class="grid2">
-        <div><label>Target minutes</label><input id="cm" type="number" min="1" value="${slot.minutes||20}"></div>
-        <div><label>Target HR (optional)</label><input id="ch" type="number" min="60" max="220" value="${slot.targetHR||""}" placeholder="e.g. 140"></div>
+      <label style="display:flex;align-items:center;gap:10px;text-transform:none;font-size:15px">
+        <input type="checkbox" id="ctab" style="width:22px;height:22px" ${slot.tabataOn?"checked":""}> Tabata / intervals</label>
+      <div id="tabfields" style="display:${slot.tabataOn?"block":"none"}">
+        <div class="grid3">
+          <div><label>Work (s)</label><input id="tw" type="number" min="5" value="${tb.work||20}"></div>
+          <div><label>Rest (s)</label><input id="tr" type="number" min="0" value="${tb.rest??10}"></div>
+          <div><label>Rounds</label><input id="tn" type="number" min="1" value="${tb.rounds||10}"></div>
+        </div>
       </div>
+      <div id="durfield" style="display:${slot.tabataOn?"none":"block"}">
+        <label>Target minutes</label><input id="cm" type="number" min="1" value="${slot.minutes||20}"></div>
+      <label>Target HR (optional)</label><input id="ch" type="number" min="60" max="220" value="${slot.targetHR||""}" placeholder="e.g. 140">
       <label>Notes</label><input id="sn" value="${esc(slot.notes||"")}" placeholder="Zone 2, easy pace…">
       <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>Done</button>`, mEl=>{
+      $("#ctab",mEl).onchange=ev=>{ const on=ev.target.checked;
+        $("#tabfields",mEl).style.display=on?"block":"none";
+        $("#durfield",mEl).style.display=on?"none":"block"; };
       mEl.onclick=e=>{ if(!e.target.closest("[data-ok]")) return;
         slot.cardio=true;
-        slot.minutes=clamp(+$("#cm",mEl).value||20,1,600);
+        slot.tabataOn=$("#ctab",mEl).checked;
+        if(slot.tabataOn){
+          const work=clamp(+$("#tw",mEl).value||20,5,600), rest=clamp(+$("#tr",mEl).value||10,0,600), rounds=clamp(+$("#tn",mEl).value||10,1,100);
+          slot.tabata={work,rest,rounds};
+          slot.minutes=Math.max(1, Math.round(rounds*(work+rest)/60));
+        } else {
+          slot.tabata=null;
+          slot.minutes=clamp(+$("#cm",mEl).value||20,1,600);
+        }
         const th=parseInt($("#ch",mEl).value); slot.targetHR=(th>=60&&th<=220)?th:null;
         slot.notes=$("#sn",mEl).value;
         closeModal(); done();
@@ -1770,7 +1809,8 @@ VIEWS.workout=function(){
         if(slot.cardio || isCardioEx(slot.exerciseId)){
           // cardio item: duration + HR, logged into the cardio store on finish
           return {slotId:slot.id, exerciseId:slot.exerciseId, cardio:true,
-            target:{minutes:slot.minutes||20, targetHR:slot.targetHR||null, notes:slot.notes||""},
+            target:{minutes:slot.minutes||20, targetHR:slot.targetHR||null, notes:slot.notes||"",
+              tabataOn:!!slot.tabataOn, tabata:slot.tabata||null},
             notes:"", skipped:false, rowsReady:true, done:false,
             log:{minutes:slot.minutes||20, avgHR:null, distanceKm:null, level:null, speed:null, incline:null}, sets:[]};
         }
@@ -1829,7 +1869,7 @@ function cardioCardHTML(ses, xi, ex){
   <div class="card excard cardio-card ${done?"done-card":""} ${ses.skipped?"skipped-card":""}" data-card="${xi}">
     <div class="exhead">
       <div><div class="exname">${FUN()?"🫀 ":""}${esc(ex.name)}</div>
-        <div class="exsub num">Cardio · target ${t.minutes} min${t.targetHR?` @ ${t.targetHR}bpm`:""}${done?" · logged":""}</div></div>
+        <div class="exsub num">Cardio${t.tabataOn&&t.tabata?` · Tabata ${t.tabata.rounds}×${t.tabata.work}/${t.tabata.rest}s`:""} · target ${t.minutes} min${t.targetHR?` @ ${t.targetHR}bpm`:""}${done?" · logged":""}</div></div>
       <button class="iconbtn" data-exmenu="${xi}" aria-label="Exercise options">⋯</button>
     </div>
     ${t.notes?`<div class="pinned"><span aria-hidden="true">📌</span>${esc(t.notes)}</div>`:""}
@@ -2396,10 +2436,12 @@ function enableCardDrag(s){
 function enableWorkoutSwipe(s){
   let tx=null, ty=null;
   $("#view").ontouchstart=e=>{
+    if(currentView!=="workout") return;              // swipe is a Train-page gesture only
     if(e.target.closest("input,select,textarea,.setgrid")) return;
     tx=e.touches[0].clientX; ty=e.touches[0].clientY;
   };
   $("#view").ontouchend=e=>{
+    if(currentView!=="workout"){ tx=null; return; }
     if(tx==null) return;
     const dx=e.changedTouches[0].clientX-tx, dy=e.changedTouches[0].clientY-ty;
     tx=null;
@@ -2630,6 +2672,7 @@ function finishWorkout(){
       minutes:e.log.minutes, avgHR:e.log.avgHR||null, zone:zoneFor(e.log.avgHR),
       distanceKm:e.log.distanceKm||null,
       level:e.log.level||null, speed:e.log.speed||null, incline:e.log.incline||null,
+      tabata:e.target?.tabataOn?e.target.tabata:null,
       notes:e.notes||"", mesoId:s.mesoId, fromWorkout:true});
   });
   stopRest();
@@ -2843,6 +2886,69 @@ function confirmDeleteLog(logId){
   });
 }
 
+/* ---- Female + Fun "cutie" motivation layer (stats page) ----
+   Gated on Fun mode AND profile.gender === "Female". Pure encouragement: the
+   score only rewards activity and never subtracts for a rough session. */
+function cutieOn(){ return FUN() && (S().profile?.gender==="Female"); }
+const CUTIE_TITLES=["Gym Cutie","Hot Mumma","Fit Queen","Strong Sweetheart","Iron Angel","Barbell Baddie","Snack with Muscles","Certified Powerpuff","Dumbbell Darling","Glute Goddess"];
+const CUTIE_MSGS=[
+ "OMG you're crushing it 💅","Look at you, absolute unit (affectionate) 🥰","Strong girl summer is ON 🌞",
+ "Hot mumma in the making 🔥","Certified gym cutie behaviour 💖","Your future self is blowing you kisses 😘",
+ "Snack today, whole meal by week 6 😋","Booked, busy, and buff 💪","Slaying reps like it's your job 💃",
+ "Queen behaviour, frankly 👑","That glow? It's the gains talking ✨","Unbothered, moisturised, mid-set 💧",
+ "You + those weights = iconic duo 🏋️‍♀️","Barbell said thank you 🏋️","Serving strength and cuteness 💅",
+ "Main character energy today 🎬","She lifts AND she sparkles ✨","Pilates girls could never (jk love them) 😌",
+ "Confidence level: post-workout 🌟","You're literally so that girl 💕","Baddie with a training plan 📋",
+ "The bar feared you today 😤","Cardio conquered, cutie confirmed 🫶","Making it look easy, show-off 😍",
+ "Strong is your color 💖","Little sore, very iconic 🥹","Reps done, vibes immaculate ✨",
+ "Certified stronger than yesterday 📈","You showed up — that's the flex 🌸","Sweaty and adorable, balanced 💦",
+ "Powerpuff energy fully charged ⚡","Yeah you did that 💁‍♀️","Glow up in progress, please hold ⏳",
+ "Muscles: cute. Discipline: cuter 🥰","Gym besties would be proud 👯‍♀️","Serving looks and lifts 💋",
+ "The plan is planning, queen 👑","Strong hands, soft heart 💗","You make effort look effortless 😎",
+ "Another one for the highlight reel 🎞️","Fit, fine, and thriving 🌺","Weights lifted, standards higher 📊",
+ "Cutie with a mean deadlift 😈","Consistency looks gorgeous on you 💐","She came, she saw, she squatted 🍑",
+ "Delulu is the solulu and it's working 😌","Zero because you're perfect (jk, effort counts) 💯","Big lifts, bigger sparkle ✨",
+ "Sore muscles, soaring confidence 🚀","Bra you're literally an athlete now 🏅","Sweat is just cute glitter 💫",
+ "Booty by barbell, brains by you 🍑","The gym missed you, welcome back 🫶","Tiny wins stack into big glow 🌟",
+ "Effort logged, cuteness noted 📝","You're the moment, always 💖","Strong girl, soft life 🌸",
+ "Absolute powerhouse in lip gloss 💄","Reps for the plot 🎬","She's built different (cutely) 🧁",
+ "Making gains and taking names 📛","Fabulous form, flirty finish 😘","One workout closer to unstoppable 🚀",
+ "Certified fine and functional 💪","Your consistency is so hot 🔥","Queen of showing up 👑",
+ "Cuteness aggression at the squat rack 🥹","You lifted that?? Iconic 😳","Strong today, softer sleep tonight 😴",
+ "Little legend behaviour 🏆","Gym glow hits different on you ✨","Proud of you, no notes 💕",
+ "Serving protein-powered radiance 🥤","Fit queen, reporting for duty 🫡","That's a wrap, gorgeous 🎀"
+];
+function cutieScore(logs, meso){
+  // encouragement-only: workouts + streak + volume + cardio, never penalised.
+  const workouts=logs.length;
+  const streak=streakCount();
+  const vol=logs.reduce((t,l)=>t+l.exercises.reduce((a,e)=>a+e.sets.reduce((v,x)=>v+x.kg*x.reps,0),0),0);
+  const cardioMin=S().cardio.filter(c=>!meso||c.mesoId===meso.id).reduce((t,c)=>t+c.minutes,0);
+  return Math.round(workouts*100 + streak*50 + vol/50 + cardioMin*3);
+}
+function cutieTitle(score){ return CUTIE_TITLES[Math.min(CUTIE_TITLES.length-1, Math.floor(score/1500))]; }
+function cutieMsg(){ return CUTIE_MSGS[Math.floor(Math.random()*CUTIE_MSGS.length)]; }
+function cutieCardHTML(logs, meso, pos){
+  if(!cutieOn()) return "";
+  const score=cutieScore(logs, meso);
+  return `<div class="card cutie-card">
+    <div class="row split"><div class="kicker" style="color:#E0559C">${cutieTitle(score)} points</div>
+      <span class="pill" style="background:rgba(224,85,156,.15);color:#E0559C">💖</span></div>
+    <div class="num" style="font-size:30px;font-weight:900;color:#E0559C">${score.toLocaleString()}</div>
+    <div style="margin-top:4px;font-weight:600">${cutieMsg()}</div>
+    <canvas class="chart" id="cutiechart" style="margin-top:10px"></canvas>
+    <p class="faint" style="margin:6px 0 0">Just for fun — it only ever goes up. Keep showing up 🌸</p></div>`;
+}
+function drawCutie(logs, meso){
+  if(!cutieOn()) return;
+  // cumulative "glow" over recent workouts — always rising
+  const sorted=[...logs].sort((a,b)=>a.date.localeCompare(b.date)).slice(-10);
+  let run=0;
+  const pts=sorted.map((l,i)=>{ run+=l.exercises.reduce((a,e)=>a+e.sets.length,0)+5;
+    return {x:"#"+(i+1), y:run}; });
+  if(pts.length>=2) ChartManager.draw($("#cutiechart"), pts, {color:"#E0559C"});
+}
+
 /* ================= VIEW: ANALYTICS ================= */
 VIEWS.analytics=function(){
   const st=S();
@@ -2975,10 +3081,8 @@ VIEWS.analytics=function(){
         <div class="faint num">${FUN()?"🔥 ":""}${streakCount()} streak</div></div>
     </div>
     ${meso? `
-    <div class="card"><div class="kicker">Weekly ${term("tonnage")} (kg)</div><canvas class="chart" id="mt"></canvas></div>
-    <div class="card"><div class="kicker">Weekly sets</div><canvas class="chart" id="ms"></canvas></div>
-    <div class="card"><div class="kicker">${FUN()?"Reps left in the tank (weekly avg)":"Average RIR by week"}</div><canvas class="chart" id="mr"></canvas></div>
-    <div class="card"><div class="kicker">Sets per muscle · weekly target vs actual</div>
+    ${cutieCardHTML(logs, meso, pos)}
+    <div class="card"><div class="kicker">Sets per muscle · weekly view</div>
       <div class="stack" style="margin-top:8px">
         ${Object.keys(targetPerMuscle).sort((a,b)=>targetPerMuscle[b]-targetPerMuscle[a]).map(mg=>{
           const t=targetPerMuscle[mg], a=actualPerMuscle[mg]||0;
@@ -3048,11 +3152,7 @@ VIEWS.analytics=function(){
   ChartManager.draw($("#cf"), weeks.map(k=>({x:fmtDate(k), y:byWeek[k].count})), {type:"bar", color:green});
   ChartManager.draw($("#cd"), weeks.map(k=>({x:fmtDate(k), y:byWeek[k].count?Math.round(byWeek[k].dur/byWeek[k].count):0})));
   ChartManager.draw($("#cb"), st.bodyweight.slice(-30).map(b=>({x:fmtDate(b.date), y:dispW(b.kg)})), {color:cyan});
-  if(meso){
-    ChartManager.draw($("#mt"), mWeeks.map(w=>({x:"W"+w, y:Math.round(byMesoWeek[w].vol)})), {type:"bar"});
-    ChartManager.draw($("#ms"), mWeeks.map(w=>({x:"W"+w, y:byMesoWeek[w].sets})), {type:"bar", color:cyan});
-    ChartManager.draw($("#mr"), mWeeks.map(w=>({x:"W"+w, y:byMesoWeek[w].rirN?Math.round(byMesoWeek[w].rirSum/byMesoWeek[w].rirN*10)/10:0})), {color:green});
-  }
+  drawCutie(logs, meso);
   if(mesoStats.length>=2)
     ChartManager.draw($("#mc"), mesoStats.slice(-6).map(m=>({x:m.name.slice(0,6), y:m.avgVol})), {type:"bar"});
   if(months.length>=2){
