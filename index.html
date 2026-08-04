@@ -960,8 +960,13 @@ function toast(msg, cls=""){
 }
 let _modalReturnFocus=null;
 function modal(html, onMount){
-  closeModal();
-  _modalReturnFocus=document.activeElement;
+  // Opening a modal cancels any pending "pop the modal history entry" from a
+  // just-closed modal, so menu→submodal transitions keep a single history entry
+  // and never race with popstate.
+  if(_modalPopTimer){ clearTimeout(_modalPopTimer); _modalPopTimer=null; }
+  const alreadyOpen = !!$("#overlay").innerHTML;
+  if(!alreadyOpen) _modalReturnFocus=document.activeElement;
+  $("#overlay").innerHTML="";
   const bg=document.createElement("div"); bg.className="modal-bg";
   bg.innerHTML=`<div class="modal" role="dialog" aria-modal="true">${html}</div>`;
   bg.addEventListener("click",e=>{ if(e.target===bg) closeModal(); });
@@ -982,8 +987,8 @@ function modal(html, onMount){
     }
   });
   $("#overlay").appendChild(bg);
-  // Push a history entry so the hardware/browser back button closes the modal
-  // instead of navigating the page underneath it.
+  // Push a history entry (once) so hardware back closes the modal instead of
+  // navigating. If a modal was already open we reuse its entry — no new push.
   try{ if(!_modalHistory){ history.pushState({modal:true},""); _modalHistory=true; } }catch(_){}
   const m=bg.firstElementChild;
   // focus first field, else first button
@@ -1000,12 +1005,21 @@ function closeModal(fromPop){
   }
   _modalReturnFocus=null;
   // Balance the history entry the modal pushed.
-  //  • closed by hardware back (fromPop): the entry is already gone — just clear the flag.
-  //  • closed by button/backdrop: consume the entry with history.back(); the guarded
-  //    popstate that follows is a no-op because the modal is already gone and the flag is clear.
+  //  • closed by hardware back (fromPop): entry already gone — just clear the flag.
+  //  • closed by button/backdrop: defer the history.back() one tick. If another
+  //    modal opens in that tick (a menu→submodal swap), modal() cancels this and
+  //    reuses the same entry. Otherwise the entry is consumed.
   if(_modalHistory){
-    _modalHistory=false;
-    if(!fromPop){ _navigating=true; try{ history.back(); }catch(_){} _navigating=false; }
+    if(fromPop){ _modalHistory=false; }
+    else {
+      _modalPopTimer=setTimeout(()=>{
+        _modalPopTimer=null;
+        if(_modalHistory && !$("#overlay").innerHTML){   // still nothing open → pop it
+          _modalHistory=false;
+          _navigating=true; try{ history.back(); }catch(_){} _navigating=false;
+        }
+      }, 0);
+    }
   }
 }
 
@@ -1039,7 +1053,7 @@ function go(view, ...args){
    We keep AT MOST one DETAIL entry no matter how many screens you visit, so
    back is always a single, predictable hop to home. All navigation funnels
    through syncHistory; a guard prevents popstate-driven nav from re-stacking. */
-let _histReady=false, _navigating=false, _atDetail=false, _modalHistory=false;
+let _histReady=false, _navigating=false, _atDetail=false, _modalHistory=false, _modalPopTimer=null;
 function syncHistory(name){
   if(_navigating) return;                       // popstate is driving; don't touch the stack
   try{
@@ -2555,7 +2569,6 @@ function exerciseMenu(xi){
         return;
       }
       if(a==="rest"){
-        closeModal();
         const cur=ses.target.rest??0;
         modal(`<h2>Rest time</h2>
           <p class="muted">Applies to every set of ${esc(ex.name)} in this workout.</p>
