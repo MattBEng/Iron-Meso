@@ -249,6 +249,8 @@ canvas.chart{width:100%; height:180px; display:block}
 .settype-badge{display:inline-flex;align-items:center;justify-content:center;background:var(--accent);color:#fff;font-size:10px;font-weight:800;padding:1px 6px;border-radius:6px;letter-spacing:.03em}
 .repcell .settype-badge{position:absolute;top:-9px;right:-4px;z-index:2;box-shadow:0 1px 3px rgba(0,0,0,.3)}
 .settype-opt{height:auto;padding:10px 12px;flex-direction:column;align-items:stretch}
+.setup-pin{background:rgba(43,191,179,.12);border-color:rgba(43,191,179,.3)}
+.linkbtn{background:none;border:0;color:var(--accent);font-weight:700;padding:0;font:inherit;text-decoration:underline;cursor:pointer}
 .scale-ends{display:flex;justify-content:space-between;font-size:11px;color:var(--faint);margin:4px 2px 0;font-weight:600}
 .ro-banner{background:var(--raised);border:1px solid var(--line);border-radius:var(--r-sm);
   padding:10px 12px;margin-bottom:12px;font-size:13px;color:var(--muted);font-weight:600}
@@ -447,6 +449,9 @@ const MIGRATIONS = {
     }
     // flag existing assisted movements so progression inverts correctly
     (st.exercises||[]).forEach(e=>{ if(/assisted (pull|dip|chin)/i.test(e.name)) e.assisted=true; });
+    // normalise gender to the allowed set
+    if(st.profile && !["","Female","Male","Prefer not to say"].includes(st.profile.gender))
+      st.profile.gender="Prefer not to say";
     return st;
   },
 };
@@ -860,6 +865,25 @@ class ProgressionEngine{
     const dir = assisted? -1 : 1;
     const bigInc = (lower? st.incLower : st.incUpper) * dir;
     const smallInc = (lower? st.incLowerSmall : st.incUpperSmall) * dir;
+    // Held-weight detection: if the previous session used the SAME working weight
+    // (a plateau the user chose), lean toward rep progression until the rep ceiling.
+    const prev=hist[1];
+    let heldPlateau=false;
+    if(prev){
+      const pcounts=new Map();
+      prev.sets.filter(s=>!s.type||s.type==="normal").forEach(s=>pcounts.set(s.kg,(pcounts.get(s.kg)||0)+1));
+      const prevKg=pcounts.size?[...pcounts.entries()].sort((a,b)=>b[1]-a[1]||b[0]-a[0])[0][0]:null;
+      heldPlateau = prevKg===lastKg;
+    }
+    const repCeiling=targetReps + 4;
+    const avgRepsNow=Math.round(work.reduce((t,s)=>t+s.reps,0)/work.length);
+    if(heldPlateau && hitAll && avgRIR>=targetRIR && avgRepsNow<repCeiling){
+      // progress reps at the same weight rather than adding load
+      const repTarget=Math.min(repCeiling, avgRepsNow+1);
+      return {kg:lastKg, lastKg, diff:0, repTarget, heldRep:true,
+        reason:`Held ${dispW(lastKg)}${unitLabel()} last time — aim for ${repTarget} reps.`,
+        lastSummary:`${dispW(lastKg)}${unitLabel()} × ${work.map(s=>s.reps).join("/")} @~${Math.round(avgRIR*10)/10}RIR`};
+    }
     let kg=lastKg, reason;
     if(hitAll && avgRIR>targetRIR && minRIR>=targetRIR){
       if(recovMod===1){ kg=lastKg+bigInc; reason=assisted?"All sets strong — drop the assistance a notch.":"All sets beat target with reps in reserve — add load."; }
@@ -1935,9 +1959,12 @@ function exCardHTML(ses, xi){
       <button class="iconbtn" data-exmenu="${xi}" aria-label="Exercise options">⋯</button>
     </div>
     ${t.notes?`<div class="pinned"><span aria-hidden="true">📌</span>${esc(t.notes)}</div>`:""}
+    ${(exById(ses.exerciseId)?.setup)?`<div class="pinned setup-pin"><span aria-hidden="true">🔧</span>${esc(exById(ses.exerciseId).setup)}</div>`:""}
     ${ses._edit? "" : sug? (sug.bodyweight
          ? `<div class="sugline num"><b>Aim for ${sug.reps} reps</b> · last ${sug.lastSummary} · ${sug.reason}</div>`
-         : `<div class="sugline num"><b>${(exById(ses.exerciseId)?.assisted)? `${dispW(Math.max(0,sug.kg-wStep()*2))}–${dispW(sug.kg)}` : `${dispW(sug.kg)}–${dispW(sug.kg+wStep()*2)}`}${unitLabel()}${(exById(ses.exerciseId)?.assisted)?" assist":""}</b> · last ${sug.lastSummary} · ${sug.reason}</div>`)
+         : ses.holdWeight
+         ? `<div class="sugline num"><b>Hold ${dispW(sug.lastKg)}${unitLabel()} · aim for ${sug.repTarget||(t.reps)} reps</b> · progressing by reps · <button class="linkbtn" data-holdundo="${xi}">undo</button></div>`
+         : `<div class="sugline num"><b>${(exById(ses.exerciseId)?.assisted)? `${dispW(Math.max(0,sug.kg-wStep()*2))}–${dispW(sug.kg)}` : `${dispW(sug.kg)}–${dispW(sug.kg+wStep()*2)}`}${unitLabel()}${(exById(ses.exerciseId)?.assisted)?" assist":""}</b> · last ${sug.lastSummary} · ${sug.reason}${(sug.kg>sug.lastKg && !exById(ses.exerciseId)?.assisted)?` · <button class="linkbtn" data-cantadd="${xi}">can't add weight?</button>`:""}</div>`)
          : `<div class="faint" style="margin:6px 0 0">${ses.bodyweight?`Bodyweight — aim for ${t.reps} good reps.`:(FUN()?`First time — find a weight where ${t.reps} reps feels ${feelWord(t.rir).toLowerCase()}.`:`First time — find your ${t.reps}-rep @${t.rir}RIR load.`)}</div>`}
     <div class="setgrid" data-grid="${xi}">
       <span></span><span class="h">Weight (${unitLabel()})</span><span class="h">Reps</span><span class="h">${term("rirHead")}</span><span class="h">Log</span>
@@ -1957,6 +1984,7 @@ function cardioCardHTML(ses, xi, ex){
       <button class="iconbtn" data-exmenu="${xi}" aria-label="Exercise options">⋯</button>
     </div>
     ${t.notes?`<div class="pinned"><span aria-hidden="true">📌</span>${esc(t.notes)}</div>`:""}
+    ${(exById(ses.exerciseId)?.setup)?`<div class="pinned setup-pin"><span aria-hidden="true">🔧</span>${esc(exById(ses.exerciseId).setup)}</div>`:""}
     <div class="grid3" style="margin-top:8px">
       <div><label>Duration (min)</label><input type="number" inputmode="numeric" value="${lg.minutes||""}" placeholder="${t.minutes}" data-cf="minutes" data-card-in="${xi}"></div>
       <div><label>Avg HR (opt)</label><input type="number" inputmode="numeric" value="${lg.avgHR||""}" placeholder="${t.targetHR||"bpm"}" data-cf="avgHR" data-card-in="${xi}"></div>
@@ -2005,6 +2033,31 @@ function setRowHTML(ses, xi, x, si){
     <button class="chk ${x.done?"on":""}" data-chk="${id}" aria-label="Log set ${si+1}" aria-pressed="${x.done}">${x.done?"✓":""}</button>`;
 }
 
+/* "Can't add weight" → keep the current (last) weight and progress by reps.
+   Rep target = beat last session's reps by 1, capped at target+4 (the ceiling,
+   above which the engine will push weight again). Re-decided from history next
+   session, so there's no sticky flag to get out of sync. */
+const REP_CEILING_OVER_TARGET=4;
+function holdWeightRepProgress(xi){
+  const s=S().editSession||S().activeSession, ses=s.exercises[xi];
+  const sug=ses.suggestion; if(!sug) return;
+  const holdKg=sug.lastKg;
+  // last session's reps at the working weight
+  const hist=exerciseHistory(ses.exerciseId);
+  const lastWork=hist.length? hist[0].sets.filter(x=>x.kg===holdKg && (!x.type||x.type==="normal")) : [];
+  const lastReps=lastWork.length? Math.max(...lastWork.map(x=>x.reps)) : ses.target.reps;
+  const ceiling=ses.target.reps + REP_CEILING_OVER_TARGET;
+  const repTarget=Math.min(ceiling, lastReps+1);
+  ses.holdWeight=true;
+  ses.suggestion={...sug, repTarget, kg:holdKg, diff:0,
+    reason:`Holding ${dispW(holdKg)}${unitLabel()} — aim for ${repTarget} reps.`};
+  // rebuild rows: all sets at holdKg, ghost reps = repTarget
+  ses.sets=ses.sets.map((row,i)=>({kg:holdKg, reps:repTarget, rir:ses.target.rir,
+    expReps:repTarget, done:false, at:null, type:row.type||null}));
+  Store.save(); 
+  const fn=window.refreshCard || null;
+  renderWorkout();
+}
 function renderWorkout(){
   const s=S().editSession||S().activeSession;
   if(!s) return go("home");
@@ -2415,6 +2468,16 @@ function bindWorkout(){
       save(); refreshCard(xi);
       return;
     }
+    // "Can't add weight" -> progress reps at the held weight instead
+    const cant=e.target.closest("[data-cantadd]");
+    if(cant){ holdWeightRepProgress(+cant.dataset.cantadd); return; }
+    const undo=e.target.closest("[data-holdundo]");
+    if(undo){ const xi=+undo.dataset.holdundo, ses=s.exercises[xi];
+      ses.holdWeight=false;
+      // rebuild rows from the original suggestion
+      const sug=ses.suggestion;
+      if(sug){ ses.sets=buildGhostRows(ses.exerciseId, ses.sets.length, sug.kg, ses.target.reps, ses.target.rir, sug, false); }
+      save(); refreshCard(xi); return; }
     // Per-exercise menu
     const menu=e.target.closest("[data-exmenu]");
     if(menu){ exerciseMenu(+menu.dataset.exmenu); return; }
@@ -2653,7 +2716,8 @@ function exerciseMenu(xi){
       <input id="restsecs" type="number" inputmode="numeric" min="0" max="900" step="5" value="${ses.target.rest??0}" style="width:96px;text-align:center">
     </div>`}
     <button class="btn btn-ghost" data-m="hist">View history</button>
-    <button class="btn btn-ghost" data-m="notes">Exercise notes</button>
+    <button class="btn btn-ghost" data-m="notes">Session note</button>
+    <button class="btn btn-ghost" data-m="setup">Setup note (saved to exercise)</button>
     <button class="btn btn-ghost" data-m="skip">${ses.skipped?"Unskip exercise":"Skip exercise"}</button>
     ${ses.cardio?"":`<button class="btn btn-ghost" data-m="delset" ${ses.sets.length<=1?"disabled style='opacity:.4'":""}>Remove last set</button>`}
     <button class="btn btn-danger" data-m="remove">Remove from workout</button></div>`, m=>{
@@ -2745,9 +2809,28 @@ function exerciseMenu(xi){
         return; }
       if(a==="notes"){
         closeModal();
-        modal(`<h2>Exercise notes</h2><textarea id="xn" rows="3" placeholder="Seat 4, felt strong…">${esc(ses.notes)}</textarea>
+        modal(`<h2>Session note</h2><p class="muted">Just for this workout.</p>
+          <textarea id="xn" rows="3" placeholder="Felt strong today…">${esc(ses.notes)}</textarea>
           <button class="btn btn-primary btn-block" style="margin-top:14px" data-ok>Save</button>`, mm=>{
-          mm.onclick=ev=>{ if(ev.target.closest("[data-ok]")){ ses.notes=$("#xn",mm).value; Store.save(); closeModal(); } };
+          mm.onclick=ev=>{ if(ev.target.closest("[data-ok]")){ ses.notes=$("#xn",mm).value; Store.save(); closeModal(); refreshCard(xi); } };
+        });
+      }
+      if(a==="setup"){
+        closeModal();
+        const exLib=exById(ses.exerciseId);
+        modal(`<h2>Setup note</h2>
+          <p class="muted">Saved to <b>${esc(ex.name)}</b> and shown every time you do it — seat height, pin numbers, grip, etc. Carries into any ${term("meso")}.</p>
+          <textarea id="sn" rows="3" placeholder="Seat pin 4, back pad 2, handle notch 3…">${esc(exLib?.setup||"")}</textarea>
+          <button class="btn btn-primary btn-block" style="margin-top:14px" data-ok>Save</button>
+          ${exLib?.setup?`<button class="btn btn-ghost btn-block" style="margin-top:8px" data-clear>Remove setup note</button>`:""}`, mm=>{
+          mm.onclick=ev=>{
+            if(ev.target.closest("[data-clear]")){ if(exLib) delete exLib.setup; Store.save(); closeModal(); refreshCard(xi); return; }
+            if(ev.target.closest("[data-ok]")){
+              const v=$("#sn",mm).value.trim();
+              if(exLib){ if(v) exLib.setup=v; else delete exLib.setup; }
+              Store.save(); closeModal(); refreshCard(xi);
+            }
+          };
         });
       }
     };
@@ -3509,7 +3592,7 @@ VIEWS.settings=function(){
       <p class="faint" style="margin:-4px 0 6px">Optional. Age and body metrics only feed cardio heart-rate zones — never your lifting progression.</p>
       <div class="grid2">
         <div><label>Gender</label><select id="pgender">
-          ${["","Female","Male","Other","Prefer not to say"].map(g=>`<option value="${g}" ${(P.gender||"")===g?"selected":""}>${g||"—"}</option>`).join("")}</select></div>
+          ${["","Female","Male","Prefer not to say"].map(g=>`<option value="${g}" ${(P.gender||"")===g?"selected":""}>${g||"—"}</option>`).join("")}</select></div>
         <div><label>Age</label><input id="page" type="number" min="10" max="100" value="${P.age??""}" placeholder="Optional"></div>
         <div><label>Weight (${unitLabel()})</label><input id="pweight" type="number" step="0.1" value="${P.weightKg!=null?dispW(P.weightKg):""}" placeholder="Optional"></div>
         <div><label>Height (cm)</label><input id="pheight" type="number" min="100" max="230" value="${P.heightCm??""}" placeholder="Optional"></div>
