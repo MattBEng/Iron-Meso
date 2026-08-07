@@ -245,6 +245,10 @@ canvas.chart{width:100%; height:180px; display:block}
 .spm-target{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--text);opacity:.55}
 .spm-val{width:52px;text-align:right;font-size:13px;font-weight:700;flex:0 0 auto}
 .bwcell{display:flex;align-items:center;justify-content:center;background:var(--raised);border-radius:var(--r-xs,8px);font-weight:800;color:var(--muted);font-size:13px}
+.repcell{position:relative}
+.settype-badge{display:inline-flex;align-items:center;justify-content:center;background:var(--accent);color:#fff;font-size:10px;font-weight:800;padding:1px 6px;border-radius:6px;letter-spacing:.03em}
+.repcell .settype-badge{position:absolute;top:-9px;right:-4px;z-index:2;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.settype-opt{height:auto;padding:10px 12px;flex-direction:column;align-items:stretch}
 .scale-ends{display:flex;justify-content:space-between;font-size:11px;color:var(--faint);margin:4px 2px 0;font-weight:600}
 .ro-banner{background:var(--raised);border:1px solid var(--line);border-radius:var(--r-sm);
   padding:10px 12px;margin-bottom:12px;font-size:13px;color:var(--muted);font-weight:600}
@@ -800,7 +804,10 @@ class ProgressionEngine{
     const last=hist[0];
     const ex=exById(exId);
     const lower=ex && LOWER.has(ex.muscle);
-    const sets=last.sets;
+    // Exclude AMRAP / myorep sets: their reps are intentionally variable (to
+    // failure), so they shouldn't drive the working-weight or load decision.
+    const sets=last.sets.filter(s=>!s.type || s.type==="normal");
+    if(!sets.length) return null;    // only special sets logged — no standard progression
     // Working weight: modal weight across sets (ties -> heavier)
     const counts=new Map();
     sets.forEach(s=>counts.set(s.kg,(counts.get(s.kg)||0)+1));
@@ -1973,6 +1980,14 @@ function cardioCardHTML(ses, xi, ex){
     </div>
   </div>`;
 }
+const SET_TYPES={
+  normal: {badge:"",   label:"Regular",       desc:"Straight set"},
+  amrap:  {badge:"AMRAP", label:"AMRAP",       desc:"As many reps as possible on the last set"},
+  my:     {badge:"MY",  label:"Myorep",        desc:"Rest-pause: short rests, extra mini-sets to failure"},
+  mm:     {badge:"MM",  label:"Myorep Match",  desc:"Match the myorep count across clusters"},
+};
+function setTypeBadge(t){ const d=SET_TYPES[t]; return (d&&d.badge)? `<span class="settype-badge" data-tt="${t}">${d.badge}</span>` : ""; }
+
 function setRowHTML(ses, xi, x, si){
   const id=`${xi}:${si}`;
   const show=x.touched||x.done;   // expected values ghost as placeholders until entered
@@ -1981,7 +1996,7 @@ function setRowHTML(ses, xi, x, si){
     ${bw
       ? `<div class="bwcell" aria-label="Bodyweight">BW</div>`
       : `<input type="number" inputmode="decimal" step="any" value="${show?dispW(x.kg):""}" placeholder="${dispW(x.kg)}" data-f="kg" data-set="${id}" aria-label="Set ${si+1} weight, expected ${dispW(x.kg)}">`}
-    <input type="number" inputmode="numeric" value="${show?x.reps:""}" placeholder="${x.reps}" data-f="reps" data-set="${id}" aria-label="Set ${si+1} reps, expected ${x.reps}">
+    <div class="repcell">${setTypeBadge(x.type)}<input type="number" inputmode="numeric" value="${show?x.reps:""}" placeholder="${x.reps}" data-f="reps" data-set="${id}" aria-label="Set ${si+1} reps, expected ${x.reps}"></div>
     <select data-f="rir" data-set="${id}" aria-label="${FUN()?`Set ${si+1} feel`:`Set ${si+1} reps in reserve`}">
       ${FUN()
         ? FEELS.map(([v,lb])=>`<option value="${v}" ${feelBucket(x.rir)===v?"selected":""}>${lb}</option>`).join("")
@@ -2357,12 +2372,27 @@ function bindWorkout(){
         <div class="stack" style="margin-top:12px">
           <button class="btn btn-ghost" data-sa="dup">Duplicate set</button>
           <button class="btn btn-danger" data-sa="del" ${ses.sets.length<=1?"disabled style='opacity:.4'":""}>Delete this set</button>
+        </div>
+        <div class="kicker" style="margin-top:16px">Set type</div>
+        <div class="stack" style="margin-top:8px">
+          ${Object.entries(SET_TYPES).map(([k,d])=>`
+            <button class="btn btn-ghost settype-opt" data-st="${k}" style="text-align:left;${(set.type||"normal")===k?"border-color:var(--accent);color:var(--accent)":""}">
+              <div style="display:flex;align-items:center;gap:8px">
+                ${d.badge?`<span class="settype-badge">${d.badge}</span>`:`<span style="width:2px"></span>`}
+                <span style="font-weight:800">${d.label}</span>
+                ${(set.type||"normal")===k?'<span style="margin-left:auto">✓</span>':""}
+              </div>
+              <div class="faint" style="margin-top:2px">${d.desc}</div>
+            </button>`).join("")}
         </div>`, m=>{
         m.onclick=ev=>{
+          const stBtn=ev.target.closest("[data-st]");
+          if(stBtn){ set.type=stBtn.dataset.st==="normal"?null:stBtn.dataset.st;
+            save(); closeModal(); refreshCard(xi); return; }
           const sa=ev.target.closest("[data-sa]")?.dataset.sa; if(!sa) return;
           if(sa==="dup"){
             ses.sets.splice(si+1,0,{kg:set.kg, reps:set.reps, rir:set.rir,
-              expReps:set.expReps??set.reps, done:false, at:null});
+              expReps:set.expReps??set.reps, done:false, at:null, type:set.type||null});
           }
           if(sa==="del"){
             if(ses.sets.length<=1) return;
