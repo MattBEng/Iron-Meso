@@ -238,6 +238,13 @@ canvas.chart{width:100%; height:180px; display:block}
 .mgfilter .typechip{white-space:nowrap;flex:0 0 auto}
 .linkdate{color:var(--accent);font-weight:700;background:none;border:0;padding:0;font:inherit}
 .cutie-card{border-color:rgba(224,85,156,.35);background:linear-gradient(180deg,rgba(224,85,156,.06),transparent)}
+.spm-row{display:flex;align-items:center;gap:10px;margin-bottom:7px}
+.spm-label{width:84px;font-size:13px;color:var(--muted);font-weight:600;flex:0 0 auto}
+.spm-track{flex:1;height:18px;background:var(--raised);border-radius:6px;position:relative;overflow:hidden}
+.spm-fill{height:100%;border-radius:6px;transition:width .3s}
+.spm-target{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--text);opacity:.55}
+.spm-val{width:52px;text-align:right;font-size:13px;font-weight:700;flex:0 0 auto}
+.bwcell{display:flex;align-items:center;justify-content:center;background:var(--raised);border-radius:var(--r-xs,8px);font-weight:800;color:var(--muted);font-size:13px}
 .scale-ends{display:flex;justify-content:space-between;font-size:11px;color:var(--faint);margin:4px 2px 0;font-weight:600}
 .ro-banner{background:var(--raised);border:1px solid var(--line);border-radius:var(--r-sm);
   padding:10px 12px;margin-bottom:12px;font-size:13px;color:var(--muted);font-weight:600}
@@ -819,6 +826,29 @@ class ProgressionEngine{
     // Assisted exercises (assisted pull-up/dip machines) invert the logic:
     // LESS assistance weight = harder = progress. We flip the sign of every
     // load change so suggestions move the right way, and clamp at 0 (unassisted).
+    // Bodyweight exercises with NO added load progress by REPS, not weight — you
+    // can't modulate bodyweight week to week, so the target rep count rises when
+    // you beat it with reps in reserve. (Loaded bodyweight — weighted pull-ups —
+    // falls through to normal weight progression.)
+    const bodyweight = !!(ex && ex.equipment==="Bodyweight") && lastKg===0;
+    if(bodyweight){
+      const avgReps=Math.round(work.reduce((t,s)=>t+s.reps,0)/work.length);
+      let repTarget=targetReps, reason;
+      if(hitAll && avgRIR>targetRIR && minRIR>=targetRIR){
+        repTarget = (recovMod===0? targetReps : avgReps + (recovMod===1?2:1));
+        reason = recovMod===0? "Strong, but recovery is poor — hold the rep target."
+               : "Beat the target with reps to spare — aim for more reps.";
+      } else if(hitAll){
+        repTarget = recovMod===0? targetReps : avgReps+1;
+        reason = "Hit the target — add a rep next time.";
+      } else if(hitMost && nearAll){
+        repTarget = targetReps; reason="Most sets there — repeat and complete every rep.";
+      } else {
+        repTarget = Math.max(1, targetReps-1); reason="Short of target — drop a rep and rebuild.";
+      }
+      return {kg:0, lastKg:0, diff:0, reps:repTarget, bodyweight:true, reason,
+        lastSummary:`bodyweight × ${work.map(s=>s.reps).join("/")} @~${Math.round(avgRIR*10)/10}RIR`};
+    }
     const assisted = !!(ex && ex.assisted);
     const dir = assisted? -1 : 1;
     const bigInc = (lower? st.incLower : st.incUpper) * dir;
@@ -862,7 +892,7 @@ class ChartManager{
     const muted=css.getPropertyValue("--muted").trim();
     if(!data.length){ ctx.fillStyle=muted; ctx.font="600 13px sans-serif";
       ctx.textAlign="center"; ctx.fillText("No data yet",W/2,H/2); return; }
-    const pad={l:38,r:10,t:12,b:22};
+    const pad={l:44,r:14,t:12,b:22};
     const ys=data.map(d=>d.y);
     let ymin=Math.min(...ys), ymax=Math.max(...ys);
     if(ymin===ymax){ ymin=ymin*0.9-1; ymax=ymax*1.1+1; }
@@ -877,18 +907,27 @@ class ChartManager{
       ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(W-pad.r,y); ctx.stroke();
       ctx.textAlign="right"; ctx.fillText(yFmt(Math.round(v*10)/10), pad.l-5, y+3);
     }
-    // x labels: first, middle, last
-    ctx.textAlign="center";
-    [0, Math.floor((data.length-1)/2), data.length-1]
-      .filter((v,i,a)=>a.indexOf(v)===i)
-      .forEach(i=>ctx.fillText(String(data[i].x).slice(0,10), px(i), H-6));
+    // x labels for LINE charts (bar charts draw their own slot-aligned labels below)
+    if(type!=="bar"){
+      ctx.textAlign="center";
+      [0, Math.floor((data.length-1)/2), data.length-1]
+        .filter((v,i,a)=>a.indexOf(v)===i)
+        .forEach(i=>ctx.fillText(String(data[i].x).slice(0,10), px(i), H-6));
+    }
     if(type==="bar"){
-      const bw=clamp((W-pad.l-pad.r)/data.length*.6, 3, 34);
+      // Bars sit in evenly divided slots INSET from the axes, so the first bar
+      // never overlaps the y-labels and the last never clips the right edge.
+      const bx=i=>pad.l+(W-pad.l-pad.r)*((i+0.5)/data.length);
+      const bw=clamp((W-pad.l-pad.r)/data.length*.62, 3, 40);
       ctx.fillStyle=color;
-      data.forEach((d,i)=>{ const x=px(i)-bw/2, y=py(d.y), h=Math.max(2,H-pad.b-y);
+      data.forEach((d,i)=>{ const x=bx(i)-bw/2, y=py(d.y), h=Math.max(2,H-pad.b-y);
         ctx.beginPath();
         if(ctx.roundRect) ctx.roundRect(x,y,bw,h,3); else ctx.rect(x,y,bw,h);
         ctx.fill(); });
+      // x labels aligned to the bar slots (not edge px)
+      ctx.fillStyle=muted; ctx.textAlign="center";
+      const idxs=data.length<=6? data.map((_,i)=>i) : [0,Math.floor((data.length-1)/2),data.length-1];
+      idxs.filter((v,i,a)=>a.indexOf(v)===i).forEach(i=>ctx.fillText(String(data[i].x).slice(0,10), bx(i), H-6));
     } else {
       if(fill){
         const g=ctx.createLinearGradient(0,pad.t,0,H-pad.b);
@@ -1016,7 +1055,8 @@ function closeModal(fromPop){
         _modalPopTimer=null;
         if(_modalHistory && !$("#overlay").innerHTML){   // still nothing open → pop it
           _modalHistory=false;
-          _navigating=true; try{ history.back(); }catch(_){} _navigating=false;
+          _modalPopPending=true;         // the popstate this triggers is ours; ignore it
+          try{ history.back(); }catch(_){ _modalPopPending=false; }
         }
       }, 0);
     }
@@ -1053,7 +1093,7 @@ function go(view, ...args){
    We keep AT MOST one DETAIL entry no matter how many screens you visit, so
    back is always a single, predictable hop to home. All navigation funnels
    through syncHistory; a guard prevents popstate-driven nav from re-stacking. */
-let _histReady=false, _navigating=false, _atDetail=false, _modalHistory=false, _modalPopTimer=null;
+let _histReady=false, _navigating=false, _atDetail=false, _modalHistory=false, _modalPopTimer=null, _modalPopPending=false;
 function syncHistory(name){
   if(_navigating) return;                       // popstate is driving; don't touch the stack
   try{
@@ -1083,6 +1123,7 @@ window.addEventListener("popstate", ()=>{
   // us on BASE → show home. If we were already at home/BASE, let it be (the OS
   // handles closing; we don't re-push, so a second back exits).
   if(_navigating) return;                        // our own history.back() above
+  if(_modalPopPending){ _modalPopPending=false; return; }   // our own deferred modal-entry pop
   // A modal is open → back closes the modal, nothing else moves.
   if($("#overlay").innerHTML){ closeModal(true); return; }
   // If a read-only/future preview is open, back dismisses THAT first and returns
@@ -1844,15 +1885,20 @@ VIEWS.workout=function(){
             log:{minutes:slot.minutes||20, avgHR:null, distanceKm:null, level:null, speed:null, incline:null}, sets:[]};
         }
         const sug=ProgressionEngine.suggest(slot.exerciseId, slot.reps, slot.rir);
+        const exRef=exById(slot.exerciseId);
+        const isBW = !!(exRef && exRef.equipment==="Bodyweight");
         let kg=sug? sug.kg : 0;
+        // reps target: bodyweight uses the engine's rep suggestion, else the slot's
+        const repTarget = (sug && sug.bodyweight)? sug.reps : slot.reps;
         // volume ramp: +1 set per week after week 1 (capped +2); deload halves sets
         let nSets=slot.sets + (meso.rampSets && !deload? Math.min(pos.week-1, 2):0);
-        if(deload){ nSets=Math.max(1, Math.ceil(slot.sets/2)); if(sug) kg=Math.round((sug.lastKg*0.6)/wStep())*wStep(); }
-        return {slotId:slot.id, exerciseId:slot.exerciseId,
-          target:{sets:nSets, reps:slot.reps, rir:slot.rir, rest:slot.rest, notes:slot.notes},
-          suggestion: deload&&sug? {...sug, kg, diff:kg-sug.lastKg, reason:FUN()?"Recovery week — lighter and shorter on purpose.":"Deload — ~60% load, half the sets."} : sug,
+        if(deload){ nSets=Math.max(1, Math.ceil(slot.sets/2)); if(sug && !isBW) kg=Math.round((sug.lastKg*0.6)/wStep())*wStep(); }
+        return {slotId:slot.id, exerciseId:slot.exerciseId, bodyweight:isBW,
+          target:{sets:nSets, reps:repTarget, rir:slot.rir, rest:slot.rest, notes:slot.notes},
+          suggestion: deload&&sug&&!isBW? {...sug, kg, diff:kg-sug.lastKg, reason:FUN()?"Recovery week — lighter and shorter on purpose.":"Deload — ~60% load, half the sets."} : sug,
           notes:"", skipped:false, rowsReady:true,
-          sets:buildGhostRows(slot.exerciseId, nSets, kg, slot.reps, slot.rir, sug, deload)};
+          sets: isBW? buildSetRows(nSets, 0, repTarget, slot.rir)
+                    : buildGhostRows(slot.exerciseId, nSets, kg, slot.reps, slot.rir, sug, deload)};
       })
     };
     Store.save(); Store.flush();
@@ -1882,8 +1928,10 @@ function exCardHTML(ses, xi){
       <button class="iconbtn" data-exmenu="${xi}" aria-label="Exercise options">⋯</button>
     </div>
     ${t.notes?`<div class="pinned"><span aria-hidden="true">📌</span>${esc(t.notes)}</div>`:""}
-    ${ses._edit? "" : sug? `<div class="sugline num"><b>${(exById(ses.exerciseId)?.assisted)? `${dispW(Math.max(0,sug.kg-wStep()*2))}–${dispW(sug.kg)}` : `${dispW(sug.kg)}–${dispW(sug.kg+wStep()*2)}`}${unitLabel()}${(exById(ses.exerciseId)?.assisted)?" assist":""}</b> · last ${sug.lastSummary} · ${sug.reason}</div>`
-         : `<div class="faint" style="margin:6px 0 0">${FUN()?`First time — find a weight where ${t.reps} reps feels ${feelWord(t.rir).toLowerCase()}.`:`First time — find your ${t.reps}-rep @${t.rir}RIR load.`}</div>`}
+    ${ses._edit? "" : sug? (sug.bodyweight
+         ? `<div class="sugline num"><b>Aim for ${sug.reps} reps</b> · last ${sug.lastSummary} · ${sug.reason}</div>`
+         : `<div class="sugline num"><b>${(exById(ses.exerciseId)?.assisted)? `${dispW(Math.max(0,sug.kg-wStep()*2))}–${dispW(sug.kg)}` : `${dispW(sug.kg)}–${dispW(sug.kg+wStep()*2)}`}${unitLabel()}${(exById(ses.exerciseId)?.assisted)?" assist":""}</b> · last ${sug.lastSummary} · ${sug.reason}</div>`)
+         : `<div class="faint" style="margin:6px 0 0">${ses.bodyweight?`Bodyweight — aim for ${t.reps} good reps.`:(FUN()?`First time — find a weight where ${t.reps} reps feels ${feelWord(t.rir).toLowerCase()}.`:`First time — find your ${t.reps}-rep @${t.rir}RIR load.`)}</div>`}
     <div class="setgrid" data-grid="${xi}">
       <span></span><span class="h">Weight (${unitLabel()})</span><span class="h">Reps</span><span class="h">${term("rirHead")}</span><span class="h">Log</span>
       ${ses.sets.map((x,si)=>setRowHTML(ses,xi,x,si)).join("")}
@@ -1912,6 +1960,13 @@ function cardioCardHTML(ses, xi, ex){
       <div><label>Speed (opt)</label><input type="number" inputmode="decimal" step="0.1" value="${lg.speed||""}" placeholder="km/h" data-cf="speed" data-card-in="${xi}"></div>
       <div><label>Incline % (opt)</label><input type="number" inputmode="decimal" step="0.5" value="${lg.incline||""}" placeholder="opt" data-cf="incline" data-card-in="${xi}"></div>
     </div>
+    <label style="display:flex;align-items:center;gap:10px;text-transform:none;font-size:14px;margin-top:10px">
+      <input type="checkbox" ${t.tabataOn?"checked":""} data-tabtog="${xi}" style="width:20px;height:20px"> Tabata / intervals</label>
+    ${t.tabataOn?`<div class="grid3" style="margin-top:6px">
+      <div><label>Work (s)</label><input type="number" inputmode="numeric" value="${t.tabata?.work??20}" data-tf="work" data-tab-in="${xi}"></div>
+      <div><label>Rest (s)</label><input type="number" inputmode="numeric" value="${t.tabata?.rest??10}" data-tf="rest" data-tab-in="${xi}"></div>
+      <div><label>Rounds</label><input type="number" inputmode="numeric" value="${t.tabata?.rounds??10}" data-tf="rounds" data-tab-in="${xi}"></div>
+    </div>`:""}
     <div class="row split" style="margin-top:10px;align-items:center">
       <span class="zchip" data-z="${z||""}" id="cz-${xi}">${z?`Zone ${z}`:"Zone —"}</span>
       <button class="btn ${done?"btn-ghost":"btn-primary"}" style="min-height:44px;padding:0 20px" data-cardiolog="${xi}">${done?"✓ Logged":"Log this cardio"}</button>
@@ -1921,8 +1976,11 @@ function cardioCardHTML(ses, xi, ex){
 function setRowHTML(ses, xi, x, si){
   const id=`${xi}:${si}`;
   const show=x.touched||x.done;   // expected values ghost as placeholders until entered
+  const bw=ses.bodyweight;
   return `<button class="sn" data-setmenu="${id}" aria-label="Set ${si+1} options"><span class="dots">⋮</span>${si+1}</button>
-    <input type="number" inputmode="decimal" step="any" value="${show?dispW(x.kg):""}" placeholder="${dispW(x.kg)}" data-f="kg" data-set="${id}" aria-label="Set ${si+1} weight, expected ${dispW(x.kg)}">
+    ${bw
+      ? `<div class="bwcell" aria-label="Bodyweight">BW</div>`
+      : `<input type="number" inputmode="decimal" step="any" value="${show?dispW(x.kg):""}" placeholder="${dispW(x.kg)}" data-f="kg" data-set="${id}" aria-label="Set ${si+1} weight, expected ${dispW(x.kg)}">`}
     <input type="number" inputmode="numeric" value="${show?x.reps:""}" placeholder="${x.reps}" data-f="reps" data-set="${id}" aria-label="Set ${si+1} reps, expected ${x.reps}">
     <select data-f="rir" data-set="${id}" aria-label="${FUN()?`Set ${si+1} feel`:`Set ${si+1} reps in reserve`}">
       ${FUN()
@@ -2185,6 +2243,17 @@ function bindWorkout(){
 
   // Inline edits on any set field
   $("#view").oninput=e=>{
+    const tin=e.target.closest("[data-tab-in]");
+    if(tin){
+      const xi=+tin.dataset.tabIn, ses=s.exercises[xi]; if(!ses||!ses.cardio) return;
+      ses.target.tabata=ses.target.tabata||{work:20,rest:10,rounds:10};
+      const f=tin.dataset.tf, v=clamp(parseInt(tin.value)||0, f==="rest"?0:1, 900);
+      ses.target.tabata[f]=v;
+      const tb=ses.target.tabata;
+      ses.target.minutes=Math.max(1, Math.round(tb.rounds*(tb.work+tb.rest)/60));
+      ses.log.minutes=ses.target.minutes;
+      save(); return;
+    }
     const cel=e.target.closest("[data-card-in]");
     if(cel){
       const xi=+cel.dataset.cardIn, ses=s.exercises[xi]; if(!ses||!ses.cardio) return;
@@ -2226,6 +2295,18 @@ function bindWorkout(){
 
   $("#view").onclick=e=>{
     // Log / unlog a cardio item
+    const tt=e.target.closest("[data-tabtog]");
+    if(tt){
+      const xi=+tt.dataset.tabtog, ses=s.exercises[xi]; if(!ses||!ses.cardio) return;
+      ses.target.tabataOn=tt.checked;
+      if(tt.checked){
+        ses.target.tabata=ses.target.tabata||{work:20,rest:10,rounds:10};
+        const tb=ses.target.tabata;
+        ses.target.minutes=Math.max(1, Math.round(tb.rounds*(tb.work+tb.rest)/60));
+        ses.log.minutes=ses.target.minutes;
+      }
+      save(); refreshCard(xi); return;
+    }
     const cl=e.target.closest("[data-cardiolog]");
     if(cl){
       const xi=+cl.dataset.cardiolog, ses=s.exercises[xi];
@@ -3249,17 +3330,26 @@ VIEWS.analytics=function(){
     ${cutieCardHTML(logs, meso, pos)}
     <div class="card"><div class="kicker">Sets per muscle · weekly view</div>
       <div class="stack" style="margin-top:8px">
-        ${Object.keys(targetPerMuscle).sort((a,b)=>targetPerMuscle[b]-targetPerMuscle[a]).map(mg=>{
-          const t=targetPerMuscle[mg], a=actualPerMuscle[mg]||0;
-          const max=Math.max(t,a,1);
-          return `<div class="zrow"><span class="zl" style="width:82px">${mg}</span>
-            <div class="track" style="position:relative">
-              <div class="fillz" style="width:${Math.round(100*t/max)}%;background:var(--line)"></div>
-              <div class="fillz" style="position:absolute;inset:0 auto 0 0;width:${Math.round(100*a/max)}%;background:${a>=t?"var(--green)":"var(--amber)"}"></div>
-            </div><span class="zm num">${a}/${t}</span></div>`;
-        }).join("")||`<div class="faint">No template targets</div>`}
+        ${(()=>{
+          const muscles=[...new Set([...Object.keys(targetPerMuscle),...Object.keys(actualPerMuscle)])];
+          if(!muscles.length) return `<div class="faint">No data yet</div>`;
+          // ONE shared scale = the biggest actual (or target) across all muscles, so
+          // bar length is comparable between rows: priority is obvious at a glance.
+          const gmax=Math.max(1,...muscles.map(m=>Math.max(actualPerMuscle[m]||0, targetPerMuscle[m]||0)));
+          return muscles.sort((a,b)=>(actualPerMuscle[b]||0)-(actualPerMuscle[a]||0)).map(mg=>{
+            const t=targetPerMuscle[mg]||0, a=actualPerMuscle[mg]||0;
+            const met=t>0 && a>=t;
+            return `<div class="spm-row">
+              <span class="spm-label">${mg}</span>
+              <div class="spm-track">
+                <div class="spm-fill" style="width:${Math.round(100*a/gmax)}%;background:${met?"var(--green)":a>0?"var(--accent)":"var(--line)"}"></div>
+                ${t>0?`<div class="spm-target" style="left:${Math.round(100*t/gmax)}%" title="target ${t}"></div>`:""}
+              </div>
+              <span class="spm-val num">${a}${t>0?`/${t}`:""}</span></div>`;
+          }).join("");
+        })()}
       </div>
-      <p class="faint" style="margin:8px 0 0">Colored = actual sets/week · gray = template target.</p></div>
+      <p class="faint" style="margin:8px 0 0">Bars scaled to your highest muscle. Tick = weekly target. Green = target met.</p></div>
     ${prList.length? `<div class="card"><div class="kicker">PRs this ${term("meso")}</div>
       <div class="stack" style="margin-top:8px">${prList.slice(0,6).map(p=>
         `<div class="row split num"><span>${esc(p.name)}</span>
