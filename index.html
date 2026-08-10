@@ -325,7 +325,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 const $ = (s, el=document)=>el.querySelector(s);
 const $$ = (s, el=document)=>[...el.querySelectorAll(s)];
 const uid = ()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36);
-const todayISO = ()=>new Date().toISOString().slice(0,10);
+// Local calendar date (YYYY-MM-DD) from the phone's timezone. NOT toISOString(),
+// which converts to UTC and shifts early-morning sessions to the wrong day.
+const todayISO = ()=>{
+  const d=new Date();
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), day=String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+};
 const fmtDate = iso=>new Date(iso+"T12:00").toLocaleDateString(undefined,{day:"numeric",month:"short"});
 const esc = s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
@@ -680,9 +686,10 @@ function zoneFor(hr){
   return 5;
 }
 function isoWeekStart(dISO){
-  const dt=new Date(dISO+"T12:00");
-  dt.setDate(dt.getDate()-((dt.getDay()+6)%7));
-  return dt.toISOString().slice(0,10);
+  const dt=new Date(dISO+"T12:00");                 // local noon: no UTC date-shift
+  dt.setDate(dt.getDate()-((dt.getDay()+6)%7));     // back up to Monday
+  const y=dt.getFullYear(), m=String(dt.getMonth()+1).padStart(2,"0"), d=String(dt.getDate()).padStart(2,"0");
+  return `${y}-${m}-${d}`;
 }
 /** Minutes per zone for cardio sessions in [fromISO, toISO] (inclusive; null = open). */
 function zoneMinutes(fromISO, toISO){
@@ -795,6 +802,37 @@ function exercisePR(exId){
 }
 
 /* ---------------- progression engine ---------------- */
+/* ---- Volume ramp ----
+   Each exercise ramps from a start count to a per-muscle CEILING, landing on the
+   ceiling in the final REAL week (deload excluded), spread evenly across the real
+   weeks. Ceiling by priority: High = endTarget, Normal = endTarget−1, Low = −2.
+   Repeat runs start the ramp one week in (week-2 level). When the set count holds
+   week to week, normal load/rep progression carries the session (handled by the
+   engine). */
+function realWeeks(meso){ return Math.max(1, meso.weeks - (meso.deload?1:0)); }
+function muscleCeiling(meso, muscle){
+  const end = meso.endTargetSets || 5;
+  const pri = (meso.priority && meso.priority[muscle]) || "normal";
+  const drop = pri==="high"?0 : pri==="low"?2 : 1;   // high=end, normal=end-1, low=end-2
+  return Math.max(1, end - drop);
+}
+/** Sets prescribed for an exercise on a given (1-based) real-training week. */
+function rampedSets(meso, slot, week, deload){
+  if(deload) return Math.max(1, Math.ceil((slot.baseSets||slot.sets)/2));
+  if(!meso.rampSets){ return slot.sets; }            // ramp off → flat template sets
+  const ex=exById(slot.exerciseId);
+  const muscle=ex? ex.muscle : "";
+  const ceiling=muscleCeiling(meso, muscle);
+  const start=Math.min(meso.startSets||2, ceiling);
+  const rw=realWeeks(meso);
+  // repeat runs begin one week in
+  const wk = (meso.repeatRun? week+1 : week);
+  if(rw<=1) return ceiling;
+  // linear interpolation start→ceiling across real weeks, landing on ceiling at rw
+  const frac=Math.min(1, (wk-1)/(rw-1));
+  return Math.round(start + (ceiling-start)*frac);
+}
+
 class ProgressionEngine{
   /**
    * Suggest next load based on the WHOLE last workout for this exercise:
@@ -1423,6 +1461,7 @@ function mesoMenu(id){
       ? `<button class="btn btn-danger" data-a="endmeso">End mesocycle</button>`
       : `<button class="btn btn-ghost" data-a="activate">Set as active</button>
          <button class="btn btn-ghost" data-a="archive">${m.archived?"Unarchive":"Archive"}</button>`}
+    <button class="btn btn-primary" data-a="repeat">Repeat this ${term("meso")} again</button>
     <button class="btn btn-ghost" data-a="dup">Duplicate mesocycle</button>
     <button class="btn btn-ghost" data-a="export">Export as JSON</button>
     <button class="btn btn-danger" data-a="del">Delete</button></div>`, box=>{
@@ -1450,6 +1489,21 @@ function mesoMenu(id){
         return;
       }
       if(a==="archive"){ m.archived=!m.archived; Store.save(); }
+      if(a==="repeat"){
+        const c=JSON.parse(JSON.stringify(m));
+        c.id=uid();
+        c.name=m.name.replace(/ \(run \d+\)$/,"") + ` (run ${( (m.name.match(/run (\d+)/)||[])[1] ? +m.name.match(/run (\d+)/)[1]+1 : 2 )})`;
+        c.days.forEach(d=>{ d.id=uid(); d.exercises.forEach(x=>x.id=uid()); });
+        c.archived=false;
+        c.repeatRun=true;               // ramp starts one week in (week-2 volume)
+        // priorities, start/end sets, rep ranges all carry over unchanged
+        S().mesocycles.push(c);
+        S().activeMesoId=c.id;
+        Store.save(); Store.flush();
+        closeModal();
+        toast(`Repeating — starting at week-2 volume, chase more reps/weight 💪`);
+        go("mesos"); return;
+      }
       if(a==="dup"){
         const c=JSON.parse(JSON.stringify(m)); c.id=uid(); c.name=m.name+" (copy)";
         c.days.forEach(d=>{d.id=uid(); d.exercises.forEach(x=>x.id=uid());});
@@ -1523,6 +1577,7 @@ function editMeso(id){
     // Create and persist immediately — every edit below autosaves,
     // so navigating away never loses work.
     m={id:uid(), name:"", weeks:5, deload:true, split:"Push Pull Legs",
+      rampSets:true, startSets:2, endTargetSets:5, priority:{}, repeatRun:false,
       notes:"", days:SPLITS["Push Pull Legs"].map(n=>({id:uid(), name:n, exercises:[]}))};
     S().mesocycles.push(m);
     if(!S().activeMesoId) S().activeMesoId=m.id;
@@ -1544,7 +1599,16 @@ function editMeso(id){
         <label style="display:flex;align-items:center;gap:10px;text-transform:none;font-size:15px;margin-top:16px">
           <input type="checkbox" id="mdeload" style="width:22px;height:22px" ${m.deload?"checked":""}> Final week is a ${term("deload")}</label>
         <label style="display:flex;align-items:center;gap:10px;text-transform:none;font-size:15px;margin-top:12px">
-          <input type="checkbox" id="mramp" style="width:22px;height:22px" ${m.rampSets?"checked":""}> Volume ramp — add one set per exercise each week (caps at +2, deload resets)</label>
+          <input type="checkbox" id="mramp" style="width:22px;height:22px" ${m.rampSets?"checked":""}> Volume ramp — sets climb to a target over the ${term("meso")}</label>
+        <div id="rampcfg" style="${m.rampSets?"":"display:none"}">
+          <div class="grid2" style="margin-top:10px">
+            <div><label>Start sets (week 1)</label><input id="mstart" type="number" min="1" max="10" value="${m.startSets??2}"></div>
+            <div><label>End-week target sets</label><input id="mend" type="number" min="1" max="12" value="${m.endTargetSets??5}"></div>
+          </div>
+          <div class="kicker" style="margin-top:14px">Muscle priority</div>
+          <p class="faint" style="margin:2px 0 8px">High = target · Normal = target−1 · Low (maintain) = target−2. Locked once the ${term("meso")} starts.</p>
+          <div id="priolist"></div>
+        </div>
         <label>${term("Meso")} notes</label><textarea id="mnotes" rows="2" placeholder="Goals, focus, cues…">${esc(m.notes||"")}</textarea>
       </div>
       <div class="row split" style="margin:6px 2px 10px"><h3>Training days</h3>
@@ -1552,11 +1616,33 @@ function editMeso(id){
       <div id="days">${m.days.map((d,di)=>dayCard(d,di)).join("")}</div>
       <button class="btn btn-primary btn-block" data-a="save" style="margin-top:4px">Done</button>`;
     bindDayEvents();
+    renderPriorities();
+    // ramp config show/hide
+    const ramp=$("#mramp");
+    if(ramp) ramp.addEventListener("change", ()=>{ const c=$("#rampcfg"); if(c) c.style.display=ramp.checked?"":"none"; });
     // autosave on every field edit
     $$("#view input, #view select, #view textarea").forEach(el=>{
       el.addEventListener("input", autosave);
       el.addEventListener("change", autosave);
     });
+  }
+  function renderPriorities(){
+    const host=$("#priolist"); if(!host) return;
+    // muscles actually trained in this meso (non-cardio)
+    const muscles=[...new Set(m.days.flatMap(d=>d.exercises
+      .map(x=>exById(x.exerciseId)).filter(e=>e && e.muscle && e.muscle!=="Cardio").map(e=>e.muscle)))].sort();
+    if(!muscles.length){ host.innerHTML=`<div class="faint">Add exercises to set muscle priorities.</div>`; return; }
+    m.priority=m.priority||{};
+    host.innerHTML=muscles.map(mg=>{
+      const cur=m.priority[mg]||"normal";
+      return `<div class="row split" style="margin-bottom:6px;align-items:center">
+        <span style="font-weight:600">${mg}</span>
+        <select data-prio="${mg}" style="width:130px">
+          ${["high","normal","low"].map(p=>`<option value="${p}" ${cur===p?"selected":""}>${p==="high"?"High":p==="low"?"Low (maintain)":"Normal"}</option>`).join("")}
+        </select></div>`;
+    }).join("");
+    // re-bind autosave to the new selects
+    $$("[data-prio]").forEach(sel=>sel.addEventListener("change", autosave));
   }
   function dayCard(d,di){
     return `<div class="card" data-day="${di}">
@@ -1586,6 +1672,10 @@ function editMeso(id){
     m.weeks=clamp(parseInt($("#mweeks").value)||5,1,16);
     m.deload=$("#mdeload").checked;
     m.rampSets=$("#mramp")?.checked??false;
+    if($("#mstart")) m.startSets=clamp(parseInt($("#mstart").value)||2,1,10);
+    if($("#mend")) m.endTargetSets=clamp(parseInt($("#mend").value)||5,1,12);
+    m.priority=m.priority||{};
+    $$("[data-prio]").forEach(sel=>{ m.priority[sel.dataset.prio]=sel.value; });
     m.notes=$("#mnotes").value;
     $$("[data-dname]").forEach(inp=>m.days[+inp.dataset.dname].name=inp.value.trim()||"Day");
   }
@@ -1642,12 +1732,15 @@ function editMeso(id){
       }
       if(t.dataset.a==="addday"){ collectBasics(); m.days.push({id:uid(),name:"Day "+(m.days.length+1),exercises:[]}); Store.save(); render(); return; }
       if(t.dataset.deld!=null){ collectBasics(); if(confirm("Remove this day?")){ m.days.splice(+t.dataset.deld,1); Store.save(); render(); } return; }
-      if(t.dataset.addx!=null){ collectBasics(); pickExercise(exId=>{
+      if(t.dataset.addx!=null){ collectBasics(); const di=+t.dataset.addx; pickExercise(exId=>{
         const slot=isCardioEx(exId)
           ? {id:uid(), exerciseId:exId, cardio:true, minutes:20, targetHR:null, notes:""}
           : {id:uid(), exerciseId:exId, sets:3, reps:10, rir:2, rest:S().settings.restDefault, notes:""};
-        m.days[+t.dataset.addx].exercises.push(slot);
-        Store.save(); render();
+        m.days[di].exercises.push(slot);
+        Store.save();
+        // open the target editor right away so sets/reps are set intentionally
+        if(!slot.cardio) editSlot(slot, ()=>{Store.save(); render();});
+        else render();
       }); return; }
       if(t.dataset.delx!=null){ collectBasics(); const [di,xi]=t.dataset.delx.split(":").map(Number);
         m.days[di].exercises.splice(xi,1); Store.save(); render(); return; }
@@ -1921,9 +2014,9 @@ VIEWS.workout=function(){
         let kg=sug? sug.kg : 0;
         // reps target: bodyweight uses the engine's rep suggestion, else the slot's
         const repTarget = (sug && sug.bodyweight)? sug.reps : slot.reps;
-        // volume ramp: +1 set per week after week 1 (capped +2); deload halves sets
-        let nSets=slot.sets + (meso.rampSets && !deload? Math.min(pos.week-1, 2):0);
-        if(deload){ nSets=Math.max(1, Math.ceil(slot.sets/2)); if(sug && !isBW) kg=Math.round((sug.lastKg*0.6)/wStep())*wStep(); }
+        // volume ramp (per-exercise, per-muscle ceiling, lands in final real week)
+        let nSets=rampedSets(meso, slot, pos.week, deload);
+        if(deload && sug && !isBW){ kg=Math.round((sug.lastKg*0.6)/wStep())*wStep(); }
         return {slotId:slot.id, exerciseId:slot.exerciseId, bodyweight:isBW,
           target:{sets:nSets, reps:repTarget, rir:slot.rir, rest:slot.rest, notes:slot.notes},
           suggestion: deload&&sug&&!isBW? {...sug, kg, diff:kg-sug.lastKg, reason:FUN()?"Recovery week — lighter and shorter on purpose.":"Deload — ~60% load, half the sets."} : sug,
@@ -2196,8 +2289,8 @@ function startFuturePreview(week, dayIdx){
           log:{minutes:slot.minutes||20, avgHR:null, distanceKm:null}, sets:[]};
       const sug=ProgressionEngine.suggest(slot.exerciseId, slot.reps, slot.rir);
       let kg=sug?sug.kg:0;
-      let nSets=slot.sets + (meso.rampSets && !deload? Math.min(week-1,2):0);
-      if(deload){ nSets=Math.max(1,Math.ceil(slot.sets/2)); if(sug) kg=Math.round((sug.lastKg*0.6)/wStep())*wStep(); }
+      let nSets=rampedSets(meso, slot, week, deload);
+      if(deload && sug){ kg=Math.round((sug.lastKg*0.6)/wStep())*wStep(); }
       return {slotId:slot.id, exerciseId:slot.exerciseId,
         target:{sets:nSets, reps:slot.reps, rir:slot.rir, rest:slot.rest, notes:slot.notes},
         suggestion:sug, notes:"", skipped:false, rowsReady:true, _edit:false,
@@ -2850,6 +2943,108 @@ function checkPR(exId, kg, reps){
    the OS suspends JS while backgrounded, on return it shows the true remaining
    time (or fires completion) instead of a frozen count. */
 let _restEnd=0, _restFired=false;
+const REST_OVER_MSGS=[
+ "Rest over — slay time, bish 💅",
+ "Break's done, go be iconic 🔥",
+ "Up you get, gorgeous 💪",
+ "Rest's over — back to business, queen 👑",
+ "Enough lounging, hot stuff 😏",
+ "Time's up — show that bar who's boss 💥",
+ "Break over, let's gooo 🚀",
+ "Rest done — reapply that lip gloss and lift 💋",
+ "Chop chop, cutie — next set 💕",
+ "That's enough sitting pretty, superstar ✨",
+ "Rest over — go get 'em, tiger 🐯",
+ "Back to it, babe — you've got this 💪",
+ "Break's up — time to be unstoppable 🔥",
+ "Rest over — let's make it look easy 😌",
+ "Up and at 'em, glamazon 💫",
+ "Done resting — go flex on 'em 💅",
+ "Rest's over, no excuses missy 😤",
+ "Time to move, moneymaker 💰",
+ "Break done — channel your inner beast 🐆",
+ "Rest over — sweat is just sparkle 💦",
+ "Come on legend, next set awaits 🏆",
+ "Enough chilling — go be great 🌟",
+ "Rest's up — make your muscles proud 💪",
+ "Back to work, wonder woman 🦸‍♀️",
+ "Break over — you're built for this, babe 💖",
+ "Rest done — let's raise the bar (literally) 🏋️‍♀️",
+ "Up you get — greatness won't wait ⏰",
+ "Rest over — go on, show off 😏",
+ "Time's up, sweetheart — lift like you mean it 💥",
+ "Break's done — be the main character 🎬",
+ "Rest over — your comeback starts now 🔥",
+ "Enough rest — go collect those gains, hun 💅",
+ "Back at it — the weights missed you 🏋️",
+ "Rest done — strut over and lift 💃",
+ "Break over — you're too fine to quit now 😍",
+ "Up you get — future you says thanks 💕",
+ "Rest's up — go be that girl 💫",
+ "Time to grind, gorgeous 💪",
+ "Break over — sparkle and squat ✨",
+ "Rest done — let's get sweaty and cute 💦",
+ "Come on, cupcake — next set 🧁",
+ "Rest over — flex now, flaunt later 💅",
+ "Enough sitting — go be a force 🌪️",
+ "Back to it — you're on fire today 🔥",
+ "Rest done — the bar's not gonna lift itself, babe 🏋️‍♀️",
+ "Up you get — slay first, rest later 💋",
+ "Break over — make it count, queen 👑",
+ "Rest's up — go get gorgeous and strong 💪",
+ "Time's up — no rest for the fabulous ✨",
+ "Rest over — go be a whole snack 😋",
+ "Break done — you've got unfinished business 💥",
+ "Up and moving, superstar 🌟",
+ "Rest over — dig deep, diva 💎",
+ "Enough lounging — go earn that glow ✨",
+ "Back to work — you're a machine (a cute one) 🤖",
+ "Rest done — lift heavy, look pretty 💅",
+ "Break's up — go make magic 🪄",
+ "Rest over — you didn't come here to sit, babe 😏",
+ "Up you get — greatness is calling 📞",
+ "Time to move it, hot mumma 🔥",
+ "Rest done — go show that weight who's queen 👑",
+ "Break over — sweat now, shine forever ✨",
+ "Come on, gorgeous — one more won't kill you (probably) 😅",
+ "Rest's up — go be undeniable 💫",
+ "Enough rest — your gains are waiting 💪",
+ "Back at it — you're doing amazing, sweetie 💕",
+ "Rest over — lift like everyone's watching 👀",
+ "Up you get — be bold, be strong, be you ✨",
+ "Break done — time to flex, cutie 💪",
+ "Rest over — go crush it, buttercup 🌼",
+ "Time's up — the grind looks good on you 🔥",
+ "Rest done — channel that boss energy 💼",
+ "Break over — go be a little unstoppable 🚀",
+ "Up you get — you're stronger than yesterday 💪",
+ "Rest over — make those muscles work, missy 😤",
+ "Come on, queen — reign over that rack 👑",
+ "Rest's up — go get 'em, glamazon 💅",
+ "Enough chilling — heat things up 🔥",
+ "Back to it — you gorgeous powerhouse 💥",
+ "Rest done — slay the set, sip the water 💦",
+ "Break over — go be iconic (again) ✨",
+ "Up you get — the bar believes in you 🏋️",
+ "Rest over — flex those fabulous muscles 💪",
+ "Time to move, darling — greatness awaits 🌟",
+ "Rest done — go be a hot little legend 🔥",
+ "Break's up — you've got this in the bag, babe 💼",
+ "Come on, cutie — next set, no drama 💅",
+ "Rest over — strong is your best accessory 💎",
+ "Enough rest — go earn your smoothie 🥤",
+ "Back at it — you're literally that girl 💫",
+ "Rest done — lift now, brag later 😏",
+ "Up you get — sparkle through the pain ✨",
+ "Break over — go make it look effortless 😌",
+ "Rest's up — be fierce, be fabulous, be done resting 🔥",
+ "Time to shine — go get 'em, gorgeous 💖",
+ "Rest over — slay, hydrate, repeat 💦",
+ "Break done — go be a bad girl (at the gym) 😈",
+ "Rest over — your muscles called, they want more 📞",
+ "Up you get — cute is temporary, strong is forever 💪",
+ "Rest's up — go be the moment, babe ✨"];
+function restOverMsg(){ return REST_OVER_MSGS[Math.floor(Math.random()*REST_OVER_MSGS.length)]; }
 function restAlert(){
   // Vibration only — no audio, ever. (Works in foreground on Android.)
   if(!S().settings.restBuzz) return;
@@ -2861,7 +3056,7 @@ function renderRest(){
   const left=Math.round((_restEnd-Date.now())/1000);
   if(left<=0){
     box.innerHTML="";
-    if(!_restFired){ _restFired=true; toast("Rest over — go! 💪"); restAlert(); }
+    if(!_restFired){ _restFired=true; toast(FUN()? restOverMsg() : "Rest over — go!"); restAlert(); }
     _restEnd=0; clearInterval(restInterval); restInterval=null;
     return;
   }
@@ -3072,7 +3267,7 @@ function previewDay(meso, dayIdx, week){
         if(x.cardio || isCardioEx(x.exerciseId))
           return `<div class="setline num"><div class="grow" style="flex:1">${FUN()?"🫀 ":""}${esc(ex?ex.name:"?")}</div>
             <span class="muted">${x.minutes||20} min${x.targetHR?` @ ${x.targetHR}bpm`:""}</span></div>`;
-        let nSets=x.sets + (meso.rampSets && week && !deload? Math.min(week-1,2):0);
+        let nSets=week? rampedSets(meso, x, week, deload) : x.sets;
         let proj="";
         try{
           const sug=ProgressionEngine.suggest(x.exerciseId, x.reps, x.rir);
@@ -3316,7 +3511,8 @@ VIEWS.analytics=function(){
   const logs=meso? st.logs.filter(l=>l.mesoId===meso.id) : st.logs;
   // weekly volume + sets per muscle
   const byWeek={}; // isoWeekKey -> {vol, sets, count, dur}
-  const weekKey=d=>{ const dt=new Date(d+"T12:00"); const on=new Date(dt); on.setDate(dt.getDate()-((dt.getDay()+6)%7)); return on.toISOString().slice(0,10); };
+  const weekKey=d=>{ const dt=new Date(d+"T12:00"); dt.setDate(dt.getDate()-((dt.getDay()+6)%7));
+    const y=dt.getFullYear(), m=String(dt.getMonth()+1).padStart(2,"0"), dd=String(dt.getDate()).padStart(2,"0"); return `${y}-${m}-${dd}`; };
   const setsPerMuscle={};
   logs.forEach(l=>{
     const k=weekKey(l.date);
