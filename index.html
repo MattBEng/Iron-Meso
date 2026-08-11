@@ -1801,20 +1801,24 @@ function editSlot(slot, done){
     });
     return;
   }
+  const timed=!!ex.timed;
   modal(`<h2>${esc(ex.name)}</h2>
     <div class="grid3">
       <div><label>Sets</label><input id="ss" type="number" min="1" value="${slot.sets}"></div>
-      <div><label>Reps</label><input id="sr" type="number" min="1" value="${slot.reps}"></div>
+      ${timed
+        ? `<div><label>Seconds</label><input id="sr" type="number" min="1" value="${slot.secs||30}"></div>`
+        : `<div><label>Reps</label><input id="sr" type="number" min="1" value="${slot.reps}"></div>`}
       <div><label>${term("rirHead")}</label>${FUN()
         ? `<select id="si">${FEELS.map(([v,lb])=>`<option value="${v}" ${feelBucket(slot.rir)===v?"selected":""}>${lb}</option>`).join("")}</select>`
         : `<input id="si" type="number" min="0" max="5" value="${slot.rir}">`}</div>
     </div>
     <label>Rest (seconds)</label><input id="st" type="number" min="0" step="15" value="${slot.rest}">
-    <label>Notes</label><input id="sn" value="${esc(slot.notes||"")}" placeholder="Tempo, grip, cue…">
+    <label>Notes</label><input id="sn" value="${esc(slot.notes||"")}" placeholder="${timed?"Tempo, cue…":"Tempo, grip, cue…"}">
     <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>Done</button>`, mEl=>{
     mEl.onclick=e=>{ if(!e.target.closest("[data-ok]")) return;
       slot.sets=clamp(+$("#ss",mEl).value||3,1,12);
-      slot.reps=clamp(+$("#sr",mEl).value||10,1,50);
+      if(timed){ slot.secs=clamp(+$("#sr",mEl).value||30,1,3600); slot.reps=0; }
+      else slot.reps=clamp(+$("#sr",mEl).value||10,1,50);
       slot.rir=clamp(+$("#si",mEl).value||0,0,5);
       slot.rest=clamp(+$("#st",mEl).value||120,0,900);
       slot.notes=$("#sn",mEl).value;
@@ -1901,6 +1905,9 @@ function editExercise(id, done){
     <label style="display:flex;align-items:center;gap:10px;text-transform:none;font-size:15px;margin-top:14px">
       <input type="checkbox" id="eassist" style="width:22px;height:22px" ${ex.assisted?"checked":""}>
       Assisted (more weight = easier, e.g. assisted pull-up)</label>
+    <label style="display:flex;align-items:center;gap:10px;text-transform:none;font-size:15px;margin-top:10px">
+      <input type="checkbox" id="etime" style="width:22px;height:22px" ${ex.timed?"checked":""}>
+      Time-based hold (log seconds, e.g. plank, dead hang)</label>
     <label>Notes</label><textarea id="eno" rows="2">${esc(ex.notes||"")}</textarea>
     <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>Save exercise</button>`, m=>{
     $("#en",m).focus();
@@ -1912,6 +1919,8 @@ function editExercise(id, done){
       ex.name=name;
       ex.muscle=$("#em",m).value; ex.equipment=$("#ee",m).value; ex.notes=$("#eno",m).value;
       ex.assisted=$("#eassist",m).checked;
+      ex.timed=$("#etime",m).checked;
+      if(ex.timed) ex.assisted=false;   // mutually exclusive with assisted-weight logic
       if(!id) S().exercises.push(ex);
       Store.save(); closeModal(); done(ex.id);
     };
@@ -1942,7 +1951,7 @@ VIEWS.history=function(exId){
     ${hist.length? hist.map(h=>`<div class="card" style="padding:14px">
       <div class="row split"><b class="num">${fmtDate(h.date)}</b>
         <span class="muted num">W${h.week} · vol ${Math.round(h.volume).toLocaleString()} · e1RM ${dispW(h.e1rm)}</span></div>
-      <div class="muted num" style="margin-top:6px">${h.sets.map(s=>`${dispW(s.kg)}×${s.reps}@${s.rir}`).join(" · ")}</div>
+      <div class="muted num" style="margin-top:6px">${h.sets.map(s=>s.secs!=null?`${s.secs}s`:`${dispW(s.kg)}×${s.reps}@${s.rir}`).join(" · ")}</div>
       </div>`).join(""):`<div class="empty">No sets logged yet</div>`}`;
   const cyan=getComputedStyle(document.body).getPropertyValue("--cyan").trim();
   ChartManager.draw($("#c1"), chron.map(h=>({x:fmtDate(h.date), y:dispW(h.e1rm)})));
@@ -1959,6 +1968,9 @@ VIEWS.history=function(exId){
 let restInterval=null;
 
 /** Build pre-filled set rows for a session exercise. */
+function buildTimedRows(count, secs, rir){
+  return Array.from({length:count}, ()=>({kg:0, reps:0, secs, rir, expSecs:secs, done:false, touched:false, at:null}));
+}
 function buildSetRows(count, kg, reps, rir){
   return Array.from({length:count},()=>({kg, reps, rir, expReps:reps, done:false, at:null}));
 }
@@ -1989,6 +2001,10 @@ function upgradeSession(s){
     if(e.bodyweight===undefined && !e.cardio){
       const ex=exById(e.exerciseId);
       e.bodyweight = !!(ex && ex.equipment==="Bodyweight");
+    }
+    if(e.timed===undefined && !e.cardio){
+      const ex=exById(e.exerciseId);
+      e.timed = !!(ex && ex.timed);
     }
     if(e.rowsReady) return;
     const done=(e.sets||[]).map(x=>({...x, done:true}));
@@ -2027,17 +2043,20 @@ VIEWS.workout=function(){
         const sug=ProgressionEngine.suggest(slot.exerciseId, slot.reps, slot.rir);
         const exRef=exById(slot.exerciseId);
         const isBW = !!(exRef && exRef.equipment==="Bodyweight");
+        const isTimed = !!(exRef && exRef.timed);
         let kg=sug? sug.kg : 0;
         // reps target: bodyweight uses the engine's rep suggestion, else the slot's
         const repTarget = (sug && sug.bodyweight)? sug.reps : slot.reps;
         // volume ramp (per-exercise, per-muscle ceiling, lands in final real week)
         let nSets=rampedSets(meso, slot, pos.week, deload);
         if(deload && sug && !isBW){ kg=Math.round((sug.lastKg*0.6)/wStep())*wStep(); }
-        return {slotId:slot.id, exerciseId:slot.exerciseId, bodyweight:isBW,
-          target:{sets:nSets, reps:repTarget, rir:slot.rir, rest:slot.rest, notes:slot.notes},
-          suggestion: deload&&sug&&!isBW? {...sug, kg, diff:kg-sug.lastKg, reason:FUN()?"Recovery week — lighter and shorter on purpose.":"Deload — ~60% load, half the sets."} : sug,
+        return {slotId:slot.id, exerciseId:slot.exerciseId, bodyweight:isBW, timed:isTimed,
+          target:{sets:nSets, reps:repTarget, rir:slot.rir, rest:slot.rest, notes:slot.notes,
+            secs: isTimed? (slot.secs||30) : undefined},
+          suggestion: isTimed? null : (deload&&sug&&!isBW? {...sug, kg, diff:kg-sug.lastKg, reason:FUN()?"Recovery week — lighter and shorter on purpose.":"Deload — ~60% load, half the sets."} : sug),
           notes:"", skipped:false, rowsReady:true,
-          sets: isBW? buildSetRows(nSets, 0, repTarget, slot.rir)
+          sets: isTimed? buildTimedRows(nSets, slot.secs||30, slot.rir)
+                : isBW? buildSetRows(nSets, 0, repTarget, slot.rir)
                     : buildGhostRows(slot.exerciseId, nSets, kg, slot.reps, slot.rir, sug, deload)};
       })
     };
@@ -2064,7 +2083,7 @@ function exCardHTML(ses, xi){
   <div class="card excard ${allDone?"done-card":""} ${ses.skipped?"skipped-card":""}" data-card="${xi}">
     <div class="exhead">
       <div><div class="exname">${esc(ex.name)}</div>
-        <div class="exsub num">${esc(ex.equipment)} · target ${t.sets}×${t.reps} · ${rirTxt(t.rir)} · ${doneN}/${ses.sets.length} sets${ses.skipped?" · skipped":""}</div></div>
+        <div class="exsub num">${ses.timed?`Hold · target ${t.sets}×${t.secs||30}s`:`${esc(ex.equipment)} · target ${t.sets}×${t.reps} · ${rirTxt(t.rir)}`} · ${doneN}/${ses.sets.length} sets${ses.skipped?" · skipped":""}</div></div>
       <button class="iconbtn" data-exmenu="${xi}" aria-label="Exercise options">⋯</button>
     </div>
     ${t.notes?`<div class="pinned"><span aria-hidden="true">📌</span>${esc(t.notes)}</div>`:""}
@@ -2074,9 +2093,17 @@ function exCardHTML(ses, xi){
          : ses.holdWeight
          ? `<div class="sugline num"><b>Hold ${dispW(sug.lastKg)}${unitLabel()} · aim for ${sug.repTarget||(t.reps)} reps</b> · progressing by reps · <button class="linkbtn" data-holdundo="${xi}">undo</button></div>`
          : `<div class="sugline num"><b>${(exById(ses.exerciseId)?.assisted)? `${dispW(Math.max(0,sug.kg-wStep()*2))}–${dispW(sug.kg)}` : `${dispW(sug.kg)}–${dispW(sug.kg+wStep()*2)}`}${unitLabel()}${(exById(ses.exerciseId)?.assisted)?" assist":""}</b> · last ${sug.lastSummary} · ${sug.reason}${(sug.kg>sug.lastKg && !exById(ses.exerciseId)?.assisted)?` · <button class="linkbtn" data-cantadd="${xi}">can't add weight?</button>`:""}</div>`)
+         : ses.timed
+         ? (()=>{ const h=exerciseHistory(ses.exerciseId);
+             const last=h.length? h[0].sets.filter(s=>s.secs!=null) : [];
+             return last.length
+               ? `<div class="sugline num"><b>Last time: ${last.map(s=>s.secs+"s").join(" · ")}</b></div>`
+               : `<div class="faint" style="margin:6px 0 0">First time — log your hold ⏱️</div>`; })()
          : `<div class="faint" style="margin:6px 0 0">${ses.bodyweight?`Bodyweight — aim for ${t.reps} good reps.`:(FUN()?`First time — find a weight where ${t.reps} reps feels ${feelWord(t.rir).toLowerCase()}.`:`First time — find your ${t.reps}-rep @${t.rir}RIR load.`)}</div>`}
     <div class="setgrid" data-grid="${xi}">
-      <span></span><span class="h">Weight (${unitLabel()})</span><span class="h">Reps</span><span class="h">${term("rirHead")}</span><span class="h">Log</span>
+      ${ses.timed
+        ? `<span></span><span class="h">Hold</span><span class="h">Seconds</span><span class="h">${term("rirHead")}</span><span class="h">Log</span>`
+        : `<span></span><span class="h">Weight (${unitLabel()})</span><span class="h">Reps</span><span class="h">${term("rirHead")}</span><span class="h">Log</span>`}
       ${ses.sets.map((x,si)=>setRowHTML(ses,xi,x,si)).join("")}
     </div>
     <button class="addset" data-addset="${xi}">+ Add set</button>
@@ -2128,9 +2155,21 @@ function setTypeBadge(t){ const d=SET_TYPES[t]; return (d&&d.badge)? `<span clas
 function setRowHTML(ses, xi, x, si){
   const id=`${xi}:${si}`;
   const show=x.touched||x.done;   // expected values ghost as placeholders until entered
-  const bw=ses.bodyweight;
+  const bw=ses.bodyweight, timed=ses.timed;
+  if(timed){
+    return `<button class="sn" data-setmenu="${id}" aria-label="Set ${si+1} options"><span class="dots">⋮</span>${si+1}</button>
+    <div class="bwcell" aria-label="Hold">⏱️</div>
+    <div class="repcell"><input type="number" inputmode="numeric" value="${show?x.secs:""}" placeholder="${x.expSecs??x.secs??30}" data-f="secs" data-set="${id}" aria-label="Set ${si+1} seconds"></div>
+    <select data-f="rir" data-set="${id}" aria-label="${FUN()?`Set ${si+1} feel`:`Set ${si+1} reps in reserve`}">
+      ${FUN()
+        ? FEELS.map(([v,lb])=>`<option value="${v}" ${feelBucket(x.rir)===v?"selected":""}>${lb}</option>`).join("")
+        : [0,1,2,3,4,5].map(r=>`<option value="${r}" ${x.rir===r?"selected":""}>${r}</option>`).join("")}
+    </select>
+    <button class="chk ${x.done?"on":""}" data-chk="${id}" aria-label="Log set ${si+1}" aria-pressed="${x.done}">${x.done?"✓":""}</button>`;
+  }
+  const bw2=bw;
   return `<button class="sn" data-setmenu="${id}" aria-label="Set ${si+1} options"><span class="dots">⋮</span>${si+1}</button>
-    ${bw
+    ${bw2
       ? `<div class="bwcell" aria-label="Bodyweight">BW</div>`
       : `<input type="number" inputmode="decimal" step="any" value="${show?dispW(x.kg):""}" placeholder="${dispW(x.kg)}" data-f="kg" data-set="${id}" aria-label="Set ${si+1} weight, expected ${dispW(x.kg)}">`}
     <div class="repcell">${setTypeBadge(x.type)}<input type="number" inputmode="numeric" value="${show?x.reps:""}" placeholder="${x.reps}" data-f="reps" data-set="${id}" aria-label="Set ${si+1} reps, expected ${x.reps}"></div>
@@ -2459,6 +2498,11 @@ function bindWorkout(){
       if(el.value===""){ set.touched=false; }
       else if(isFinite(v)){ set.reps=clamp(v,0,100); set.touched=true; }
     }
+    if(el.dataset.f==="secs"){
+      const v=parseInt(el.value);
+      if(el.value===""){ set.touched=false; }
+      else if(isFinite(v)&&v>=0){ set.secs=clamp(v,0,3600); set.touched=true; }
+    }
     save();
   };
   $("#view").onchange=e=>{
@@ -2532,7 +2576,7 @@ function bindWorkout(){
       const ses=s.exercises[xi], set=ses.sets[si];
       if(!set) return;
       modal(`<h2>Set ${si+1}${set.done?" · logged":""}</h2>
-        <p class="muted num">${dispW(set.kg)}${unitLabel()} × ${set.reps} @${set.rir}RIR</p>
+        <p class="muted num">${set.secs!=null?`${set.secs}s hold`:`${dispW(set.kg)}${unitLabel()} × ${set.reps} @${set.rir}RIR`}</p>
         <div class="stack" style="margin-top:12px">
           <button class="btn btn-ghost" data-sa="dup">Duplicate set</button>
           <button class="btn btn-danger" data-sa="del" ${ses.sets.length<=1?"disabled style='opacity:.4'":""}>Delete this set</button>
@@ -2604,6 +2648,13 @@ function bindWorkout(){
             notes:"", skipped:false, rowsReady:true, done:false, _edit:edit,
             log:{minutes:20, avgHR:null, distanceKm:null, level:null, speed:null, incline:null}, sets:[]};
           mkSlot=()=>({id:uid(), exerciseId:exId, cardio:true, minutes:20, targetHR:null, notes:""});
+        } else if(exById(exId)?.timed){
+          const nSets=edit?1:3;
+          inst={slotId:null, exerciseId:exId, timed:true,
+            target:{sets:nSets, reps:0, rir:2, rest:S().settings.restDefault, notes:"", secs:30},
+            suggestion:null, notes:"", skipped:false, rowsReady:true, _edit:edit,
+            sets:buildTimedRows(nSets, 30, 2)};
+          mkSlot=()=>({id:uid(), exerciseId:exId, sets:3, reps:0, rir:2, secs:30, rest:S().settings.restDefault, notes:""});
         } else {
           const exRef=exById(exId);
           const isBW=!!(exRef && exRef.equipment==="Bodyweight");
