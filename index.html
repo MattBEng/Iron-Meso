@@ -72,6 +72,16 @@ label{font-size:12px; font-weight:700; color:var(--muted); text-transform:upperc
   color:var(--brand-coral); line-height:1}
 .brand em{font-style:normal; color:var(--brand-coral)}
 .top-sub{font-size:12px; color:var(--muted); font-weight:600}
+.wk-header{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:14px 0 10px}
+.wk-title{text-align:left;background:none;border:0;padding:0;flex:1;min-width:0;cursor:pointer}
+.wk-daynm{font-size:22px;font-weight:900;color:var(--text);letter-spacing:.01em;line-height:1.1}
+.wk-caret{color:var(--faint);font-size:15px}
+.wk-meta{font-size:12px;color:var(--muted);font-weight:600;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wk-badge{font-size:10px;font-weight:800;padding:1px 6px;border-radius:5px;letter-spacing:.04em}
+.wk-badge.edit{background:rgba(224,152,42,.18);color:var(--amber)}
+.wk-badge.view,.wk-badge.prev{background:var(--raised);color:var(--muted)}
+.iconbtn.has-note{color:var(--accent)}
+.wk-note{margin:0 0 12px;cursor:pointer}
 
 /* cards */
 .card{background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg);
@@ -1974,6 +1984,12 @@ function buildGhostRows(exId, count, kg, targetReps, rir, sug, deload){
 /** Older sessions stored steppers + a grow-only sets array; upgrade in place. */
 function upgradeSession(s){
   s.exercises.forEach(e=>{
+    // backfill bodyweight flag from the library (handles exercises added/edited
+    // to Bodyweight after this session was first built)
+    if(e.bodyweight===undefined && !e.cardio){
+      const ex=exById(e.exerciseId);
+      e.bodyweight = !!(ex && ex.equipment==="Bodyweight");
+    }
     if(e.rowsReady) return;
     const done=(e.sets||[]).map(x=>({...x, done:true}));
     const kg=e.curKg ?? (e.suggestion? e.suggestion.kg:0);
@@ -2161,16 +2177,18 @@ function renderWorkout(){
   const mins=Math.floor((Date.now()-s.startedAt)/60000);
   const dateLbl=s.future? `W${s.week} · planned` : (s.date? fmtDate(s.date):"");
   $("#view").innerHTML=`
-    <div class="topbar">
-      <button style="text-align:left" data-a="${ro?"":"picker"}" aria-label="Choose another workout">
-        <h1 style="letter-spacing:.01em">${ro?'<span style="color:var(--muted)">'+(s.future?"PREVIEW":"VIEWING")+'</span> ':(edit?'<span style="color:var(--amber)">EDITING</span> ':"")}WEEK ${s.week} <span style="color:var(--faint)">DAY ${ (s.dayIdx??0)+1 }${ro?"":" ▾"}</span></h1>
-        <div class="top-sub">${esc(s.dayName)}${ro? ` · ${dateLbl}` : ` · <button class="linkdate" data-a="setdate" aria-label="Change workout date">${fmtDate(s.date)} ✎</button>`}${!edit&&s.mesoName?` · ${esc(s.mesoName)}`:""}${s.deload?` · ${term("Deload")}`:""}</div>
+    <div class="wk-header">
+      <button class="wk-title" data-a="${ro?"":"picker"}" aria-label="Switch workout">
+        <div class="wk-daynm">${esc(s.dayName)}${ro?"":' <span class="wk-caret">▾</span>'}</div>
+        <div class="wk-meta">${ro?`<span class="wk-badge ${s.future?"prev":"view"}">${s.future?"PREVIEW":"VIEWING"}</span> `:(edit?'<span class="wk-badge edit">EDITING</span> ':"")}Wk ${s.week} · Day ${(s.dayIdx??0)+1}${s.mesoName&&!edit?` · ${esc(s.mesoName)}`:""}${s.deload?` · ${term("Deload")}`:""}</div>
       </button>
-      <div class="row">
-        ${ro?"":'<button class="iconbtn" data-a="wnotes" aria-label="Workout notes">✎</button>'}
+      <div class="row" style="gap:4px">
+        ${ro?"":`<button class="iconbtn" data-a="setdate" aria-label="Change date">📅</button>
+        <button class="iconbtn ${s.notes?"has-note":""}" data-a="wnotes" aria-label="Workout note">📝</button>`}
         <button class="iconbtn" data-a="quit" aria-label="Close">✕</button>
       </div>
     </div>
+    ${(!ro && s.notes)? `<div class="pinned wk-note" data-a="wnotes"><span aria-hidden="true">📝</span>${esc(s.notes)}</div>`:""}
     ${ro? `<div class="ro-banner">${s.future
         ? "🔒 Planned workout — read-only preview. Weights are projections."
         : "🔒 Read-only — outside the editable window ("+EDIT_WINDOW+" most recent in your active "+term("meso")+")."}</div>`:""}
@@ -2587,12 +2605,15 @@ function bindWorkout(){
             log:{minutes:20, avgHR:null, distanceKm:null, level:null, speed:null, incline:null}, sets:[]};
           mkSlot=()=>({id:uid(), exerciseId:exId, cardio:true, minutes:20, targetHR:null, notes:""});
         } else {
+          const exRef=exById(exId);
+          const isBW=!!(exRef && exRef.equipment==="Bodyweight");
           const sug=edit? null : ProgressionEngine.suggest(exId, 10, 2);
           const nSets=edit?1:3;
-          inst={slotId:null, exerciseId:exId,
-            target:{sets:nSets, reps:10, rir:2, rest:S().settings.restDefault, notes:""},
+          const repTarget=(sug && sug.bodyweight)? sug.reps : 10;
+          inst={slotId:null, exerciseId:exId, bodyweight:isBW,
+            target:{sets:nSets, reps:repTarget, rir:2, rest:S().settings.restDefault, notes:""},
             suggestion:sug, notes:"", skipped:false, rowsReady:true, _edit:edit,
-            sets:buildSetRows(nSets, sug?sug.kg:0, 10, 2)};
+            sets:buildSetRows(nSets, (isBW?0:(sug?sug.kg:0)), repTarget, 2)};
           mkSlot=()=>({id:uid(), exerciseId:exId, sets:3, reps:10, rir:2, rest:S().settings.restDefault, notes:""});
         }
         const finish=()=>{ save(); renderWorkout(); toast("Exercise added"); };
@@ -2632,9 +2653,10 @@ function bindWorkout(){
       return;
     }
     if(a==="wnotes"){
-      modal(`<h2>Workout notes</h2><textarea id="wn" rows="4" placeholder="Session notes…">${esc(s.notes)}</textarea>
+      modal(`<h2>Workout note</h2><p class="muted">Shows on this workout while you train.</p>
+        <textarea id="wn" rows="4" placeholder="How's it going, anything to remember…">${esc(s.notes)}</textarea>
         <button class="btn btn-primary btn-block" style="margin-top:14px" data-ok>Save</button>`, m=>{
-        m.onclick=ev=>{ if(ev.target.closest("[data-ok]")){ s.notes=$("#wn",m).value; save(); closeModal(); } };
+        m.onclick=ev=>{ if(ev.target.closest("[data-ok]")){ s.notes=$("#wn",m).value.trim(); save(); Store.flush(); closeModal(); renderWorkout(); } };
       });
     }
   };
