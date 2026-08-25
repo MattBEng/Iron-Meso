@@ -1255,10 +1255,14 @@ function logEditable(log){
   if(!log) return false;
   if(log.mesoId!==S().activeMesoId) return false;         // not the active meso
   const meso=activeMeso(); if(!meso || meso.archived) return false;
+  // Order by when the log was CREATED, not by its date field. Sorting by date
+  // created a catch-22: a workout saved with a wrong (older) date sorted out of
+  // the edit window, so you could never open it to correct that date.
+  const order=S().logs.map(l=>l.id);                       // push order = creation order
   const mlogs=S().logs.filter(l=>l.mesoId===log.mesoId)
-    .sort((a,b)=>a.date.localeCompare(b.date) || (a.id>b.id?1:-1));
+    .sort((a,b)=>(a.loggedAt||0)-(b.loggedAt||0) || order.indexOf(a.id)-order.indexOf(b.id));
   const idx=mlogs.findIndex(l=>l.id===log.id);
-  return idx>=0 && idx >= mlogs.length-EDIT_WINDOW;        // within the last 6
+  return idx>=0 && idx >= mlogs.length-EDIT_WINDOW;        // within the last 6 logged
 }
 function streakCount(){
   const dates=[...new Set(S().logs.map(l=>l.date))].sort().reverse();
@@ -2375,17 +2379,39 @@ function pickWorkoutDate(s){
 /** Ask for the real elapsed time. `guess` is what the app estimated; `current`
     is the value to prefill (the app guess on finish, or the stored value on edit).
     Calls cb(minutes). */
-function askDuration(guess, current, cb){
-  modal(`<h2>How long did it take?</h2>
+/** Ask for duration AND the date the workout happened.
+    `dateDefault` prefills the date (the day training actually started).
+    Calls cb(minutes, dateISO). */
+function askDuration(guess, current, cb, dateDefault){
+  const dflt=dateDefault||todayISO();
+  modal(`<h2>Nice work — a couple of details</h2>
     <p class="muted">We estimated about <b>${guess}</b> min. If that's off (phone locked, logged later), fix it here.</p>
-    <label>Actual duration (minutes)</label>
+    <label>Date of this workout</label>
+    <input id="wdate" type="date" value="${dflt}" max="${todayISO()}">
+    <label style="margin-top:12px">Actual duration (minutes)</label>
     <input id="dur" type="number" inputmode="numeric" min="1" max="600" value="${current}">
     <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>Save</button>`, m=>{
     m.onclick=e=>{ if(!e.target.closest("[data-ok]")) return;
       const v=clamp(parseInt($("#dur",m).value)||current||guess, 1, 600);
-      closeModal(); cb(v);           // synchronous: cb opens the survey; modal() cancels the pop timer
+      const d=$("#wdate",m).value || dflt;
+      closeModal(); cb(v, d);        // synchronous: cb opens the survey; modal() cancels the pop timer
     };
   });
+}
+/** The date training actually STARTED = the first logged set's timestamp.
+    Falls back to the session's stored date, then today. NOTE: a session object
+    is created just by opening the Train tab, so its creation date is NOT a
+    reliable "start" — only a logged set proves training began. */
+function sessionStartDate(s){
+  let earliest=null;
+  (s.exercises||[]).forEach(e=>(e.sets||[]).forEach(x=>{
+    if(x.done && x.at && (earliest===null || x.at<earliest)) earliest=x.at;
+  }));
+  if(earliest){
+    const d=new Date(earliest);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  }
+  return s.date || todayISO();
 }
 
 function saveLogEdit(){
@@ -2393,8 +2419,9 @@ function saveLogEdit(){
   const log=S().logs.find(l=>l.id===s.logId);
   if(!log){ S().editSession=null; Store.save(); go("workout"); return; }
   const stored=log.durationMin||1;
-  askDuration(stored, stored, dur=>{
+  askDuration(stored, stored, (dur, chosenDate)=>{
     const oldDate=log.date;
+    if(chosenDate) s.date=chosenDate;
     log.notes=s.notes;
     log.date=s.date;
     log.durationMin=dur;
@@ -2424,7 +2451,7 @@ function saveLogEdit(){
     Store.save(); Store.flush();
     toast("Workout updated");
     go("workout");
-  });
+  }, s.date);
 }
 
 /** Re-render a single exercise card + the progress header (no full redraw). */
@@ -3188,18 +3215,6 @@ function finishWorkout(){
     S().activeSession=null; Store.save(); stopRest(); return go("home");
   }
   const logged=liftLogged;
-  // Cardio items logged during the workout go into the cardio store, tagged
-  // with this meso/day so cardio analytics can attribute them — never mixed
-  // into lifting volume.
-  cardioLogged.forEach(e=>{
-    const ex=exById(e.exerciseId);
-    S().cardio.push({id:uid(), date:s.date, type:ex?ex.name:"Cardio",
-      minutes:e.log.minutes, avgHR:e.log.avgHR||null, zone:zoneFor(e.log.avgHR),
-      distanceKm:e.log.distanceKm||null,
-      level:e.log.level||null, speed:e.log.speed||null, incline:e.log.incline||null,
-      tabata:e.target?.tabataOn?e.target.tabata:null,
-      notes:e.notes||"", mesoId:s.mesoId, fromWorkout:true});
-  });
   stopRest();
   const guess=(()=>{
     const ats=s.exercises.flatMap(e=>e.sets.filter(x=>x.done&&x.at).map(x=>x.at));
@@ -3210,10 +3225,25 @@ function finishWorkout(){
     }
     return Math.max(1, Math.min(wall, 90));
   })();
-  const finalize=dur=>{
+  const finalize=(dur, chosenDate)=>{
+    // The log's date is the day training actually happened — chosen at finish,
+    // defaulting to the first logged set's day (NOT when the session object was
+    // created, which happens merely by opening the Train tab).
+    if(chosenDate) s.date=chosenDate;
+    // Cardio items go into the cardio store tagged with this meso — written here,
+    // AFTER the date is chosen, so they carry the same date as the workout log.
+    cardioLogged.forEach(e=>{
+      const ex=exById(e.exerciseId);
+      S().cardio.push({id:uid(), date:s.date, type:ex?ex.name:"Cardio",
+        minutes:e.log.minutes, avgHR:e.log.avgHR||null, zone:zoneFor(e.log.avgHR),
+        distanceKm:e.log.distanceKm||null,
+        level:e.log.level||null, speed:e.log.speed||null, incline:e.log.incline||null,
+        tabata:e.target?.tabataOn?e.target.tabata:null,
+        notes:e.notes||"", mesoId:s.mesoId, fromWorkout:true});
+    });
     const log={
       id:s.id, mesoId:s.mesoId, week:s.week, dayId:s.dayId, dayName:s.dayName,
-      date:s.date, notes:s.notes, durationMin:dur,
+      date:s.date, notes:s.notes, durationMin:dur, loggedAt:Date.now(),
       exercises:logged.map(e=>({exerciseId:e.exerciseId, target:e.target, notes:e.notes,
         sets:e.sets.filter(x=>x.done)}))
     };
@@ -3223,8 +3253,8 @@ function finishWorkout(){
     if(logged.length) feedbackSurvey(log);
     else { toast(FUN()?"Cardio logged 🫀":"Cardio logged"); go("home"); }
   };
-  if(logged.length) askDuration(guess, guess, finalize);
-  else finalize(guess);        // cardio-only: no duration prompt
+  if(logged.length) askDuration(guess, guess, finalize, sessionStartDate(s));
+  else finalize(guess, sessionStartDate(s));        // cardio-only: no duration prompt
 }
 /** Post-workout survey feeding the progression modifier. */
 function feedbackSurvey(log){
