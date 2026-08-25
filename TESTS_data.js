@@ -1,6 +1,6 @@
 /* Data layer: local-date handling, storage round-trip, export/import,
    migrations, and meso creation defaults. */
-const {boot, ok, run}=require("./lib");
+const {boot, ok, run}=require("./TESTS_lib");
 const A=boot();
 
 run("data + dates", ()=>{

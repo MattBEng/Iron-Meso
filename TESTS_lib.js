@@ -1,12 +1,15 @@
 /* Shared test harness for Lift Daddy.
-   Usage:  node tests/t-<name>.js        (run one suite)
-           node tests/run-all.js         (run everything)
+   All test files live in the repo root, prefixed TESTS_ so they sit next to
+   index.html and are easy to copy in one go.
+
+   Usage:  node TESTS_<name>.js     (run one suite)
+           node TESTS_run-all.js    (run everything)
    Requires: npm install jsdom
 */
 const {JSDOM}=require("jsdom");
 const fs=require("fs"), path=require("path");
 
-const APP=path.join(__dirname,"..","index.html");
+const APP=path.join(__dirname,"index.html");
 
 let pass=0, fail=0;
 function ok(label, cond, detail){

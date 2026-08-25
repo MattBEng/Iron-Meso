@@ -1,7 +1,7 @@
 /* Edge cases and defensive behaviour: empty states, set operations,
    input clamping, discarding empty workouts, and cross-feature interactions
    (timed exercises must not pollute lifting stats). */
-const {boot, ok, run}=require("./lib");
+const {boot, ok, run}=require("./TESTS_lib");
 const A=boot();
 
 run("edge cases", ()=>{

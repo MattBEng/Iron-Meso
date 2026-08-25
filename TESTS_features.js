@@ -1,6 +1,6 @@
 /* Feature coverage: set types, setup notes, timed holds, bodyweight rows,
    workout notes, gender options, rest-over message bank. */
-const {boot, ok, run}=require("./lib");
+const {boot, ok, run}=require("./TESTS_lib");
 const A=boot();
 
 run("features", ()=>{
@@ -87,6 +87,24 @@ run("features", ()=>{
   const opts=[...$("#pgender").options].map(o=>o.value);
   ok("gender options are exactly the three allowed",
      JSON.stringify(opts)===JSON.stringify(["","Female","Male","Prefer not to say"]), opts.join("|"));
+
+  // ---------- PR TOAST IS FUN-MODE ONLY ----------
+  st().settings.mode="serious"; save();
+  st().logs=[]; st().mesocycles=[]; st().activeSession=null;
+  makeMeso([{id:"pr1", exerciseId:"b_back_squat", sets:1, reps:5, rir:2, rest:60}], {id:"mpr"});
+  st().logs.push({id:"prv", mesoId:"mpr", week:1, dayId:"d", dayName:"Day", date:"2026-08-01",
+    notes:"", durationMin:30, loggedAt:1,
+    exercises:[{exerciseId:"b_back_squat", target:{sets:1,reps:5,rir:2},
+      sets:[{kg:100,reps:5,rir:2,done:true,expReps:5}]}]});
+  save();
+  let toasted=null;
+  const realToast=w.toast; w.toast=(msg,kind)=>{ if(kind==="pr") toasted=msg; };
+  ev("checkPR")("b_back_squat", 200, 5);        // a monster PR
+  ok("Serious mode shows no PR popup", toasted===null, toasted);
+  st().settings.mode="fun"; save();
+  ev("checkPR")("b_back_squat", 200, 5);
+  ok("Fun mode still celebrates a PR", toasted!==null);
+  w.toast=realToast;
 
   // ---------- REST-OVER MESSAGES ----------
   ok("rest-over bank has 100 messages", ev("REST_OVER_MSGS").length===100, ev("REST_OVER_MSGS").length);

@@ -1,6 +1,6 @@
 /* User flows that span several features: "can't add weight", repeating a meso,
    the priority lock, feedback-driven progression, cardio zones, and the picker. */
-const {boot, ok, run}=require("./lib");
+const {boot, ok, run}=require("./TESTS_lib");
 const A=boot();
 
 run("flows", ()=>{

@@ -1,6 +1,6 @@
 /* Progression engine: load suggestions, bodyweight, assisted, held-weight
    plateau, and exclusion of AMRAP/myorep sets. */
-const {boot, ok, run}=require("./lib");
+const {boot, ok, run}=require("./TESTS_lib");
 const A=boot();
 
 run("progression engine", ()=>{
@@ -44,15 +44,29 @@ run("progression engine", ()=>{
   sug=ev(`ProgressionEngine.suggest("${bw.id}",10,2)`);
   ok("weighted bodyweight uses load progression", sug && !sug.bodyweight && sug.kg>10, sug&&sug.kg);
 
-  // --- held-weight plateau: same weight twice -> recommend reps ---
+  // --- held-weight plateau: rep on only while BELOW the jump-aware ceiling ---
+  // A barbell squat's next jump is tiny in % terms, so at target reps the engine
+  // should stop repping and add weight (correct double progression).
   st().logs=[];
   pushLog(sq,[{kg:100,reps:10,rir:2,done:true,expReps:10},
               {kg:100,reps:10,rir:2,done:true,expReps:10}],{date:"2026-08-01",loggedAt:1});
   pushLog(sq,[{kg:100,reps:10,rir:2,done:true,expReps:10},
               {kg:100,reps:10,rir:2,done:true,expReps:10}],{date:"2026-08-08",loggedAt:2});
   sug=ev(`ProgressionEngine.suggest("${sq}",10,2)`);
-  ok("plateau detected -> rep progression", sug && sug.heldRep===true && sug.kg===100,
-     sug&&JSON.stringify({kg:sug.kg,heldRep:sug.heldRep}));
+  ok("plateau on a big lift with a small jump -> add weight",
+     sug && !sug.heldRep && sug.kg>100, sug&&JSON.stringify({kg:sug.kg,heldRep:sug.heldRep}));
+
+  // A small dumbbell movement's next jump is huge in % terms, so it should keep
+  // adding reps instead of demanding an impossible load increase.
+  st().logs=[];
+  const db=st().exercises.find(e=>e.equipment==="Dumbbell" && !e.cardio && !e.assisted);
+  pushLog(db.id,[{kg:5,reps:12,rir:2,done:true,expReps:12},
+                 {kg:5,reps:12,rir:2,done:true,expReps:12}],{date:"2026-08-01",loggedAt:1});
+  pushLog(db.id,[{kg:5,reps:12,rir:2,done:true,expReps:12},
+                 {kg:5,reps:12,rir:2,done:true,expReps:12}],{date:"2026-08-08",loggedAt:2});
+  sug=ev(`ProgressionEngine.suggest("${db.id}",12,2)`);
+  ok("plateau on a small lift with a huge jump -> keep repping",
+     sug && sug.heldRep===true && sug.kg===5, sug&&JSON.stringify({kg:sug.kg,heldRep:sug.heldRep}));
 
   // --- no history -> no suggestion (first time) ---
   st().logs=[]; save();

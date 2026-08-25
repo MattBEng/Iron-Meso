@@ -1,6 +1,6 @@
 /* Volume ramp: per-muscle priority ceilings, meso-length awareness,
    repeat runs, deload, and ramp-off. */
-const {boot, ok, run}=require("./lib");
+const {boot, ok, run}=require("./TESTS_lib");
 const A=boot();
 
 run("volume ramp", ()=>{

@@ -3,35 +3,39 @@
 Automated checks that run the real `index.html` in a headless DOM.
 They exist so a change in one place can't silently break another.
 
+All test files live in the **repo root**, prefixed `TESTS_` so they sit
+alongside `index.html` and can be copied in one go — no subfolder.
+
 ## Running
 
 ```bash
-npm install jsdom      # once
-node tests/run-all.js  # run everything
-node tests/t-ramp.js   # run one suite
+npm install jsdom          # once
+node TESTS_run-all.js      # run everything
+node TESTS_ramp.js         # run one suite
 ```
-
-Run from the repo root — the harness loads `../index.html` relative to
-this folder.
 
 ## Suites
 
 | File | Covers |
 |---|---|
-| `t-progression.js` | Load suggestions, bodyweight reps-progression, weighted-bodyweight, held-weight plateau detection, AMRAP/myorep exclusion |
-| `t-ramp.js` | Volume ramp: priority ceilings (High/Normal/Low), meso-length awareness, repeat runs, deload, ramp-off, legacy fallback |
-| `t-workout.js` | Rendering, logging, finish flow (duration + date), date correctness, cardio capture, editing past logs, the editability window |
-| `t-features.js` | Set types, setup notes, workout notes, bodyweight rows, timed holds, gender options, rest-over messages |
-| `t-data.js` | Local-date handling (the UTC bug), storage round-trip, meso creation defaults, schema |
-| `t-integrity.js` | Export/import round-trip, checksum tampering, legacy imports, schema migration, corrupt-state rejection |
-| `t-edge.js` | Empty states, set add/duplicate/delete, input clamping, empty-workout discard, timed exercises not polluting lifting stats |
-| `t-flows.js` | "Can't add weight", repeating a meso, the priority lock, feedback-driven progression, cardio zones, workout picker |
-| `lib.js` | Shared harness — `boot()`, `ok()`, `run()` and helpers |
+| `TESTS_progression.js` | Load suggestions, bodyweight reps-progression, weighted-bodyweight, held-weight plateau detection, AMRAP/myorep exclusion |
+| `TESTS_ramp.js` | Volume ramp: priority ceilings (High/Normal/Low), meso-length awareness, repeat runs, deload, ramp-off, legacy fallback |
+| `TESTS_workout.js` | Rendering, logging, finish flow (duration + date), date correctness, cardio capture, editing past logs, the editability window |
+| `TESTS_features.js` | Set types, setup notes, workout notes, bodyweight rows, timed holds, gender options, rest-over messages |
+| `TESTS_data.js` | Local-date handling (the UTC bug), storage round-trip, meso creation defaults, schema |
+| `TESTS_integrity.js` | Export/import round-trip, checksum tampering, legacy imports, schema migration, corrupt-state rejection |
+| `TESTS_edge.js` | Empty states, set add/duplicate/delete, input clamping, empty-workout discard, timed exercises not polluting lifting stats |
+| `TESTS_loadrep.js` | Load–rep prediction accuracy, the "??" trusted band, per-exercise weight steps, the jump-aware rep ceiling, never-both-at-once, live re-prediction |
+| `TESTS_flows.js` | "Can't add weight", repeating a meso, the priority lock, feedback-driven progression, cardio zones, workout picker |
+| `TESTS_lib.js` | Shared harness — `boot()`, `ok()`, `run()` and helpers |
 
 ## Writing a new suite
 
+Name it `TESTS_<area>.js` in the repo root — `TESTS_run-all.js` picks it up
+automatically.
+
 ```js
-const {boot, ok, run}=require("./lib");
+const {boot, ok, run}=require("./TESTS_lib");
 const A=boot();
 
 run("my area", ()=>{

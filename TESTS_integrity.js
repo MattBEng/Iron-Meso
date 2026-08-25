@@ -1,6 +1,6 @@
 /* Data integrity: export/import round-trip, checksum tampering, legacy imports,
    migrations from older schema versions, and corrupt-state handling. */
-const {boot, ok, run}=require("./lib");
+const {boot, ok, run}=require("./TESTS_lib");
 const A=boot();
 
 run("data integrity", ()=>{

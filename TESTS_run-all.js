@@ -1,11 +1,14 @@
 #!/usr/bin/env node
-/* Runs every t-*.js suite in this folder and reports a combined total.
-   Usage:  node tests/run-all.js        (from the repo root or anywhere) */
+/* Runs every TESTS_*.js suite in the repo root and reports a combined total.
+   Usage:  node TESTS_run-all.js */
 const {execFileSync}=require("child_process");
 const fs=require("fs"), path=require("path");
 
 const dir=__dirname;
-const suites=fs.readdirSync(dir).filter(f=>/^t-.*\.js$/.test(f)).sort();
+const SKIP=new Set(["TESTS_lib.js","TESTS_run-all.js"]);
+const suites=fs.readdirSync(dir)
+  .filter(f=>/^TESTS_.*\.js$/.test(f) && !SKIP.has(f))
+  .sort();
 let pass=0, fail=0, failed=[];
 
 for(const f of suites){

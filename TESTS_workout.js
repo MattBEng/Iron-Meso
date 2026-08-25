@@ -1,6 +1,6 @@
 /* Workout lifecycle: rendering, logging, the finish flow (duration + date),
    date correctness, editing a past log, and the editability window. */
-const {boot, ok, run}=require("./lib");
+const {boot, ok, run}=require("./TESTS_lib");
 const A=boot();
 
 run("workout lifecycle", ()=>{
