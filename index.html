@@ -1647,11 +1647,15 @@ function editMeso(id){
       .map(x=>exById(x.exerciseId)).filter(e=>e && e.muscle && e.muscle!=="Cardio").map(e=>e.muscle)))].sort();
     if(!muscles.length){ host.innerHTML=`<div class="faint">Add exercises to set muscle priorities.</div>`; return; }
     m.priority=m.priority||{};
-    host.innerHTML=muscles.map(mg=>{
+    // Priorities are LOCKED once the meso has started (any logged workout), so the
+    // volume ramp can't be moved under a block that's already in progress.
+    const started=S().logs.some(l=>l.mesoId===m.id);
+    host.innerHTML=(started?`<div class="faint" style="margin-bottom:8px">🔒 Locked — this ${term("meso")} has started.</div>`:"")
+      + muscles.map(mg=>{
       const cur=m.priority[mg]||"normal";
       return `<div class="row split" style="margin-bottom:6px;align-items:center">
         <span style="font-weight:600">${mg}</span>
-        <select data-prio="${mg}" style="width:130px">
+        <select data-prio="${mg}" style="width:130px" ${started?"disabled":""}>
           ${["high","normal","low"].map(p=>`<option value="${p}" ${cur===p?"selected":""}>${p==="high"?"High":p==="low"?"Low (maintain)":"Normal"}</option>`).join("")}
         </select></div>`;
     }).join("");
@@ -1689,7 +1693,8 @@ function editMeso(id){
     if($("#mstart")) m.startSets=clamp(parseInt($("#mstart").value)||2,1,10);
     if($("#mend")) m.endTargetSets=clamp(parseInt($("#mend").value)||5,1,12);
     m.priority=m.priority||{};
-    $$("[data-prio]").forEach(sel=>{ m.priority[sel.dataset.prio]=sel.value; });
+    // skip disabled (locked) selects so a started meso keeps its priorities
+    $$("[data-prio]").forEach(sel=>{ if(!sel.disabled) m.priority[sel.dataset.prio]=sel.value; });
     m.notes=$("#mnotes").value;
     $$("[data-dname]").forEach(inp=>m.days[+inp.dataset.dname].name=inp.value.trim()||"Day");
   }

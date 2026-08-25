@@ -69,7 +69,9 @@ Everything lives in one `<script>` in `index.html`.
 ceiling, landing on the ceiling in the final *real* week (deload excluded),
 spread evenly. Ceiling comes from `endTargetSets` (default 5) stepped down by
 priority: **High = target, Normal = target − 1, Low (maintain) = target − 2.**
-Priority is set at meso creation and locked once it starts. A **repeat run**
+Priority is set at meso creation and **locked once the meso has any logged
+workout** (selects disable; `collectBasics` skips disabled ones so the stored
+values survive a re-save). A **repeat run**
 (`repeatRun: true`) starts one week in — a repeated 4-real-week High muscle
 goes 3,4,5,5. When the set count holds week to week, load/rep progression
 carries the session.
@@ -129,6 +131,23 @@ feed, wearable HR, a named trainer/coach persona.
 ## Changelog
 
 Newest first. Add an entry when you ship.
+
+### 2026-08-25 (second pass — audit)
+- **Audited the codebase** against edge cases, data integrity, and cross-feature
+  interactions. Two findings:
+  - **Fixed: muscle priorities were never locked** once a meso started, though
+    that was the agreed rule. Priorities now disable (with a 🔒 note) as soon as
+    the meso has a logged workout, and `collectBasics` skips disabled selects so
+    a started meso keeps its settings.
+  - **Fixed earlier the same day: cardio kept the stale date** (see below).
+- Test suite grown to **138 checks across 8 suites** — added `t-integrity.js`
+  (export/import, checksums, migrations), `t-edge.js` (empty states, set ops,
+  input clamping), `t-flows.js` (multi-feature user journeys).
+- Verified clean, no action needed: timed exercises don't pollute lifting
+  volume or PRs; negative/absurd inputs are clamped; empty workouts are
+  discarded rather than logged as phantoms; all views render on an empty
+  install and with a completed meso; the rest timer survives navigation;
+  `scopePrompt` escapes user text.
 
 ### 2026-08-25
 - **Fixed: wrong date on completed workouts.** The date was stamped when the

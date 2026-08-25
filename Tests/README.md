@@ -23,6 +23,9 @@ this folder.
 | `t-workout.js` | Rendering, logging, finish flow (duration + date), date correctness, cardio capture, editing past logs, the editability window |
 | `t-features.js` | Set types, setup notes, workout notes, bodyweight rows, timed holds, gender options, rest-over messages |
 | `t-data.js` | Local-date handling (the UTC bug), storage round-trip, meso creation defaults, schema |
+| `t-integrity.js` | Export/import round-trip, checksum tampering, legacy imports, schema migration, corrupt-state rejection |
+| `t-edge.js` | Empty states, set add/duplicate/delete, input clamping, empty-workout discard, timed exercises not polluting lifting stats |
+| `t-flows.js` | "Can't add weight", repeating a meso, the priority lock, feedback-driven progression, cardio zones, workout picker |
 | `lib.js` | Shared harness — `boot()`, `ok()`, `run()` and helpers |
 
 ## Writing a new suite
