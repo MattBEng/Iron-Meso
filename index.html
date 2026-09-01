@@ -248,6 +248,7 @@ canvas.chart{width:100%; height:180px; display:block}
 .mgfilter .typechip{white-space:nowrap;flex:0 0 auto}
 .linkdate{color:var(--accent);font-weight:700;background:none;border:0;padding:0;font:inherit}
 .cutie-card{border-color:rgba(224,85,156,.35);background:linear-gradient(180deg,rgba(224,85,156,.06),transparent)}
+.welcome-back h3{font-size:17px;line-height:1.35}
 .spm-row{display:flex;align-items:center;gap:10px;margin-bottom:7px}
 .spm-label{width:84px;font-size:13px;color:var(--muted);font-weight:600;flex:0 0 auto}
 .spm-track{flex:1;height:18px;background:var(--raised);border-radius:6px;position:relative;overflow:hidden}
@@ -256,6 +257,7 @@ canvas.chart{width:100%; height:180px; display:block}
 .spm-val{width:52px;text-align:right;font-size:13px;font-weight:700;flex:0 0 auto}
 .bwcell{display:flex;align-items:center;justify-content:center;background:var(--raised);border-radius:var(--r-xs,8px);font-weight:800;color:var(--muted);font-size:13px}
 .repcell{position:relative}
+.pred-unknown{color:var(--muted)!important;font-weight:700}
 .settype-badge{display:inline-flex;align-items:center;justify-content:center;background:var(--accent);color:#fff;font-size:10px;font-weight:800;padding:1px 6px;border-radius:6px;letter-spacing:.03em}
 .repcell .settype-badge{position:absolute;top:-9px;right:-4px;z-index:2;box-shadow:0 1px 3px rgba(0,0,0,.3)}
 .settype-opt{height:auto;padding:10px 12px;flex-direction:column;align-items:stretch}
@@ -656,6 +658,62 @@ function toKg(v){ return S().settings.unit==="lb"? v/KG2LB : v; }
 function unitLabel(){ return S().settings.unit; }
 function wStep(){ return S().settings.unit==="lb"? 2.5 : 1.25; }
 
+/* ---------------- load–rep model ----------------
+   Converting a load change into a rep change uses 1RM prediction equations.
+   No single equation is trustworthy here: at ~15 reps the common ones spread
+   ~25% (Lombardi 19.7kg vs Brzycki 24.6kg for 15kg x 15). Brzycki over-predicts
+   at high reps (asymptote at 37), Epley under-predicts (linear where reality
+   curves), so we AVERAGE the two — they bracket the range, and averaging
+   several equations is a documented way to cut individual-equation error.
+   Applied consistently in both directions so the maths round-trips.
+
+   These equations are validated mainly at 1-10 reps and degrade beyond ~12,
+   which is why predictions outside a sane band return null ("??") rather than
+   a confident-looking guess. */
+const E1RM_MIN_REPS=3, E1RM_MAX_REPS=25;
+function e1rmAvg(kg, reps){
+  if(!(kg>0) || !(reps>0) || reps>=37) return 0;
+  return (kg*(1+reps/30) + kg*36/(37-reps))/2;
+}
+/** Predicted reps at `kg` given a reference set. null = outside a band we trust. */
+function repsAtLoad(refKg, refReps, kg){
+  const one=e1rmAvg(refKg, refReps);
+  if(!(one>0) || !(kg>0)) return null;
+  if(kg>=one) return null;                       // at or above estimated max
+  const e=30*(one/kg-1), b=37-36*(kg/one);
+  const r=(e+b)/2;
+  if(!isFinite(r) || r<E1RM_MIN_REPS || r>E1RM_MAX_REPS) return null;
+  return Math.round(r);
+}
+/** The smallest real weight jump for this exercise (per-exercise, kg). */
+const DEFAULT_STEP={Barbell:2.5, Dumbbell:2.5, Machine:5, Cable:2.5,
+                    Smith:2.5, Kettlebell:4, Bodyweight:2.5, Other:2.5};
+function exStep(ex){
+  if(!ex) return 2.5;
+  const v=Number(ex.step);
+  if(isFinite(v) && v>0) return v;
+  return DEFAULT_STEP[ex.equipment] ?? 2.5;
+}
+/* Jump-aware rep ceiling.
+   A fixed "+4 reps" ceiling breaks on small-muscle work: 5kg -> 7.5kg on a
+   lateral raise is +50%, which from 12 reps is not physically doable — you
+   need ~20 reps banked before that jump lands anywhere sensible. So the
+   ceiling is derived from the size of the NEXT AVAILABLE JUMP: keep adding
+   reps until the jump would land at a trainable rep count (>= LANDING_REPS),
+   then stop and take the weight. Small increments jump early; big ones rep on.
+   This is ordinary double progression, made aware of your equipment. */
+const LANDING_REPS=8, CEILING_MIN=6, CEILING_MAX=30;
+function repCeilingFor(ex, kg, targetReps){
+  const step=exStep(ex);
+  if(!(kg>0)) return Math.max(CEILING_MIN, (targetReps||10)+4);
+  const next=kg+step;
+  for(let r=Math.max(CEILING_MIN, targetReps||8); r<=CEILING_MAX; r++){
+    const landed=repsAtLoad(kg, r, next);
+    if(landed!==null && landed>=LANDING_REPS) return r;
+  }
+  return CEILING_MAX;
+}
+
 /* ---------------- validation ---------------- */
 function nameExists(list, name, exceptId){
   const n=name.trim().toLowerCase();
@@ -923,7 +981,7 @@ class ProgressionEngine{
       const prevKg=pcounts.size?[...pcounts.entries()].sort((a,b)=>b[1]-a[1]||b[0]-a[0])[0][0]:null;
       heldPlateau = prevKg===lastKg;
     }
-    const repCeiling=targetReps + 4;
+    const repCeiling=repCeilingFor(ex, lastKg, targetReps);
     const avgRepsNow=Math.round(work.reduce((t,s)=>t+s.reps,0)/work.length);
     if(heldPlateau && hitAll && avgRIR>=targetRIR && avgRepsNow<repCeiling){
       // progress reps at the same weight rather than adding load
@@ -1330,6 +1388,14 @@ VIEWS.home=function(){
           <h3>Set up your profile</h3><p class="muted" style="margin:4px 0 0">Add your age and body metrics for accurate cardio zones. Optional — takes 20 seconds.</p></div></div>
         <div class="row" style="margin-top:12px"><button class="btn btn-ghost" style="flex:1" data-act="skipsetup">Skip</button>
           <button class="btn btn-primary" style="flex:1" data-act="setup">Set up</button></div></div>`:""}
+    ${(()=>{ if(!cutieOn()) return "";
+        const d=daysSinceLastWorkout(), msg=returnMessage(d);
+        if(!msg) return "";
+        return `<div class="card cutie-card welcome-back">
+          <div class="kicker">${d<=5?"Welcome back":d<=13?"Good to see you":"Hey you"}</div>
+          <h3 style="margin:4px 0 0">${msg}</h3>
+          <p class="muted num" style="margin:6px 0 0">${d} days since your last workout</p></div>`;
+      })()}
     ${mesoCard}
     ${lastCard}
     <div class="card">
@@ -1917,6 +1983,11 @@ function editExercise(id, done){
     <label style="display:flex;align-items:center;gap:10px;text-transform:none;font-size:15px;margin-top:10px">
       <input type="checkbox" id="etime" style="width:22px;height:22px" ${ex.timed?"checked":""}>
       Time-based hold (log seconds, e.g. plank, dead hang)</label>
+    <label>Smallest weight jump (${unitLabel()})</label>
+    <input id="estep" type="number" inputmode="decimal" step="any" min="0.25"
+      value="${ex.step??""}" placeholder="${DEFAULT_STEP[ex.equipment]??2.5} (default for ${esc(ex.equipment||"this")})">
+    <p class="faint" style="margin:4px 0 0">The next weight you can actually load. Drives how many reps
+      you build up to before adding weight — a big jump (5→7.5kg dumbbell) needs more reps banked first.</p>
     <label>Notes</label><textarea id="eno" rows="2">${esc(ex.notes||"")}</textarea>
     <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>Save exercise</button>`, m=>{
     $("#en",m).focus();
@@ -1929,6 +2000,8 @@ function editExercise(id, done){
       ex.muscle=$("#em",m).value; ex.equipment=$("#ee",m).value; ex.notes=$("#eno",m).value;
       ex.assisted=$("#eassist",m).checked;
       ex.timed=$("#etime",m).checked;
+      { const sv=parseFloat($("#estep",m).value);
+        if(isFinite(sv)&&sv>0) ex.step=Math.round(toKg(sv)*100)/100; else delete ex.step; }
       if(ex.timed) ex.assisted=false;   // mutually exclusive with assisted-weight logic
       if(!id) S().exercises.push(ex);
       Store.save(); closeModal(); done(ex.id);
@@ -1991,14 +2064,27 @@ function buildSetRows(count, kg, reps, rir){
  *  - weight REPEATED  -> beat last week by one rep per set
  *  - backoff/deload   -> flat target reps
  */
+/* Ghost (expected) reps for the coming session.
+   Two mutually exclusive routes — never both at once:
+     - weight HELD  -> add a rep to each set (double progression)
+     - weight RAISED -> carry the same effort to the new load, which means
+                        FEWER reps, predicted from the load–rep model.
+   Asking for more weight AND the same reps is a double increase; that was the
+   old behaviour and it is too aggressive. */
 function buildGhostRows(exId, count, kg, targetReps, rir, sug, deload){
   if(!sug || deload || sug.kg<sug.lastKg) return buildSetRows(count, kg, targetReps, rir);
   const hist=exerciseHistory(exId);
-  const work=hist.length? hist[0].sets.filter(s=>s.kg===sug.lastKg):[];
-  const bump=sug.kg===sug.lastKg? 1:0;
+  const work=hist.length? hist[0].sets.filter(s=>s.kg===sug.lastKg && (!s.type||s.type==="normal")):[];
+  const heldWeight = sug.kg===sug.lastKg;
   return Array.from({length:count},(_,i)=>{
     const base=work.length? work[Math.min(i,work.length-1)].reps : targetReps;
-    const reps=Math.max(1, base+bump);
+    let reps;
+    if(heldWeight) reps=base+1;                              // same load -> one more rep
+    else {
+      const pred=repsAtLoad(sug.lastKg, base, kg);           // heavier -> fewer reps
+      reps = pred!==null? pred : Math.max(1, base-Math.round(base*0.15));
+    }
+    reps=Math.max(1, reps);
     return {kg, reps, rir, expReps:reps, done:false, at:null};
   });
 }
@@ -2101,7 +2187,13 @@ function exCardHTML(ses, xi){
          ? `<div class="sugline num"><b>Aim for ${sug.reps} reps</b> · last ${sug.lastSummary} · ${sug.reason}</div>`
          : ses.holdWeight
          ? `<div class="sugline num"><b>Hold ${dispW(sug.lastKg)}${unitLabel()} · aim for ${sug.repTarget||(t.reps)} reps</b> · progressing by reps · <button class="linkbtn" data-holdundo="${xi}">undo</button></div>`
-         : `<div class="sugline num"><b>${(exById(ses.exerciseId)?.assisted)? `${dispW(Math.max(0,sug.kg-wStep()*2))}–${dispW(sug.kg)}` : `${dispW(sug.kg)}–${dispW(sug.kg+wStep()*2)}`}${unitLabel()}${(exById(ses.exerciseId)?.assisted)?" assist":""}</b> · last ${sug.lastSummary} · ${sug.reason}${(sug.kg>sug.lastKg && !exById(ses.exerciseId)?.assisted)?` · <button class="linkbtn" data-cantadd="${xi}">can't add weight?</button>`:""}</div>`)
+         : (()=>{ const exr=exById(ses.exerciseId), up=sug.kg>sug.lastKg && !exr?.assisted;
+             const load = exr?.assisted
+               ? `${dispW(Math.max(0,sug.kg-wStep()*2))}–${dispW(sug.kg)}${unitLabel()} assist`
+               : `${dispW(sug.kg)}${unitLabel()}`;
+             const ghosts = ses.sets.map(x=>x.predReps===null?"??":x.expReps).join("/");
+             return `<div class="sugline num"><b>${load}${up?` × ${ghosts}`:""}</b> · last ${sug.lastSummary} · ${sug.reason}${
+               up?` · <button class="linkbtn" data-cantadd="${xi}">can't add weight?</button>`:""}</div>`; })())
          : ses.timed
          ? (()=>{ const h=exerciseHistory(ses.exerciseId);
              const last=h.length? h[0].sets.filter(s=>s.secs!=null) : [];
@@ -2161,6 +2253,18 @@ const SET_TYPES={
 };
 function setTypeBadge(t){ const d=SET_TYPES[t]; return (d&&d.badge)? `<span class="settype-badge" data-tt="${t}">${d.badge}</span>` : ""; }
 
+/** Update the rep placeholders/hints after a live weight change. */
+function repaintPred(xi){
+  const s=S().editSession||S().activeSession; if(!s) return;
+  const ses=s.exercises[xi]; if(!ses) return;
+  ses.sets.forEach((x,si)=>{
+    const cell=document.querySelector(`[data-f="reps"][data-set="${xi}:${si}"]`);
+    if(!cell) return;
+    if(x.predReps===null){ cell.placeholder="??"; cell.classList.add("pred-unknown"); }
+    else { cell.classList.remove("pred-unknown");
+      if(x.predReps!==undefined){ cell.placeholder=String(x.predReps); if(!x.done) cell.value=String(x.predReps); } }
+  });
+}
 function setRowHTML(ses, xi, x, si){
   const id=`${xi}:${si}`;
   const show=x.touched||x.done;   // expected values ghost as placeholders until entered
@@ -2181,7 +2285,7 @@ function setRowHTML(ses, xi, x, si){
     ${bw2
       ? `<div class="bwcell" aria-label="Bodyweight">BW</div>`
       : `<input type="number" inputmode="decimal" step="any" value="${show?dispW(x.kg):""}" placeholder="${dispW(x.kg)}" data-f="kg" data-set="${id}" aria-label="Set ${si+1} weight, expected ${dispW(x.kg)}">`}
-    <div class="repcell">${setTypeBadge(x.type)}<input type="number" inputmode="numeric" value="${show?x.reps:""}" placeholder="${x.reps}" data-f="reps" data-set="${id}" aria-label="Set ${si+1} reps, expected ${x.reps}"></div>
+    <div class="repcell">${setTypeBadge(x.type)}<input type="number" inputmode="numeric" class="${x.predReps===null?"pred-unknown":""}" value="${show&&x.predReps!==null?x.reps:""}" placeholder="${x.predReps===null?"??":x.reps}" data-f="reps" data-set="${id}" aria-label="Set ${si+1} reps, expected ${x.predReps===null?"unknown — weight change too large":x.reps}"></div>
     <select data-f="rir" data-set="${id}" aria-label="${FUN()?`Set ${si+1} feel`:`Set ${si+1} reps in reserve`}">
       ${FUN()
         ? FEELS.map(([v,lb])=>`<option value="${v}" ${feelBucket(x.rir)===v?"selected":""}>${lb}</option>`).join("")
@@ -2203,7 +2307,10 @@ function holdWeightRepProgress(xi){
   const hist=exerciseHistory(ses.exerciseId);
   const lastWork=hist.length? hist[0].sets.filter(x=>x.kg===holdKg && (!x.type||x.type==="normal")) : [];
   const lastReps=lastWork.length? Math.max(...lastWork.map(x=>x.reps)) : ses.target.reps;
-  const ceiling=ses.target.reps + REP_CEILING_OVER_TARGET;
+  // The user has explicitly said the next weight ISN'T available, so the normal
+  // "stop repping, add weight" ceiling must not clamp them below what they just
+  // did — always allow at least one more rep than last time.
+  const ceiling=Math.max(repCeilingFor(exById(ses.exerciseId), holdKg, ses.target.reps), lastReps+1);
   const repTarget=Math.min(ceiling, lastReps+1);
   ses.holdWeight=true;
   ses.suggestion={...sug, repTarget, kg:holdKg, diff:0,
@@ -2522,8 +2629,22 @@ function bindWorkout(){
     const set=s.exercises[xi]?.sets[si]; if(!set) return;
     if(el.dataset.f==="kg"){
       const v=parseFloat(el.value);
-      if(el.value===""){ set.touched=false; }               // cleared -> back to ghost/expected
-      else if(isFinite(v)&&v>=0){ set.kg=Math.round(toKg(v)*100)/100; set.touched=true; }
+      if(el.value===""){ set.touched=false; set.predReps=undefined; }   // cleared -> back to ghost
+      else if(isFinite(v)&&v>=0){
+        set.kg=Math.round(toKg(v)*100)/100; set.touched=true;
+        // Re-aim the rep target at the weight actually chosen (e.g. only 17.5kg
+        // available when 16kg was suggested). null => out of the trusted band,
+        // shown as "??" rather than a confident-looking guess.
+        const ses=s.exercises[xi], ref=ses.suggestion;
+        if(ref && !ses.timed && !ses.bodyweight && ref.lastKg>0){
+          const hist=exerciseHistory(ses.exerciseId);
+          const work=hist.length? hist[0].sets.filter(x=>x.kg===ref.lastKg && (!x.type||x.type==="normal")):[];
+          const base=work.length? work[Math.min(si,work.length-1)].reps : ses.target.reps;
+          set.predReps = (set.kg===ref.lastKg)? base+1 : repsAtLoad(ref.lastKg, base, set.kg);
+          if(!set.done && set.predReps!==null && set.predReps!==undefined) set.reps=set.predReps;
+          repaintPred(xi);
+        }
+      }
     }
     if(el.dataset.f==="reps"){
       const v=parseInt(el.value);
@@ -3039,6 +3160,7 @@ function checkPR(exId, kg, reps){
   const sessionDate=S().activeSession?.date || todayISO();
   const prev=exerciseHistory(exId).filter(x=>x.date<sessionDate);
   if(!prev.length) return;                       // first exposure — nothing to beat yet
+  if(!FUN()) return;                             // Serious mode: no PR popups
   const best=Math.max(...prev.map(x=>x.e1rm));
   if(e1>best) toast(`🏆 New e1RM PR — ${dispW(e1)}${unitLabel()}!`, "pr");
 }
@@ -3449,6 +3571,56 @@ function confirmDeleteLog(logId){
 /* ---- Female + Fun "cutie" motivation layer (stats page) ----
    Gated on Fun mode AND profile.gender === "Female". Pure encouragement: the
    score only rewards activity and never subtracts for a rough session. */
+/* Welcome-back messages for the cutie layer (Fun mode + Female).
+   Tiered by how long it's been since the last logged workout. Warm and
+   playful, never guilt-trippy — a long gap gets the kindest tier. */
+const RETURN_MSGS_SHORT=[
+ "Lets go babe — even princesses need a rest 👑",
+ "Well well well… look who's back 💅",
+ "Missed you! The weights were getting lonely 🥺",
+ "Rest was earned. Now let's earn the pump 💪",
+ "Back at it, gorgeous — pick up where you left off ✨",
+ "Little break, big comeback. Let's go 🔥",
+ "Your dumbbells have been asking about you 😏",
+ "Recharged and ready? Let's make it count 💖",
+ "A few days off looks good on you. Now move 💫",
+ "Rested, glowing, dangerous. Let's train 😈"];
+const RETURN_MSGS_MID=[
+ "Okay queen, the throne's been empty a minute 👑",
+ "Not gone, just on a strategic break 😌 welcome back!",
+ "The gym called. It wants its favourite back 📞",
+ "Long rest, longer comeback. Let's build 💪",
+ "You're back and that's the hardest part done ✨",
+ "Dust off those trainers, gorgeous — we're going 🥿",
+ "No guilt, just go. Today's a great day to restart 💕",
+ "Comeback szn officially open 🎬",
+ "Muscle memory is real, babe. It's still in there 🧠",
+ "Week off? Consider it a deload. Back to it 😉"];
+const RETURN_MSGS_LONG=[
+ "Hey stranger 💖 no judgement, just glad you're here",
+ "The best time to start was then. Second best is now ⏰",
+ "You showed up. That already puts you ahead 👏",
+ "Fresh start, clean slate, same strong girl ✨",
+ "It's been a while — let's go gentle and rebuild 🌱",
+ "No lectures, just excitement that you're back 🥳",
+ "Start light, start today. Future you says thanks 💕",
+ "Long time no lift! Let's ease back in, gorgeous 💫",
+ "Every comeback starts with one session. This one 🔥",
+ "Welcome back, legend. Let's rewrite the story 📖"];
+/** Whole days since the most recent logged workout, or null if none. */
+function daysSinceLastWorkout(){
+  const dates=S().logs.map(l=>l.date).filter(Boolean).sort();
+  if(!dates.length) return null;
+  const last=new Date(dates[dates.length-1]+"T12:00");
+  const now=new Date(); now.setHours(12,0,0,0);
+  return Math.max(0, Math.round((now-last)/864e5));
+}
+/** A welcome-back line for the current gap, or null when one isn't warranted. */
+function returnMessage(days){
+  if(days===null || days<3) return null;                 // under 3 days: no message
+  const bank = days<=5? RETURN_MSGS_SHORT : days<=13? RETURN_MSGS_MID : RETURN_MSGS_LONG;
+  return bank[Math.floor(Math.random()*bank.length)];
+}
 function cutieOn(){ return FUN() && (S().profile?.gender==="Female"); }
 const CUTIE_TITLES=["Gym Cutie","Hot Mumma","Fit Queen","Strong Sweetheart","Iron Angel","Barbell Baddie","Snack with Muscles","Certified Powerpuff","Dumbbell Darling","Glute Goddess"];
 const CUTIE_MSGS=[

@@ -27,8 +27,9 @@ Push to the repo → auto-deploys in ~1 min.
 | `sw.js` | Service worker. Network-first for the HTML shell so updates propagate. |
 | `_headers` | Cloudflare cache headers. |
 | `icon-*.png` | App icons (coral "LD"), incl. maskable variants. |
-| `tests/` | Automated test suite — see `tests/README.md`. |
+| `TESTS_*.js` | Automated test suite, in the repo root — see `TESTS_README.md`. Run `node TESTS_run-all.js`. |
 | `PROJECT-NOTES.md` | This file. |
+| `PROGRESSION-MODEL.md` | **The science behind the progression maths** — equations, evidence, worked examples, the "??" band, the jump-aware ceiling. Read this before touching the engine. |
 
 **Deploying a change:** bump the `BUILD` stamp in `sw.js`, then push
 `index.html` + `sw.js`. Without the bump, clients may keep the old shell.
@@ -93,9 +94,23 @@ back-dated log fell out of the window and could never be corrected.
 3. **Setup note** — 🔧, saved to the **exercise in the library**, so it shows
    every time you do that exercise, in any meso. Edited from the workout.
 
+**Progression maths.** Load↔rep conversion uses an **average of Epley and
+Brzycki**, applied in both directions (they disagree by ~25% individually at
+12-15 reps, and bracket the truth from opposite sides). Predictions outside a
+trusted band (reps <3 or >25, or load ≥ estimated 1RM) return `null` and render
+as **`??`** — never a fake number. Weight and reps **never both increase**:
+held weight → +1 rep; raised weight → fewer reps, predicted. The rep ceiling is
+**jump-aware** (`repCeilingFor`), derived from each exercise's own smallest
+weight jump — a 5→7.5kg lateral raise (+50%) needs ~20 reps banked before the
+jump is even possible, while a 100→102.5kg squat (+2.5%) should jump at ~10.
+Set the increment per exercise in the exercise editor. Full reasoning and
+evidence in `PROGRESSION-MODEL.md`.
+
 **Exercise flags:** `assisted` (inverted progression), `equipment:"Bodyweight"`
 (reps not load when unloaded), `timed` (log seconds, **no progression** — just
-shows "Last time: 45s · 42s · 38s"), cardio (ids prefixed `c_`).
+shows "Last time: 45s · 42s · 38s"), `step` (smallest real weight jump, drives
+the rep ceiling; defaults per equipment via `DEFAULT_STEP`), cardio (ids
+prefixed `c_`).
 
 **Cardio** is logged into a separate `cardio` store (never mixed into lifting
 volume), written at finish *after* the date is chosen so it matches the log.
@@ -132,6 +147,38 @@ feed, wearable HR, a named trainer/coach persona.
 
 Newest first. Add an entry when you ship.
 
+### 2026-08-25 (fourth pass — welcome-back messages)
+- **Added tiered welcome-back messages** for the cutie layer (Fun mode +
+  Female). Shown as a card on Home when there's a gap since the last logged
+  workout. 30 messages across three tiers: **3-5 days** (playful, "even
+  princesses need a rest"), **6-13 days** (encouraging comeback), **14+ days**
+  (deliberately the kindest — no guilt, just glad you're back). Under 3 days
+  shows nothing, and a brand-new user with no history never sees it.
+  `RETURN_MSGS_SHORT/MID/LONG`, `daysSinceLastWorkout()`, `returnMessage()`.
+- Tests: new `TESTS_welcome.js` (22 checks). Suite now **188 checks / 10 suites**.
+
+### 2026-08-25 (third pass — progression overhaul)
+- **PR popups gated to Fun mode.** `checkPR()` had no mode check at all (only
+  `maybeCelebrate` did), so Serious mode still got e1RM PR toasts.
+- **Weight and reps no longer both increase.** `buildGhostRows` used to carry
+  last week's reps onto a heavier load — a double increase. Now: held weight →
+  +1 rep; raised weight → fewer reps, predicted from the load–rep model.
+- **Added the load–rep model** (`e1rmAvg`, `repsAtLoad`) — averaged
+  Epley + Brzycki, both directions. 15kg×15/14/12 → 17.5kg now suggests
+  **10/9/7** instead of demanding the same reps at a heavier load.
+- **Live re-prediction**: typing a weight different from the suggestion
+  re-aims the rep targets for that exercise, per set.
+- **"??" for out-of-band predictions** — reps <3 or >25, or a load at/above the
+  estimated 1RM. Better than printing a confident wrong number.
+- **Jump-aware rep ceiling** replaces the flat `target+4`, which was broken for
+  small-muscle work (a 5→7.5kg lateral raise is +50% and needs ~20 reps banked;
+  +4 could never get there). Ceiling now derived from each exercise's own
+  smallest jump.
+- **Per-exercise "smallest weight jump"** field added to the exercise editor,
+  defaulting by equipment. This is what makes microloading work properly.
+- Reasoning, evidence and worked examples documented in `PROGRESSION-MODEL.md`.
+- Tests: new `TESTS_loadrep.js` (25 checks). Suite now **166 checks / 9 suites**.
+
 ### 2026-08-25 (second pass — audit)
 - **Audited the codebase** against edge cases, data integrity, and cross-feature
   interactions. Two findings:
@@ -140,9 +187,9 @@ Newest first. Add an entry when you ship.
     the meso has a logged workout, and `collectBasics` skips disabled selects so
     a started meso keeps its settings.
   - **Fixed earlier the same day: cardio kept the stale date** (see below).
-- Test suite grown to **138 checks across 8 suites** — added `t-integrity.js`
-  (export/import, checksums, migrations), `t-edge.js` (empty states, set ops,
-  input clamping), `t-flows.js` (multi-feature user journeys).
+- Test suite grown to **138 checks across 8 suites** — added `TESTS_integrity.js`
+  (export/import, checksums, migrations), `TESTS_edge.js` (empty states, set ops,
+  input clamping), `TESTS_flows.js` (multi-feature user journeys).
 - Verified clean, no action needed: timed exercises don't pollute lifting
   volume or PRs; negative/absurd inputs are clamped; empty workouts are
   discarded rather than logged as phantoms; all views render on an empty

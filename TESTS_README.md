@@ -26,6 +26,7 @@ node TESTS_ramp.js         # run one suite
 | `TESTS_integrity.js` | Export/import round-trip, checksum tampering, legacy imports, schema migration, corrupt-state rejection |
 | `TESTS_edge.js` | Empty states, set add/duplicate/delete, input clamping, empty-workout discard, timed exercises not polluting lifting stats |
 | `TESTS_loadrep.js` | Load–rep prediction accuracy, the "??" trusted band, per-exercise weight steps, the jump-aware rep ceiling, never-both-at-once, live re-prediction |
+| `TESTS_welcome.js` | Welcome-back messages — the 30-message bank, gap tiering, and the Fun+Female gate |
 | `TESTS_flows.js` | "Can't add weight", repeating a meso, the priority lock, feedback-driven progression, cardio zones, workout picker |
 | `TESTS_lib.js` | Shared harness — `boot()`, `ok()`, `run()` and helpers |
 
