@@ -302,6 +302,9 @@ canvas.chart{width:100%; height:180px; display:block}
   border-radius:var(--r-sm);text-transform:none;font-size:15px;cursor:pointer}
 .scheme-row.on{border-color:var(--accent);background:var(--accent-soft)}
 .scheme-dot{width:22px;height:22px;border-radius:50%;flex:0 0 auto;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+.tot-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 8px;margin-top:10px}
+.tot-grid .faint{font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.tot-n{font-size:20px;font-weight:900;line-height:1.1}
 .spm-row{display:flex;align-items:center;gap:10px;margin-bottom:7px}
 .spm-label{width:84px;font-size:13px;color:var(--muted);font-weight:600;flex:0 0 auto}
 .spm-track{flex:1;height:18px;background:var(--raised);border-radius:6px;position:relative;overflow:hidden}
@@ -3890,11 +3893,65 @@ function drawCutie(logs, meso){
 }
 
 /* ================= VIEW: ANALYTICS ================= */
+/* Which slice of history Stats is showing. Kept in memory (not saved) so it
+   survives navigation within a session but always opens on the current meso. */
+let _statScope=null;
+/** The scopes offered in the Stats dropdown, newest/most relevant first. */
+function statScopes(){
+  const st=S(), out=[];
+  const active=activeMeso();
+  // mesos that actually have logged workouts, newest first
+  const withLogs=st.mesocycles
+    .map(m=>({m, logs:st.logs.filter(l=>l.mesoId===m.id && !l.skipped)}))
+    .filter(x=>x.logs.length)
+    .sort((a,b)=>(b.logs[b.logs.length-1]?.date||"").localeCompare(a.logs[a.logs.length-1]?.date||""));
+  if(active) out.push({id:"meso:"+active.id, label:"Current: "+active.name, kind:"meso"});
+  withLogs.forEach(({m},i)=>{
+    if(active && m.id===active.id) return;
+    out.push({id:"meso:"+m.id, kind:"meso",
+      label:(out.some(o=>o.kind==="meso" && o.label.startsWith("Previous"))?"":"Previous: ")+m.name});
+  });
+  const y=new Date().getFullYear();
+  out.push({id:"month", label:"This month", kind:"range"});
+  out.push({id:"year",  label:"This year ("+y+")", kind:"range"});
+  out.push({id:"all",   label:"All time", kind:"range"});
+  return out;
+}
 VIEWS.analytics=function(){
   const st=S();
-  const meso=activeMeso();
-  // Stats are scoped to the active mesocycle when one exists.
-  const logs=(meso? st.logs.filter(l=>l.mesoId===meso.id) : st.logs).filter(l=>!l.skipped);
+  const scopes=statScopes();
+  if(!_statScope || !scopes.some(s=>s.id===_statScope)) _statScope=scopes[0]?.id||"all";
+  const scope=scopes.find(s=>s.id===_statScope)||scopes[0];
+  // A meso scope keeps the meso-specific panels (adherence, targets, week-by-week);
+  // a date range turns them off and shows plain totals instead.
+  const meso = scope && scope.kind==="meso"
+    ? st.mesocycles.find(m=>m.id===scope.id.slice(5)) || null
+    : null;
+  const nowISO=todayISO();
+  const inScope=l=>{
+    if(!scope) return true;
+    if(scope.kind==="meso") return l.mesoId===scope.id.slice(5);
+    if(scope.id==="month") return l.date.slice(0,7)===nowISO.slice(0,7);
+    if(scope.id==="year")  return l.date.slice(0,4)===nowISO.slice(0,4);
+    return true;                                    // all time
+  };
+  const logs=st.logs.filter(l=>!l.skipped && inScope(l));
+  const cardioInScope=st.cardio.filter(c=>{
+    if(!scope) return true;
+    if(scope.kind==="meso") return c.mesoId===scope.id.slice(5);
+    if(scope.id==="month") return c.date.slice(0,7)===nowISO.slice(0,7);
+    if(scope.id==="year")  return c.date.slice(0,4)===nowISO.slice(0,4);
+    return true;
+  });
+  // headline totals for whatever is selected
+  const totals=logs.reduce((t,l)=>{
+    t.workouts++; t.mins+=l.durationMin||0;
+    l.exercises.forEach(e=>e.sets.filter(s=>s.done).forEach(x=>{
+      t.sets++; t.vol+=(x.kg||0)*(x.reps||0); t.reps+=(x.reps||0);
+    }));
+    return t;
+  },{workouts:0,sets:0,reps:0,vol:0,mins:0});
+  totals.cardioMin=cardioInScope.reduce((t,c)=>t+(c.minutes||0),0);
   // weekly volume + sets per muscle
   const byWeek={}; // isoWeekKey -> {vol, sets, count, dur}
   const weekKey=d=>{ const dt=new Date(d+"T12:00"); dt.setDate(dt.getDate()-((dt.getDay()+6)%7));
@@ -4010,9 +4067,22 @@ VIEWS.analytics=function(){
   const strain=recentFb.length? recentFb.reduce((t,f)=>t+(f.fatigue+f.jointPain+(6-f.recovery)+(6-f.sleep))/4,0)/recentFb.length : null;
   const fatigueLabel=strain==null?null: strain>=4?["High — consider easing off","red"]: strain>=3?["Moderate","amb"]:["Low — good to push","grn"];
   $("#view").innerHTML=`
-    <div class="topbar"><div><h1>Stats</h1>
-      <div class="top-sub">${meso? esc(meso.name):"All time"}</div></div>
+    <div class="topbar"><div><h1>Stats</h1></div>
       ${fatigueLabel?`<span class="pill ${fatigueLabel[1]}">Fatigue: ${fatigueLabel[0]}</span>`:""}</div>
+    <select id="statscope" aria-label="What to show stats for" style="margin-bottom:12px">
+      ${scopes.map(sc=>`<option value="${sc.id}" ${sc.id===_statScope?"selected":""}>${esc(sc.label)}</option>`).join("")}
+    </select>
+    <div class="card" style="margin-bottom:14px">
+      <div class="kicker">${esc(scope?scope.label:"Totals")}</div>
+      ${totals.workouts? `<div class="tot-grid">
+        <div><div class="tot-n num">${totals.workouts}</div><div class="faint">workouts</div></div>
+        <div><div class="tot-n num">${totals.sets.toLocaleString()}</div><div class="faint">sets</div></div>
+        <div><div class="tot-n num">${totals.reps.toLocaleString()}</div><div class="faint">reps</div></div>
+        <div><div class="tot-n num">${Math.round(totals.vol).toLocaleString()}</div><div class="faint">${unitLabel()} volume</div></div>
+        <div><div class="tot-n num">${Math.round(totals.mins/60)}</div><div class="faint">hours lifting</div></div>
+        <div><div class="tot-n num">${totals.cardioMin.toLocaleString()}</div><div class="faint">cardio min</div></div>
+      </div>`:`<div class="faint" style="margin-top:6px">Nothing logged in this period yet.</div>`}
+    </div>
     <div class="grid2">
       <div class="card" style="margin-bottom:14px"><div class="kicker">Completion</div>
         <div class="num" style="font-size:26px;font-weight:900">${adherence!=null?clamp(adherence,0,100)+"%":logs.length}</div>
@@ -4137,6 +4207,9 @@ VIEWS.analytics=function(){
     };
     drawFit();
   }
+  // Scope dropdown — re-render Stats for the selected slice of history.
+  const scopeSel=$("#statscope");
+  if(scopeSel) scopeSel.onchange=()=>{ _statScope=scopeSel.value; VIEWS.analytics(); };
 };
 
 /* ================= VIEW: SETTINGS ================= */

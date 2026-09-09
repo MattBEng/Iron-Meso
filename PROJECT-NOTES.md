@@ -147,6 +147,21 @@ feed, wearable HR, a named trainer/coach persona.
 
 Newest first. Add an entry when you ship.
 
+### 2026-09-01 (third pass — Stats scope)
+- **Stats now has a scope dropdown** at the top: **Current meso**, each
+  **previous meso** that has logged workouts (newest first), **This month**,
+  **This year**, **All time**. Selecting one re-scopes the whole page.
+- **Totals card** under the dropdown for whatever is selected: workouts, sets,
+  reps, volume, hours lifting, cardio minutes. Empty periods say so plainly
+  rather than showing zeros everywhere.
+- A **meso scope** keeps the meso-specific panels (completion/adherence, weekly
+  targets, week-by-week, PRs); a **date range** turns those off — they have no
+  meaning outside a single block — and shows the plain totals instead.
+- Skipped markers are excluded from every scope. Scope is held in memory
+  (`_statScope`), so it survives navigation but always opens on the current
+  meso. `statScopes()` builds the list.
+- Tests: new `TESTS_statscope.js` (24 checks). Suite now **261 / 13 suites**.
+
 ### 2026-09-01 (second pass)
 - **Skip a whole workout.** The ✕ in the workout header now offers
   *Skip this workout* alongside Keep & leave / Discard, with a confirmation that

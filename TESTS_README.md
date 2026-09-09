@@ -26,6 +26,7 @@ node TESTS_ramp.js         # run one suite
 | `TESTS_integrity.js` | Export/import round-trip, checksum tampering, legacy imports, schema migration, corrupt-state rejection |
 | `TESTS_edge.js` | Empty states, set add/duplicate/delete, input clamping, empty-workout discard, timed exercises not polluting lifting stats |
 | `TESTS_loadrep.js` | Load–rep prediction accuracy, the "??" trusted band, per-exercise weight steps, the jump-aware rep ceiling, never-both-at-once, live re-prediction |
+| `TESTS_statscope.js` | Stats scope selector — meso/month/year/all-time filtering and the totals card |
 | `TESTS_skip.js` | Skipping a workout — meso advances, markers stay out of streaks/stats/editing |
 | `TESTS_schemes.js` | Fun colour schemes — four options, single-select, Fun-mode gating, persistence |
 | `TESTS_welcome.js` | Welcome-back messages — the 30-message bank, gap tiering, and the Fun+Female gate |
