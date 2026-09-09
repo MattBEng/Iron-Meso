@@ -43,6 +43,55 @@
   /* Consistent dark: coral accent to match the brand, same surfaces */
   --accent:#FF7A6E; --accent-soft:rgba(255,122,110,.14);
 }
+
+/* ---- Fun-mode colour schemes ----
+   Only applied in Fun mode (body[data-fun="1"]). "default" changes nothing —
+   it's the standard coral. The other three re-tint the accent and surfaces. */
+
+/* Pastel — soft lilac/mint, gentle and airy */
+body[data-fun="1"][data-scheme="pastel"][data-theme="light"]{
+  --bg:#F7F4FB; --surface:#FFFFFF; --raised:#FBF8FE; --line:#E7DFF3;
+  --accent:#A78BD9; --accent-soft:rgba(167,139,217,.16);
+  --text:#2C2440; --muted:#6E6288; --faint:#A79CC0;
+  --cyan:#5FC9C0; --green:#63C79A; --amber:#E8B563; --red:#E888A6;
+  --shadow:0 6px 22px rgba(90,70,140,.10);
+}
+body[data-fun="1"][data-scheme="pastel"][data-theme="dark"]{
+  --bg:#17131F; --surface:#211B2C; --raised:#2A2338; --line:#372E48;
+  --accent:#B79BE8; --accent-soft:rgba(183,155,232,.18);
+  --text:#EFE9F7; --muted:#A093B8; --faint:#6F6386;
+  --cyan:#6FD8CE; --green:#6FD5A6; --amber:#F0C06E; --red:#F294B0;
+}
+
+/* Super pink — loud, hot pink, unapologetic */
+body[data-fun="1"][data-scheme="pink"][data-theme="light"]{
+  --bg:#FFF3F8; --surface:#FFFFFF; --raised:#FFF8FB; --line:#FBD9E8;
+  --accent:#EC4899; --accent-soft:rgba(236,72,153,.15);
+  --text:#3D1029; --muted:#8C5372; --faint:#C795AE;
+  --cyan:#4FC3D9; --green:#41C48B; --amber:#F2A93B; --red:#F0436F;
+  --shadow:0 6px 22px rgba(190,60,120,.12);
+}
+body[data-fun="1"][data-scheme="pink"][data-theme="dark"]{
+  --bg:#1C0F17; --surface:#2A1622; --raised:#341B2A; --line:#452438;
+  --accent:#FF5FAE; --accent-soft:rgba(255,95,174,.20);
+  --text:#FFECF5; --muted:#C48FAB; --faint:#8A6077;
+  --cyan:#5FD4E6; --green:#5FD69C; --amber:#FFC061; --red:#FF6E90;
+}
+
+/* Peach sorbet — warm coral-peach with a soft cream canvas */
+body[data-fun="1"][data-scheme="peach"][data-theme="light"]{
+  --bg:#FFF6F0; --surface:#FFFFFF; --raised:#FFFAF6; --line:#F7DFD0;
+  --accent:#F97362; --accent-soft:rgba(249,115,98,.15);
+  --text:#3A1F18; --muted:#8A6357; --faint:#C0A093;
+  --cyan:#40BFB4; --green:#4CC28C; --amber:#EFA53C; --red:#EF5F6E;
+  --shadow:0 6px 22px rgba(190,110,80,.11);
+}
+body[data-fun="1"][data-scheme="peach"][data-theme="dark"]{
+  --bg:#1D1310; --surface:#2A1D18; --raised:#342420; --line:#452F28;
+  --accent:#FF8E7A; --accent-soft:rgba(255,142,122,.18);
+  --text:#FFEEE7; --muted:#C09A8C; --faint:#856A5E;
+  --cyan:#5FD3C7; --green:#68D49E; --amber:#FFBB63; --red:#FF7A88;
+}
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0}
 body{
@@ -249,6 +298,10 @@ canvas.chart{width:100%; height:180px; display:block}
 .linkdate{color:var(--accent);font-weight:700;background:none;border:0;padding:0;font:inherit}
 .cutie-card{border-color:rgba(224,85,156,.35);background:linear-gradient(180deg,rgba(224,85,156,.06),transparent)}
 .welcome-back h3{font-size:17px;line-height:1.35}
+.scheme-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);
+  border-radius:var(--r-sm);text-transform:none;font-size:15px;cursor:pointer}
+.scheme-row.on{border-color:var(--accent);background:var(--accent-soft)}
+.scheme-dot{width:22px;height:22px;border-radius:50%;flex:0 0 auto;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
 .spm-row{display:flex;align-items:center;gap:10px;margin-bottom:7px}
 .spm-label{width:84px;font-size:13px;color:var(--muted);font-weight:600;flex:0 0 auto}
 .spm-track{flex:1;height:18px;background:var(--raised);border-radius:6px;position:relative;overflow:hidden}
@@ -458,6 +511,7 @@ const MIGRATIONS = {
   },
   5: st => {              // v5 -> v6: Serious/Fun mode
     st.settings.mode ??= "fun";
+    st.settings.funScheme ??= "default";
     return st;
   },
   6: st => {              // v6 -> v7: seed starter template plans (once)
@@ -545,6 +599,7 @@ class StorageManager{
       STARTER_EXERCISES.forEach(e=>{ if(!have.has(e.id)) st.exercises.push(e); });
       st.profile ??= {gender:"", age:null, weightKg:null, heightCm:null, experience:"", goals:"", setupDismissed:false};
       st.settings.mode ??= "fun";
+    st.settings.funScheme ??= "default";
       st.settings.restBuzz ??= true;
       return Object.assign(this.defaults(), st,
         {settings:Object.assign(this.defaults().settings, st.settings||{})});
@@ -1311,6 +1366,7 @@ function isDeload(meso,week){ return meso.deload && week===meso.weeks; }
 const EDIT_WINDOW=6;
 function logEditable(log){
   if(!log) return false;
+  if(log.skipped) return false;                           // a skip marker has nothing to edit
   if(log.mesoId!==S().activeMesoId) return false;         // not the active meso
   const meso=activeMeso(); if(!meso || meso.archived) return false;
   // Order by when the log was CREATED, not by its date field. Sorting by date
@@ -1323,7 +1379,7 @@ function logEditable(log){
   return idx>=0 && idx >= mlogs.length-EDIT_WINDOW;        // within the last 6 logged
 }
 function streakCount(){
-  const dates=[...new Set(S().logs.map(l=>l.date))].sort().reverse();
+  const dates=[...new Set(S().logs.filter(l=>!l.skipped).map(l=>l.date))].sort().reverse();
   if(!dates.length) return 0;
   let streak=0, cursor=new Date();
   for(const d of dates){
@@ -1336,7 +1392,7 @@ function streakCount(){
 /* ================= VIEW: DASHBOARD ================= */
 VIEWS.home=function(){
   const st=S(), meso=activeMeso(), pos=mesoPosition(meso);
-  const lastLog=st.logs[st.logs.length-1];
+  const lastLog=[...st.logs].reverse().find(l=>!l.skipped)||null;   // skips are not workouts
   const lastFb=st.feedback[st.feedback.length-1];
   const bw=st.bodyweight.slice(-14);
   let mesoCard;
@@ -2260,9 +2316,17 @@ function repaintPred(xi){
   ses.sets.forEach((x,si)=>{
     const cell=document.querySelector(`[data-f="reps"][data-set="${xi}:${si}"]`);
     if(!cell) return;
-    if(x.predReps===null){ cell.placeholder="??"; cell.classList.add("pred-unknown"); }
-    else { cell.classList.remove("pred-unknown");
-      if(x.predReps!==undefined){ cell.placeholder=String(x.predReps); if(!x.done) cell.value=String(x.predReps); } }
+    const entered = x.done || x.touched;            // never disturb a set the user has filled in
+    if(x.predReps===null){
+      cell.placeholder="??";
+      cell.classList.toggle("pred-unknown", !entered);
+    } else {
+      cell.classList.remove("pred-unknown");
+      if(x.predReps!==undefined){
+        cell.placeholder=String(x.predReps);
+        if(!entered) cell.value=String(x.predReps);
+      }
+    }
   });
 }
 function setRowHTML(ses, xi, x, si){
@@ -2285,7 +2349,7 @@ function setRowHTML(ses, xi, x, si){
     ${bw2
       ? `<div class="bwcell" aria-label="Bodyweight">BW</div>`
       : `<input type="number" inputmode="decimal" step="any" value="${show?dispW(x.kg):""}" placeholder="${dispW(x.kg)}" data-f="kg" data-set="${id}" aria-label="Set ${si+1} weight, expected ${dispW(x.kg)}">`}
-    <div class="repcell">${setTypeBadge(x.type)}<input type="number" inputmode="numeric" class="${x.predReps===null?"pred-unknown":""}" value="${show&&x.predReps!==null?x.reps:""}" placeholder="${x.predReps===null?"??":x.reps}" data-f="reps" data-set="${id}" aria-label="Set ${si+1} reps, expected ${x.predReps===null?"unknown — weight change too large":x.reps}"></div>
+    <div class="repcell">${setTypeBadge(x.type)}<input type="number" inputmode="numeric" class="${(!show&&x.predReps===null)?"pred-unknown":""}" value="${show?x.reps:""}" placeholder="${x.predReps===null?"??":x.reps}" data-f="reps" data-set="${id}" aria-label="Set ${si+1} reps${x.predReps===null&&!show?" — no suggestion, weight change too large":", expected "+x.reps}"></div>
     <select data-f="rir" data-set="${id}" aria-label="${FUN()?`Set ${si+1} feel`:`Set ${si+1} reps in reserve`}">
       ${FUN()
         ? FEELS.map(([v,lb])=>`<option value="${v}" ${feelBucket(x.rir)===v?"selected":""}>${lb}</option>`).join("")
@@ -2641,15 +2705,16 @@ function bindWorkout(){
           const work=hist.length? hist[0].sets.filter(x=>x.kg===ref.lastKg && (!x.type||x.type==="normal")):[];
           const base=work.length? work[Math.min(si,work.length-1)].reps : ses.target.reps;
           set.predReps = (set.kg===ref.lastKg)? base+1 : repsAtLoad(ref.lastKg, base, set.kg);
-          if(!set.done && set.predReps!==null && set.predReps!==undefined) set.reps=set.predReps;
+          // only re-aim sets the user hasn't filled in yet
+          if(!set.done && !set.touchedReps && set.predReps!==null && set.predReps!==undefined) set.reps=set.predReps;
           repaintPred(xi);
         }
       }
     }
     if(el.dataset.f==="reps"){
       const v=parseInt(el.value);
-      if(el.value===""){ set.touched=false; }
-      else if(isFinite(v)){ set.reps=clamp(v,0,100); set.touched=true; }
+      if(el.value===""){ set.touched=false; set.touchedReps=false; }
+      else if(isFinite(v)){ set.reps=clamp(v,0,100); set.touched=true; set.touchedReps=true; }
     }
     if(el.dataset.f==="secs"){
       const v=parseInt(el.value);
@@ -2846,11 +2911,14 @@ function bindWorkout(){
         });
         return;
       }
-      modal(`<h2>Leave workout?</h2><p class="muted">Your logged sets are saved. Resume any time from Home, or discard the session.</p>
+      modal(`<h2>Leave workout?</h2><p class="muted">Your logged sets are saved. Resume any time from Home, or leave this one behind.</p>
         <div class="stack" style="margin-top:14px">
-          <button class="btn btn-ghost" data-q="keep">Keep & leave</button>
-          <button class="btn btn-danger" data-q="discard">Discard session</button></div>`, m=>{
+          <button class="btn btn-ghost" data-q="keep">Keep &amp; leave</button>
+          <button class="btn btn-ghost" data-q="skip">Skip this workout</button>
+          <button class="btn btn-danger" data-q="discard">Discard session</button></div>
+        <p class="faint" style="margin:10px 0 0">Skipping moves you on to the next workout in the ${term("meso")} — nothing is logged.</p>`, m=>{
         m.onclick=ev=>{ const q=ev.target.closest("[data-q]")?.dataset.q; if(!q) return;
+          if(q==="skip"){ closeModal(); confirmSkipWorkout(); return; }
           if(q==="discard"){ S().activeSession=null; Store.save(); Store.flush(); }
           closeModal(); stopRest(); go("home"); };
       });
@@ -2968,7 +3036,7 @@ function enableWorkoutSwipe(s){
     const dx=e.changedTouches[0].clientX-tx, dy=e.changedTouches[0].clientY-ty;
     tx=null;
     if(Math.abs(dx)<70 || Math.abs(dy)>Math.abs(dx)) return;
-    const mesoLogs=S().logs.filter(l=>l.mesoId===s.mesoId);
+    const mesoLogs=S().logs.filter(l=>l.mesoId===s.mesoId && !l.skipped);
     const edit=s.mode==="edit";
     if(dx>0){                                  // swipe right -> previous
       if(edit){
@@ -3329,6 +3397,40 @@ function maybeCelebrate(kind, ses, extra){
     s._cheered.beat=1; toast("Extra reps! Sneaky strong 💪"); return;
   }
 }
+/* Skip the whole workout.
+   Position in a meso is derived from how many logs it has, so a skip records a
+   marker log (skipped:true, no exercises). That advances to the next workout
+   without inventing training data — and everything that aggregates training
+   (streaks, volume, session counts) filters skipped markers out. */
+function skipWorkout(){
+  const s=S().activeSession;
+  const meso=activeMeso(); if(!meso) { go("home"); return; }
+  const pos=mesoPosition(meso);
+  const done=(s?.exercises||[]).some(e=>(e.sets||[]).some(x=>x.done));
+  S().logs.push({
+    id:s?.id||uid(), mesoId:meso.id, week:s?.week??pos.week,
+    dayId:s?.dayId||pos.day?.id, dayName:s?.dayName||pos.day?.name||"",
+    date:todayISO(), notes:s?.notes||"", durationMin:0,
+    loggedAt:Date.now(), skipped:true, exercises:[]
+  });
+  S().activeSession=null;
+  Store.save(); Store.flush(); stopRest();
+  toast(FUN()?"Skipped — onto the next one 💫":"Workout skipped");
+  go("home");
+}
+function confirmSkipWorkout(){
+  const s=S().activeSession;
+  const logged=(s?.exercises||[]).reduce((n,e)=>n+(e.sets||[]).filter(x=>x.done).length,0);
+  modal(`<h2>Skip this workout?</h2>
+    <p class="muted">It'll be marked skipped and you'll move on to the next workout in the ${term("meso")}.${
+      logged?` <b>${logged} logged set${logged>1?"s":""} will be discarded.</b>`:""}</p>
+    <div class="stack" style="margin-top:14px">
+      <button class="btn btn-ghost" data-sk="no">Back</button>
+      <button class="btn btn-danger" data-sk="yes">Skip it</button></div>`, m=>{
+    m.onclick=ev=>{ const v=ev.target.closest("[data-sk]")?.dataset.sk; if(!v) return;
+      closeModal(); if(v==="yes") skipWorkout(); };
+  });
+}
 function finishWorkout(){
   const s=S().activeSession;
   if(!s) return go("home");
@@ -3443,7 +3545,7 @@ VIEWS.calendar=function(){
     const wk=logsByDate[iso], cd=cardioByDate[iso];
     cells+=`<button class="calday ${iso===todayISO()?"today":""}" data-date="${iso}"
       aria-label="${iso}${wk?`, ${wk.length} workout${wk.length>1?"s":""}`:""}${cd?", cardio":""}">
-      ${d}<span class="dots">${wk?`<span class="dot" style="background:var(--green)"></span>`:""}${cd?`<span class="dot" style="background:var(--cyan)"></span>`:""}</span></button>`;
+      ${d}<span class="dots">${wk&&wk.some(l=>!l.skipped)?`<span class="dot" style="background:var(--green)"></span>`:""}${wk&&wk.every(l=>l.skipped)?`<span class="dot" style="background:var(--faint)"></span>`:""}${cd?`<span class="dot" style="background:var(--cyan)"></span>`:""}</span></button>`;
   }
   // upcoming workouts in the active meso
   const meso=activeMeso(), pos=meso? mesoPosition(meso):null;
@@ -3516,7 +3618,11 @@ function previewDay(meso, dayIdx, week){
 function dayModal(iso, logs, cardio){
   if(!logs.length && !cardio.length){ toast("Nothing logged on "+fmtDate(iso)); return; }
   modal(`<h2>${fmtDate(iso)}</h2><div class="stack" style="margin-top:12px">
-    ${logs.map(l=>{ const canEdit=logEditable(l);
+    ${logs.map(l=>{
+      if(l.skipped) return `<div class="row" style="gap:8px">
+        <div class="setline num" style="flex:1;opacity:.7">${esc(l.dayName)} · skipped · W${l.week}</div>
+        <button class="iconbtn" data-dellog="${l.id}" aria-label="Remove skip">✕</button></div>`;
+      const canEdit=logEditable(l);
       return `<div class="row" style="gap:8px">
       <button class="btn btn-ghost" style="flex:1;justify-content:flex-start" data-open="${l.id}">
         ${esc(l.dayName)} · ${l.exercises.reduce((t,e)=>t+e.sets.length,0)} sets · W${l.week}
@@ -3609,7 +3715,7 @@ const RETURN_MSGS_LONG=[
  "Welcome back, legend. Let's rewrite the story 📖"];
 /** Whole days since the most recent logged workout, or null if none. */
 function daysSinceLastWorkout(){
-  const dates=S().logs.map(l=>l.date).filter(Boolean).sort();
+  const dates=S().logs.filter(l=>!l.skipped).map(l=>l.date).filter(Boolean).sort();
   if(!dates.length) return null;
   const last=new Date(dates[dates.length-1]+"T12:00");
   const now=new Date(); now.setHours(12,0,0,0);
@@ -3788,7 +3894,7 @@ VIEWS.analytics=function(){
   const st=S();
   const meso=activeMeso();
   // Stats are scoped to the active mesocycle when one exists.
-  const logs=meso? st.logs.filter(l=>l.mesoId===meso.id) : st.logs;
+  const logs=(meso? st.logs.filter(l=>l.mesoId===meso.id) : st.logs).filter(l=>!l.skipped);
   // weekly volume + sets per muscle
   const byWeek={}; // isoWeekKey -> {vol, sets, count, dur}
   const weekKey=d=>{ const dt=new Date(d+"T12:00"); dt.setDate(dt.getDate()-((dt.getDay()+6)%7));
@@ -3877,7 +3983,7 @@ VIEWS.analytics=function(){
   mesoStats.sort((a,b)=>a.start.localeCompare(b.start));
   // ---- Monthly trends: strength (total volume) + cardio (minutes & avg zone) ----
   const byMonth={};
-  st.logs.forEach(l=>{ const k=l.date.slice(0,7);
+  st.logs.filter(l=>!l.skipped).forEach(l=>{ const k=l.date.slice(0,7);
     const m=(byMonth[k]??={vol:0, cardioMin:0, cardioN:0, zoneSum:0});
     l.exercises.forEach(e=>e.sets.forEach(x=>m.vol+=x.kg*x.reps));
   });
@@ -4044,6 +4150,21 @@ VIEWS.settings=function(){
       <label>Default rest for new exercises (seconds)</label><input id="rest" type="number" step="15" min="0" value="${s.restDefault}">
       <p class="faint" style="margin:4px 0 0">Existing exercises keep their own rest — set it per exercise from the ⋯ menu on the Train screen.</p>
       <label style="display:flex;align-items:center;gap:10px;text-transform:none;font-size:15px;margin-top:12px"><input type="checkbox" id="rbuzz" style="width:22px;height:22px" ${s.restBuzz?"checked":""}> Buzz when rest ends</label>
+      ${FUN()?`
+      <div class="kicker" style="margin-top:18px">Colour scheme</div>
+      <p class="faint" style="margin:2px 0 10px">Fun mode only — Serious mode always uses the standard look.</p>
+      <div class="stack">
+        ${FUN_SCHEMES.map(sc=>`
+          <label class="scheme-row ${(s.funScheme||"default")===sc.id?"on":""}">
+            <input type="checkbox" data-scheme-pick="${sc.id}" ${(s.funScheme||"default")===sc.id?"checked":""}
+              style="width:22px;height:22px">
+            <span class="scheme-dot" style="background:${sc.swatch}"></span>
+            <span style="flex:1">
+              <span style="font-weight:800">${sc.name}</span>
+              <span class="faint" style="display:block;font-size:12px">${sc.hint}</span>
+            </span>
+          </label>`).join("")}
+      </div>`:""}
     </div>
     <div class="card"><h3>Progression rules</h3>
       <p class="muted">Increments applied when targets are beaten (kg). Small increments used when targets are met exactly or recovery is poor.</p>
@@ -4120,6 +4241,19 @@ VIEWS.settings=function(){
     applyTheme(); Store.save();
   };
   $$("#view input, #view select").forEach(el=>el.onchange=persist);
+  // Fun colour schemes behave as a single choice even though they render as
+  // checkboxes — picking one clears the others; unticking the active one is a
+  // no-op so there is always exactly one scheme selected.
+  $$("[data-scheme-pick]").forEach(cb=>cb.onchange=()=>{
+    const id=cb.dataset.schemePick;
+    if(!cb.checked){ cb.checked=true; return; }
+    S().settings.funScheme=id;
+    Store.save(); applyTheme();
+    $$("[data-scheme-pick]").forEach(o=>{
+      const on=o.dataset.schemePick===id;
+      o.checked=on; o.closest(".scheme-row")?.classList.toggle("on", on);
+    });
+  });
   $("#view").onclick=e=>{
     const md=e.target.closest("[data-mode]");
     if(md){ s.mode=md.dataset.mode; Store.save(); go("settings"); renderNav(); return; }
@@ -4154,7 +4288,19 @@ VIEWS.settings=function(){
 };
 
 /* ---------------- boot ---------------- */
-function applyTheme(){ document.body.dataset.theme=S().settings.theme; }
+const FUN_SCHEMES=[
+  {id:"default", name:"Coral",       hint:"The original",        swatch:"#FF7A6E"},
+  {id:"pastel",  name:"Pastel",      hint:"Soft lilac & mint",   swatch:"#A78BD9"},
+  {id:"pink",    name:"Super pink",  hint:"Loud and proud",      swatch:"#EC4899"},
+  {id:"peach",   name:"Peach sorbet",hint:"Warm and sweet",      swatch:"#F97362"},
+];
+function applyTheme(){
+  const b=document.body, s=S().settings;
+  b.dataset.theme=s.theme;
+  // Fun colour schemes only take effect in Fun mode; Serious stays neutral.
+  b.dataset.fun=FUN()?"1":"0";
+  b.dataset.scheme=s.funScheme||"default";
+}
 window.LiftDaddy=window.IronMeso={Store, ProgressionEngine, ChartManager, HistoryIndex, go, version:SCHEMA_VERSION};
 window.addEventListener("beforeunload", ()=>Store.flush());
 

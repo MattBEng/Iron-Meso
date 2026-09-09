@@ -147,6 +147,34 @@ feed, wearable HR, a named trainer/coach persona.
 
 Newest first. Add an entry when you ship.
 
+### 2026-09-01 (second pass)
+- **Skip a whole workout.** The ✕ in the workout header now offers
+  *Skip this workout* alongside Keep & leave / Discard, with a confirmation that
+  warns if you'd be discarding logged sets. Position in a meso is derived from
+  its log count, so a skip records a **marker log** (`skipped:true`, no
+  exercises) to advance without inventing training data. Skip markers are
+  filtered out of streaks, the welcome-back gap, Stats, monthly rollups and the
+  progression history index; they can't be opened for editing, show as a muted
+  dot on the calendar and read "skipped" in the day sheet, and never appear as
+  the Home "Last workout".
+- **Fun colour schemes.** Four options in Settings (Fun mode only): **Coral**
+  (default, unchanged), **Pastel** (lilac/mint), **Super pink**, **Peach
+  sorbet**. Each has light and dark palettes and is applied via
+  `body[data-fun="1"][data-scheme="…"]`, so Serious mode always stays neutral.
+  They render as checkboxes per the request but behave as a single choice —
+  one is always selected. `FUN_SCHEMES`, `settings.funScheme`.
+- Tests: new `TESTS_skip.js` (18) and `TESTS_schemes.js` (25).
+  Suite now **237 checks / 12 suites**.
+
+### 2026-09-01
+- **Fixed: logging a set wiped the reps to "??".** When a typed weight produced
+  an out-of-band prediction (`predReps === null`), `setRowHTML` blanked the reps
+  input and showed the `??` hint — even for a set the user had filled in and
+  logged. The value was stored correctly but invisible. `??` is now only ever a
+  hint for an *un-entered* set; an entered or logged value always displays.
+  Also added `touchedReps` so editing the weight can't overwrite reps the user
+  typed. Regression covered in `TESTS_loadrep.js`.
+
 ### 2026-08-25 (fourth pass — welcome-back messages)
 - **Added tiered welcome-back messages** for the cutie layer (Fun mode +
   Female). Shown as a card on Home when there's a gap since the last logged
