@@ -488,7 +488,7 @@ STARTER_EXERCISES.push(...STARTER_CARDIO);
 STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|dip|chin)/i.test(e.name)) e.assisted=true; });
 
 /* ---------------- storage ---------------- */
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 8;
 /** Sequential migrations: MIGRATIONS[n] upgrades a state at version n to n+1. */
 const MIGRATIONS = {
   1: st => {              // v1 -> v2: guarantee arrays/fields added after launch
@@ -527,6 +527,16 @@ const MIGRATIONS = {
     // normalise gender to the allowed set
     if(st.profile && !["","Female","Male","Prefer not to say"].includes(st.profile.gender))
       st.profile.gender="Prefer not to say";
+    return st;
+  },
+  7: st => {              // v7 -> v8: re-flag assisted movements
+    // The v6 backfill above was added after many installs had already passed
+    // v6, so it never ran for them and their stored "Assisted Pull-Up" kept no
+    // flag — progression then ran the right way round for a normal lift (short
+    // of target -> REMOVE assistance, i.e. harder). Flag by name, once.
+    (st.exercises||[]).forEach(e=>{
+      if(!e.timed && /\bassisted\b/i.test(e.name||"")) e.assisted=true;
+    });
     return st;
   },
 };

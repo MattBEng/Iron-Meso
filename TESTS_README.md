@@ -19,6 +19,7 @@ node TESTS_ramp.js         # run one suite
 | File | Covers |
 |---|---|
 | `TESTS_progression.js` | Load suggestions, bodyweight reps-progression, weighted-bodyweight, held-weight plateau detection, AMRAP/myorep exclusion |
+| `TESTS_assisted.js` | Assisted machines — reversed progression (short → more assistance, strong → less), the v7→v8 re-flag migration, name matching, a user untick sticking, no negative assistance |
 | `TESTS_ramp.js` | Volume ramp: priority ceilings (High/Normal/Low), meso-length awareness, repeat runs, deload, ramp-off, legacy fallback |
 | `TESTS_workout.js` | Rendering, logging, finish flow (duration + date), date correctness, cardio capture, editing past logs, the editability window |
 | `TESTS_features.js` | Set types, setup notes, workout notes, bodyweight rows, timed holds, gender options, rest-over messages |

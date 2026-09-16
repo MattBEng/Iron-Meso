@@ -287,6 +287,10 @@ Each of these cost real debugging time. Don't re-learn them.
 - **Fresh installs seed archived starter templates**, so `mesocycles[0]` is not
   your test meso — call `clearTemplates()`.
 - **Adding an exercise opens the target editor**, so test flows must dismiss it.
+- **Adding lines to an already-shipped migration does nothing for existing
+  users** — their stored `version` is already past it. That's how old installs
+  kept an unflagged "Assisted Pull-Up" and got told to *remove* assistance after
+  a bad session. Always add a **new** migration and bump `SCHEMA_VERSION`.
 - **Cardio slots have no `sets`**, and were silently polluting the
   sets-per-muscle targets with a junk row.
 - **The container wipes between sessions.** The tests live in the repo precisely

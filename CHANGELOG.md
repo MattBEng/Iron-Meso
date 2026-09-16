@@ -8,6 +8,26 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### 2026-09-16 (fix — assisted pull-up progressing backwards)
+- **Bug:** on older installs, Assisted Pull-Up was treated as a normal lift.
+  After a short session (30kg × 10/8/7 vs target 10) it said *"back off 5%"*
+  and suggested 28.8kg — less assistance, i.e. **harder**. A strong session
+  would have added assistance (easier). Reported from the phone.
+- **Cause:** the engine's assisted logic was fine; the stored exercise had no
+  `assisted` flag. Fresh installs get it from `STARTER_EXERCISES`, and the v6
+  migration backfills it — but that backfill line was added to v6 *after* most
+  installs had already passed v6, so it never ran for them. `load()` only adds
+  missing starter exercises; it never refreshes fields on existing ones.
+- **Fix:** new migration **v7 → v8** (`SCHEMA_VERSION = 8`) flags any non-timed
+  exercise whose name contains the word "assisted" (built-in or custom, e.g.
+  "Band Assisted Dip"). Runs once, so unticking *Assisted* in the exercise
+  editor afterwards sticks. Same session now suggests **31.25kg — "add 5%
+  assistance and rebuild."**
+- Touches: `index.html` (`SCHEMA_VERSION`, `MIGRATIONS[7]`), `sw.js` (BUILD).
+  Added a trap to `PROJECT-NOTES.md` §6 about editing shipped migrations.
+- Tests: new `TESTS_assisted.js` (13 — fails 7 on the old app). Suite now
+  **339 / 17 suites**, all passing.
+
 ### 2026-09-16 (repo audit — restored a missing test suite)
 - **`TESTS_cardiostats.js` had gone missing from the repo** despite being
   referenced as shipped in the fourth-pass entry below — the file just wasn't
