@@ -1,0 +1,197 @@
+# Lift Daddy — changelog
+
+Newest first. Every entry: **what changed, why, and what it touches** — written
+for another AI (or Matt) picking this up with zero memory of the session that
+made it. Add yours before you consider a change finished; see the loop in
+`PROJECT-NOTES.md` §3. If this file is ever missing, recreate it — don't fold
+history back into `PROJECT-NOTES.md`.
+
+---
+
+### 2026-09-16 (repo audit — restored a missing test suite)
+- **`TESTS_cardiostats.js` had gone missing from the repo** despite being
+  referenced as shipped in the fourth-pass entry below — the file just wasn't
+  there, so `TESTS_run-all.js` (which discovers suites from the folder) had
+  been silently running one suite short with zero coverage on cardio-in-Stats.
+  Rewrote it: weekly cardio minutes including HR-less sessions and cardio
+  logged inside a workout, the weekly-minutes card appearing/disappearing
+  correctly, scope filtering (current/previous meso, month, year, all-time,
+  including a cardio session with no `mesoId`), skip markers never touching
+  cardio totals, and the sets/minutes-mixing regression (a cardio slot must
+  never leak into the per-muscle sets panel as a sets-based "Cardio" row).
+- Tests: `TESTS_cardiostats.js` restored (15 checks). Suite is genuinely
+  **326 / 16 suites** now — corrects the check count in the entry below,
+  which was written assuming this file already existed.
+
+### 2026-09-16
+- **Message banks moved to `MESSAGES.txt`.** All 315 Fun-mode messages (rest-over,
+  the three welcome-back tiers, cutie titles/messages/footers) now live in a plain
+  text file, one per line under `[SECTION]` headings. `MESSAGES_build.js` injects
+  them into `index.html`; `--check` reports drift. The app stays a single
+  self-contained offline file, so a runtime fetch wasn't an option.
+- **`TESTS_messages.js` (27 checks)** guards it: fails if the text file and the app
+  drift apart, and validates every bank for blanks and duplicates.
+- **`PROJECT-NOTES.md` rewritten as a handover doc** — added *How to work on this*
+  (the patch recipe with its all-or-nothing guard, the JS syntax check, the test
+  and deploy loop) and *Traps that have already bitten*. Verified by following it
+  from a folder containing only the repo files.
+- Suite now **345 / 16 suites**.
+
+### 2026-09-01 (fifth pass — mesocycle completion)
+- **Finishing a block now has an ending.** It used to dead-end on one line
+  ("Meso complete — duplicate it from the Mesos tab"). The Train tab now shows a
+  **completion summary**: totals (workouts, sets, reps, volume, hours, cardio),
+  completion % with skips reported separately, **how it progressed** (volume
+  change from the first week to the last *non-deload* week, and sets/week
+  added), **PRs set during the block**, and **where the work went** by muscle.
+- **Three ways out**, right there: *Run it again*, *Build a new meso*,
+  *Archive & finish here*.
+- **`repeatMeso(id)` extracted** so the completion screen and the Mesos ⋯ menu
+  share one implementation. Repeating now also **archives the finished run** and
+  drops you straight into the first workout.
+- Deload-aware on purpose: the volume comparison uses the last non-deload week,
+  so a deload week doesn't read as "you got weaker".
+- **Previous blocks are reviewable.** The same summary opens for any past
+  mesocycle: tap an archived block in the Mesos tab (it now shows its workout
+  count and "view summary ›"), or use *View block summary* in the ⋯ menu. In
+  that mode the header reads "Block summary", there's a back route, and the
+  archive action is dropped — but *Run it again* stays. `showMesoSummary(id)`,
+  `VIEWS.mesosummary`, `renderMesoComplete(meso, pos, standalone)`.
+- Tests: new `TESTS_mesocomplete.js` (40). Suite now **318 / 15 suites**.
+
+### 2026-09-01 (fourth pass — cardio in Stats)
+- **Fixed: cardio logged inside a workout was nearly invisible in Stats.** It
+  reached the cardio store correctly, but the only weekly cardio view was the
+  zone chart — which counts sessions **with a heart rate**. Log 25 minutes with
+  no HR and nothing appeared.
+- **Added "Cardio minutes per week"** chart alongside the other weekly charts,
+  counting all cardio in the selected scope regardless of HR, with a min/week
+  average. Hidden entirely when there's no cardio.
+- **Cardio now appears in the weekly muscle panel as minutes**, on its own row
+  below the muscles, because cardio has no "sets per muscle" — that mismatch is
+  why it never showed up there.
+- **Fixed a pre-existing duplicate:** cardio slots in a meso were being counted
+  into `targetPerMuscle` (with `sl.sets` undefined), producing a junk "Cardio"
+  sets row. Cardio is now excluded from both the target and actual sets maps.
+- Tests: new `TESTS_cardiostats.js` (17). Suite now **278 / 14 suites**.
+
+### 2026-09-01 (third pass — Stats scope)
+- **Stats now has a scope dropdown** at the top: **Current meso**, each
+  **previous meso** that has logged workouts (newest first), **This month**,
+  **This year**, **All time**. Selecting one re-scopes the whole page.
+- **Totals card** under the dropdown for whatever is selected: workouts, sets,
+  reps, volume, hours lifting, cardio minutes. Empty periods say so plainly
+  rather than showing zeros everywhere.
+- A **meso scope** keeps the meso-specific panels (completion/adherence, weekly
+  targets, week-by-week, PRs); a **date range** turns those off — they have no
+  meaning outside a single block — and shows the plain totals instead.
+- Skipped markers are excluded from every scope. Scope is held in memory
+  (`_statScope`), so it survives navigation but always opens on the current
+  meso. `statScopes()` builds the list.
+- Tests: new `TESTS_statscope.js` (24 checks). Suite now **261 / 13 suites**.
+
+### 2026-09-01 (second pass)
+- **Skip a whole workout.** The ✕ in the workout header now offers
+  *Skip this workout* alongside Keep & leave / Discard, with a confirmation that
+  warns if you'd be discarding logged sets. Position in a meso is derived from
+  its log count, so a skip records a **marker log** (`skipped:true`, no
+  exercises) to advance without inventing training data. Skip markers are
+  filtered out of streaks, the welcome-back gap, Stats, monthly rollups and the
+  progression history index; they can't be opened for editing, show as a muted
+  dot on the calendar and read "skipped" in the day sheet, and never appear as
+  the Home "Last workout".
+- **Fun colour schemes.** Four options in Settings (Fun mode only): **Coral**
+  (default, unchanged), **Pastel** (lilac/mint), **Super pink**, **Peach
+  sorbet**. Each has light and dark palettes and is applied via
+  `body[data-fun="1"][data-scheme="…"]`, so Serious mode always stays neutral.
+  They render as checkboxes per the request but behave as a single choice —
+  one is always selected. `FUN_SCHEMES`, `settings.funScheme`.
+- Tests: new `TESTS_skip.js` (18) and `TESTS_schemes.js` (25).
+  Suite now **237 checks / 12 suites**.
+
+### 2026-09-01
+- **Fixed: logging a set wiped the reps to "??".** When a typed weight produced
+  an out-of-band prediction (`predReps === null`), `setRowHTML` blanked the reps
+  input and showed the `??` hint — even for a set the user had filled in and
+  logged. The value was stored correctly but invisible. `??` is now only ever a
+  hint for an *un-entered* set; an entered or logged value always displays.
+  Also added `touchedReps` so editing the weight can't overwrite reps the user
+  typed. Regression covered in `TESTS_loadrep.js`.
+
+### 2026-08-25 (fourth pass — welcome-back messages)
+- **Added tiered welcome-back messages** for the cutie layer (Fun mode +
+  Female). Shown as a card on Home when there's a gap since the last logged
+  workout. 30 messages across three tiers: **3-5 days** (playful, "even
+  princesses need a rest"), **6-13 days** (encouraging comeback), **14+ days**
+  (deliberately the kindest — no guilt, just glad you're back). Under 3 days
+  shows nothing, and a brand-new user with no history never sees it.
+  `RETURN_MSGS_SHORT/MID/LONG`, `daysSinceLastWorkout()`, `returnMessage()`.
+- Tests: new `TESTS_welcome.js` (22 checks). Suite now **188 checks / 10 suites**.
+
+### 2026-08-25 (third pass — progression overhaul)
+- **PR popups gated to Fun mode.** `checkPR()` had no mode check at all (only
+  `maybeCelebrate` did), so Serious mode still got e1RM PR toasts.
+- **Weight and reps no longer both increase.** `buildGhostRows` used to carry
+  last week's reps onto a heavier load — a double increase. Now: held weight →
+  +1 rep; raised weight → fewer reps, predicted from the load–rep model.
+- **Added the load–rep model** (`e1rmAvg`, `repsAtLoad`) — averaged
+  Epley + Brzycki, both directions. 15kg×15/14/12 → 17.5kg now suggests
+  **10/9/7** instead of demanding the same reps at a heavier load.
+- **Live re-prediction**: typing a weight different from the suggestion
+  re-aims the rep targets for that exercise, per set.
+- **"??" for out-of-band predictions** — reps <3 or >25, or a load at/above the
+  estimated 1RM. Better than printing a confident wrong number.
+- **Jump-aware rep ceiling** replaces the flat `target+4`, which was broken for
+  small-muscle work (a 5→7.5kg lateral raise is +50% and needs ~20 reps banked;
+  +4 could never get there). Ceiling now derived from each exercise's own
+  smallest jump.
+- **Per-exercise "smallest weight jump"** field added to the exercise editor,
+  defaulting by equipment. This is what makes microloading work properly.
+- Reasoning, evidence and worked examples documented in `PROGRESSION-MODEL.md`.
+- Tests: new `TESTS_loadrep.js` (25 checks). Suite now **166 checks / 9 suites**.
+
+### 2026-08-25 (second pass — audit)
+- **Audited the codebase** against edge cases, data integrity, and cross-feature
+  interactions. Two findings:
+  - **Fixed: muscle priorities were never locked** once a meso started, though
+    that was the agreed rule. Priorities now disable (with a 🔒 note) as soon as
+    the meso has a logged workout, and `collectBasics` skips disabled selects so
+    a started meso keeps its settings.
+  - **Fixed earlier the same day: cardio kept the stale date** (see below).
+- Test suite grown to **138 checks across 8 suites** — added `TESTS_integrity.js`
+  (export/import, checksums, migrations), `TESTS_edge.js` (empty states, set ops,
+  input clamping), `TESTS_flows.js` (multi-feature user journeys).
+- Verified clean, no action needed: timed exercises don't pollute lifting
+  volume or PRs; negative/absurd inputs are clamped; empty workouts are
+  discarded rather than logged as phantoms; all views render on an empty
+  install and with a completed meso; the rest timer survives navigation;
+  `scopePrompt` escapes user text.
+
+### 2026-08-25
+- **Fixed: wrong date on completed workouts.** The date was stamped when the
+  session object was created — which happens just by opening the Train tab —
+  so peeking Monday and training Thursday logged Monday. Now the finish prompt
+  asks for the date, defaulting to the first logged set's day.
+- **Fixed: manual date corrections wouldn't stick.** Editability was ordered by
+  the date field, so a wrongly back-dated log sorted out of the 6-log window and
+  became read-only — the bad date locked you out of fixing it. Now ordered by
+  creation order.
+- **Fixed: cardio kept the stale date** — it was written to the store before the
+  date prompt ran. Now written after, matching the log.
+- **Added the test suite** (`tests/`) and this notes file.
+
+### Earlier (undated, in rough order)
+- Time-based holds: `timed` exercises log sets × seconds, no progression, show
+  "Last time: 45s · 42s · 38s".
+- Bodyweight fix: exercises added mid-workout weren't flagged bodyweight;
+  added backfill for existing sessions.
+- Workout header redesign (day name + compact meta line + 📅/📝/✕ icons);
+  workout note now displays as a pinned bar (it saved before but was invisible).
+- 100 Fun-mode "rest over" messages; Serious mode stays plain.
+- Volume ramp overhaul + per-muscle priority + "Repeat this meso".
+- Rep range set per-exercise at add time (adding now opens the target editor).
+- "Can't add weight → progress reps" with a rep ceiling (target + 4).
+- Setup notes (library-level), gender options reduced to three.
+- Set types: Regular / AMRAP / MY / MM, badges, excluded from progression.
+- Scaled sets-per-muscle chart; bar-chart axis clipping fix.
+- Tabata on cardio cards mid-workout; timezone/local-date fix.
