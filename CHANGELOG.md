@@ -8,6 +8,46 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### 2026-09-17 (Stats — wrong numbers fixed, screen decluttered)
+- **Numbers that were wrong:**
+  - *Completion %* counted skipped workouts as done (it used the position
+    count, which skips advance). Now `done − skipped`, with "N skipped" shown.
+  - *PRs* for a previous block included later blocks' sessions (filtered by
+    date ≥ start with no end). Now only that block's own sessions, compared
+    with everything before it.
+  - *Block comparison* counted skip markers as workouts, diluting avg volume.
+  - *Per-week averages* (cardio min/wk, the Cardio row) divided by weeks that
+    had data, capped at 12. Now divided by every week in the scope's span.
+  - *Scope leaks:* monthly trends, zone chart, "this meso by zone" (always the
+    active block), cardio fitness and bodyweight ignored the dropdown. All now
+    read the scoped lists. "Sets per muscle (all time)" was scoped but
+    mislabelled.
+  - *Weekly sets per muscle* averaged in the week still in progress, so you
+    looked behind target mid-week. It's left out (and says so) when earlier
+    weeks exist.
+  - *lb users:* volume showed kg numbers with an lb label. Converted now.
+  - *Bar charts:* the axis could dip below 0 and an empty week drew a stub.
+    Axis now starts at 0; zero bars aren't drawn. (Showed up once empty weeks
+    started appearing — see below.)
+- **Decluttered:** the page is now collapsible sections — *This plan* (block
+  scope only), *Training*, *Plans compared* (block or all-time scope, 2+
+  blocks), *Cardio*, *Body*. Empty cards and empty sections aren't drawn
+  (no zone chart without HR, no fitness chart without distance, no bodyweight
+  without entries). The four weekly charts (volume, sets, frequency,
+  duration) are **one chart with a toggle** and a per-week average. The
+  weekly axis is continuous, so weeks you didn't train show as gaps. The total
+  sets-per-muscle list only appears in date-range scopes (block scope already
+  has the weekly version). Collapsed sections are remembered
+  (`settings.statsClosed`). A cardio-only period now shows totals instead of
+  "nothing logged".
+- Touches: `index.html` (`VIEWS.analytics` rewritten; new `statsClosed`,
+  `weekKeysBetween`, `_weeklyMetric`; `.stat-sec` CSS; `ChartManager.draw`
+  bar baseline), `sw.js` (BUILD). `PROJECT-NOTES.md` §5 Stats rule updated.
+  Removed canvases: `#cv #cs #cf #cd` → `#cweek`. Checked visually at phone
+  width with seeded data.
+- Tests: new `TESTS_statsfix.js` (32). Suite now **387 / 19 suites**, all
+  passing.
+
 ### 2026-09-17 (fix — cardio logged when it wasn't done)
 - **Bug:** cardio inside a workout got logged even when you didn't do it.
   Two paths: (1) *Skip exercise* on a cardio card greyed it out, but finishing

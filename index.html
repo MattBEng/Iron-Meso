@@ -310,6 +310,12 @@ canvas.chart{width:100%; height:180px; display:block}
 .spm-track{flex:1;height:18px;background:var(--raised);border-radius:6px;position:relative;overflow:hidden}
 .spm-fill{height:100%;border-radius:6px;transition:width .3s}
 .spm-target{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--text);opacity:.55}
+.stat-sec{margin:0 0 4px}
+.stat-sec>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;
+  padding:16px 2px 8px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);min-height:44px}
+.stat-sec>summary::-webkit-details-marker{display:none}
+.stat-sec>summary::after{content:"\25BE";font-size:15px;transition:transform .15s}
+.stat-sec:not([open])>summary::after{transform:rotate(-90deg)}
 .spm-val{width:52px;text-align:right;font-size:13px;font-weight:700;flex:0 0 auto}
 .bwcell{display:flex;align-items:center;justify-content:center;background:var(--raised);border-radius:var(--r-xs,8px);font-weight:800;color:var(--muted);font-size:13px}
 .repcell{position:relative}
@@ -1102,7 +1108,8 @@ class ChartManager{
     let ymin=Math.min(...ys), ymax=Math.max(...ys);
     if(ymin===ymax){ ymin=ymin*0.9-1; ymax=ymax*1.1+1; }
     else { const m=(ymax-ymin)*.12; ymin-=m; ymax+=m; }
-    if(type==="bar") ymin=Math.min(0,ymin);
+    // bars grow from 0: the padding above must never push the axis below zero
+    if(type==="bar") ymin=Math.min(0, ...ys);
     const px=i=>pad.l+(W-pad.l-pad.r)*(data.length===1?.5:i/(data.length-1));
     const py=v=>H-pad.b-(H-pad.t-pad.b)*((v-ymin)/(ymax-ymin));
     // gridlines
@@ -1125,7 +1132,8 @@ class ChartManager{
       const bx=i=>pad.l+(W-pad.l-pad.r)*((i+0.5)/data.length);
       const bw=clamp((W-pad.l-pad.r)/data.length*.62, 3, 40);
       ctx.fillStyle=color;
-      data.forEach((d,i)=>{ const x=bx(i)-bw/2, y=py(d.y), h=Math.max(2,H-pad.b-y);
+      data.forEach((d,i)=>{ if(!d.y) return;      // an empty week is a gap, not a stub
+        const x=bx(i)-bw/2, y=py(d.y), h=Math.max(2,H-pad.b-y);
         ctx.beginPath();
         if(ctx.roundRect) ctx.roundRect(x,y,bw,h,3); else ctx.rect(x,y,bw,h);
         ctx.fill(); });
@@ -4140,33 +4148,67 @@ function statScopes(){
   out.push({id:"all",   label:"All time", kind:"range"});
   return out;
 }
+/* Stats sections the user has collapsed. Saved in settings so "I never look at
+   cardio" sticks across sessions. */
+function statsClosed(){
+  const s=S().settings;
+  if(!Array.isArray(s.statsClosed)) s.statsClosed=[];
+  return s.statsClosed;
+}
+/** Which series the merged weekly chart shows (in memory, like the scope). */
+let _weeklyMetric="vol";
+const WEEKLY_METRICS=["vol","sets","count","dur"];
+/** Every Monday-start week key from startISO to endISO inclusive. */
+function weekKeysBetween(startISO, endISO){
+  const out=[];
+  if(!startISO || !endISO || startISO>endISO) return out;
+  const end=isoWeekStart(endISO);
+  const dt=new Date(isoWeekStart(startISO)+"T12:00");
+  for(let i=0;i<800;i++){                          // cap ~15 years
+    const k=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+    if(k>end) break;
+    out.push(k);
+    dt.setDate(dt.getDate()+7);
+  }
+  return out;
+}
 VIEWS.analytics=function(){
   const st=S();
   const scopes=statScopes();
   if(!_statScope || !scopes.some(s=>s.id===_statScope)) _statScope=scopes[0]?.id||"all";
   const scope=scopes.find(s=>s.id===_statScope)||scopes[0];
-  // A meso scope keeps the meso-specific panels (adherence, targets, week-by-week);
+  // A meso scope keeps the block panels (adherence, weekly targets, PRs);
   // a date range turns them off and shows plain totals instead.
   const meso = scope && scope.kind==="meso"
     ? st.mesocycles.find(m=>m.id===scope.id.slice(5)) || null
     : null;
   const nowISO=todayISO();
-  const inScope=l=>{
+  const U=unitLabel();
+  const inScope=x=>{
     if(!scope) return true;
-    if(scope.kind==="meso") return l.mesoId===scope.id.slice(5);
-    if(scope.id==="month") return l.date.slice(0,7)===nowISO.slice(0,7);
-    if(scope.id==="year")  return l.date.slice(0,4)===nowISO.slice(0,4);
+    if(scope.kind==="meso") return x.mesoId===scope.id.slice(5);
+    if(scope.id==="month") return x.date.slice(0,7)===nowISO.slice(0,7);
+    if(scope.id==="year")  return x.date.slice(0,4)===nowISO.slice(0,4);
     return true;                                    // all time
   };
+  // Everything below reads ONLY these scoped lists, so every card follows the dropdown.
   const logs=st.logs.filter(l=>!l.skipped && inScope(l));
-  const cardioInScope=st.cardio.filter(c=>{
-    if(!scope) return true;
-    if(scope.kind==="meso") return c.mesoId===scope.id.slice(5);
-    if(scope.id==="month") return c.date.slice(0,7)===nowISO.slice(0,7);
-    if(scope.id==="year")  return c.date.slice(0,4)===nowISO.slice(0,4);
-    return true;
-  });
-  // headline totals for whatever is selected
+  const cardio=st.cardio.filter(inScope);
+  const pos=meso? mesoPosition(meso) : null;
+  const running=!!(meso && meso.id===st.activeMesoId && !pos.finished);
+
+  // ---- Time span of the scope: drives per-week averages and the week axis ----
+  // Starts at the first activity; a block still running (or a date range) ends
+  // today, a finished block ends at its last activity. Empty weeks inside the
+  // span count — they're weeks you didn't train, not weeks that don't exist.
+  const dates=[...logs.map(l=>l.date), ...cardio.map(c=>c.date)].sort();
+  const spanStart=dates[0]||null;
+  let spanEnd=(meso && !running)? (dates[dates.length-1]||null) : nowISO;
+  if(spanStart && spanEnd && spanEnd<spanStart) spanEnd=spanStart;
+  const spanKeys=spanStart? weekKeysBetween(spanStart, spanEnd) : [];
+  const spanWeeks=Math.max(1, spanKeys.length);
+
+  // ---- Totals ----
   const totals=logs.reduce((t,l)=>{
     t.workouts++; t.mins+=l.durationMin||0;
     l.exercises.forEach(e=>e.sets.filter(s=>s.done).forEach(x=>{
@@ -4174,90 +4216,83 @@ VIEWS.analytics=function(){
     }));
     return t;
   },{workouts:0,sets:0,reps:0,vol:0,mins:0});
-  totals.cardioMin=cardioInScope.reduce((t,c)=>t+(c.minutes||0),0);
-  // weekly volume + sets per muscle
-  const byWeek={}; // isoWeekKey -> {vol, sets, count, dur}
-  const weekKey=d=>{ const dt=new Date(d+"T12:00"); dt.setDate(dt.getDate()-((dt.getDay()+6)%7));
-    const y=dt.getFullYear(), m=String(dt.getMonth()+1).padStart(2,"0"), dd=String(dt.getDate()).padStart(2,"0"); return `${y}-${m}-${dd}`; };
+  totals.cardioMin=cardio.reduce((t,c)=>t+(c.minutes||0),0);
+
+  // ---- Weekly buckets (calendar weeks) ----
+  const byWeek={};
+  const bucket=k=>(byWeek[k]??={vol:0,sets:0,count:0,dur:0,cardioMin:0});
+  cardio.forEach(c=>{ bucket(isoWeekStart(c.date)).cardioMin+=(c.minutes||0); });
   const setsPerMuscle={};
-  // Cardio minutes per week — counted from the cardio store for the selected
-  // scope, including sessions logged inside a workout and those with no heart
-  // rate (the zone chart only ever showed HR-tagged sessions).
-  cardioInScope.forEach(c=>{
-    const w=(byWeek[weekKey(c.date)]??={vol:0,sets:0,count:0,dur:0,cardioMin:0});
-    w.cardioMin=(w.cardioMin||0)+(c.minutes||0);
-  });
   logs.forEach(l=>{
-    const k=weekKey(l.date);
-    const w=(byWeek[k]??={vol:0,sets:0,count:0,dur:0,cardioMin:0});
+    const w=bucket(isoWeekStart(l.date));
     w.count++; w.dur+=l.durationMin||0;
     l.exercises.forEach(e=>{
       const ex=exById(e.exerciseId);
       const done=e.sets.filter(s=>s.done);
       w.sets+=done.length;
       w.vol+=done.reduce((t,s)=>t+s.kg*s.reps,0);
-      if(ex) setsPerMuscle[ex.muscle]=(setsPerMuscle[ex.muscle]||0)+done.length;
+      if(ex && ex.muscle!=="Cardio") setsPerMuscle[ex.muscle]=(setsPerMuscle[ex.muscle]||0)+done.length;
     });
   });
-  const weeks=Object.keys(byWeek).sort().slice(-12);
-  const pos=meso? mesoPosition(meso):null;
-  const adherence=(pos && pos.total)? Math.round(100*pos.done/pos.total) : null;
-  // Missed workouts: how many the schedule expected by now vs completed
+  const weeks=spanKeys.slice(-12);                  // continuous: empty weeks show as zero
+  weeks.forEach(bucket);
+
+  // ---- Completion: skipped workouts advance the block but aren't "done" ----
+  const skippedN=meso? st.logs.filter(l=>l.mesoId===meso.id && l.skipped).length : 0;
+  const doneN=pos? pos.done-skippedN : 0;
+  const adherence=(pos && pos.total)? Math.round(100*doneN/pos.total) : null;
   let missed=0;
-  if(meso && pos && logs.length){
-    const daysElapsed=Math.floor((new Date(todayISO())-new Date(logs[0].date))/864e5);
+  if(running && spanStart){
+    const daysElapsed=Math.floor((new Date(nowISO)-new Date(spanStart))/864e5);
     const expected=Math.min(pos.total, Math.floor(daysElapsed/7*meso.days.length)+1);
-    missed=Math.max(0, expected-pos.done);
+    missed=Math.max(0, expected-pos.done);         // a skip was a decision, not a miss
   }
-  // Per-week (meso week number) buckets for meso-scoped charts
-  const byMesoWeek={};
-  logs.forEach(l=>{
-    const w=(byMesoWeek[l.week]??={vol:0,sets:0,rirSum:0,rirN:0,dur:[],count:0});
-    w.count++;
-    if(l.durationMin) w.dur.push(l.durationMin);
-    l.exercises.forEach(e=>e.sets.forEach(x=>{
-      if(!x.done && x.done!==undefined) return;
-      w.sets++; w.vol+=x.kg*x.reps; w.rirSum+=x.rir; w.rirN++;
-    }));
-  });
-  const mWeeks=Object.keys(byMesoWeek).map(Number).sort((a,b)=>a-b);
-  // Target vs actual sets per muscle per week
+
+  // ---- Target vs actual sets per muscle per week (block scope) ----
   const targetPerMuscle={}, actualPerMuscle={};
+  let partialWeek=null;
   if(meso){
     meso.days.forEach(d=>d.exercises.forEach(sl=>{
-      if(sl.cardio) return;                       // cardio is minutes, not sets
+      if(sl.cardio) return;                         // cardio is minutes, not sets
       const ex=exById(sl.exerciseId);
       if(ex && ex.muscle!=="Cardio") targetPerMuscle[ex.muscle]=(targetPerMuscle[ex.muscle]||0)+(sl.sets||0);
     }));
-    const weeksDone=Math.max(1, mWeeks.length);
-    logs.forEach(l=>l.exercises.forEach(e=>{
+    // The week you're in is still filling up — averaging it in makes you look
+    // behind target mid-week. Leave it out unless it's the only week there is.
+    const mWeeks=[...new Set(logs.map(l=>l.week))];
+    if(running && mWeeks.includes(pos.week) && mWeeks.length>1) partialWeek=pos.week;
+    const counted=logs.filter(l=>l.week!==partialWeek);
+    const weeksDone=Math.max(1, new Set(counted.map(l=>l.week)).size);
+    counted.forEach(l=>l.exercises.forEach(e=>{
       const ex=exById(e.exerciseId);
       if(ex && ex.muscle!=="Cardio") actualPerMuscle[ex.muscle]=(actualPerMuscle[ex.muscle]||0)+e.sets.length;
     }));
     Object.keys(actualPerMuscle).forEach(k=>actualPerMuscle[k]=Math.round(actualPerMuscle[k]/weeksDone*10)/10);
   }
-  // PRs set during this meso
-  const mesoStart=logs.length? logs[0].date:null;
+
+  // ---- PRs set in this block: judged against everything BEFORE it, and only
+  //      this block's own sessions count (not later blocks) ----
   const prList=[];
-  if(meso && mesoStart){
+  if(meso && spanStart){
+    const blockStart=logs.map(l=>l.date).sort()[0];
     const seen=new Set();
-    logs.forEach(l=>l.exercises.forEach(e=>{ seen.add(e.exerciseId); }));
+    logs.forEach(l=>l.exercises.forEach(e=>seen.add(e.exerciseId)));
     seen.forEach(exId=>{
       const hist=exerciseHistory(exId);
-      const inMeso=hist.filter(x=>x.date>=mesoStart);
-      const before=hist.filter(x=>x.date<mesoStart);
-      if(!inMeso.length) return;
+      const inMeso=hist.filter(x=>x.mesoId===meso.id);
+      const before=hist.filter(x=>x.mesoId!==meso.id && x.date<blockStart);
+      if(!inMeso.length || !before.length) return; // first exposure isn't a PR
       const best=Math.max(...inMeso.map(x=>x.e1rm));
-      const prev=before.length? Math.max(...before.map(x=>x.e1rm)):0;
+      const prev=Math.max(...before.map(x=>x.e1rm));
       if(best>prev && prev>0) prList.push({name:exById(exId)?.name||"?", from:prev, to:best});
-      else if(best>0 && !before.length) return; // first exposure isn't a PR
     });
     prList.sort((a,b)=>(b.to-b.from)-(a.to-a.from));
   }
-  // ---- Cross-mesocycle comparison (all mesos, oldest->newest) ----
+
+  // ---- Cross-block comparison (all blocks; skipped markers aren't workouts) ----
   const mesoStats=[];
-  S().mesocycles.forEach(mz=>{
-    const mlogs=st.logs.filter(l=>l.mesoId===mz.id);
+  st.mesocycles.forEach(mz=>{
+    const mlogs=st.logs.filter(l=>l.mesoId===mz.id && !l.skipped);
     if(!mlogs.length) return;
     let vol=0, sets=0; const e1rms={};
     mlogs.forEach(l=>l.exercises.forEach(e=>{
@@ -4266,22 +4301,9 @@ VIEWS.analytics=function(){
       if(best){ const v=epley(best.kg,best.reps); e1rms[e.exerciseId]=Math.max(e1rms[e.exerciseId]||0,v); }
     }));
     mesoStats.push({name:mz.name, workouts:mlogs.length, vol:Math.round(vol), sets,
-      avgVol:Math.round(vol/mlogs.length), start:mlogs[0].date, e1rms, archived:mz.archived});
+      avgVol:Math.round(vol/mlogs.length), start:mlogs.map(l=>l.date).sort()[0], e1rms, archived:mz.archived});
   });
   mesoStats.sort((a,b)=>a.start.localeCompare(b.start));
-  // ---- Monthly trends: strength (total volume) + cardio (minutes & avg zone) ----
-  const byMonth={};
-  st.logs.filter(l=>!l.skipped).forEach(l=>{ const k=l.date.slice(0,7);
-    const m=(byMonth[k]??={vol:0, cardioMin:0, cardioN:0, zoneSum:0});
-    l.exercises.forEach(e=>e.sets.forEach(x=>m.vol+=x.kg*x.reps));
-  });
-  st.cardio.forEach(c=>{ const k=c.date.slice(0,7);
-    const m=(byMonth[k]??={vol:0, cardioMin:0, cardioN:0, zoneSum:0});
-    m.cardioMin+=c.minutes; if(c.zone){ m.cardioN++; m.zoneSum+=c.zone; }
-  });
-  const months=Object.keys(byMonth).sort().slice(-6);
-  const monLabel=k=>{ const[y,mo]=k.split("-"); return new Date(y,mo-1,1).toLocaleDateString(undefined,{month:"short"}); };
-  // ---- Per-lift progression across mesos (top movers) ----
   const liftProg=[];
   if(mesoStats.length>=2){
     const first=mesoStats[0].e1rms, last=mesoStats[mesoStats.length-1].e1rms;
@@ -4293,44 +4315,56 @@ VIEWS.analytics=function(){
     });
     liftProg.sort((a,b)=>b.pct-a.pct);
   }
+  const showBlocks = mesoStats.length>=2 && scope && (scope.kind==="meso" || scope.id==="all");
+  const tonnes=v=> U==="lb"? `${(dispW(v)/1000).toFixed(1)}k lb` : `${(v/1000).toFixed(1)}t`;
+
+  // ---- Monthly trends (scoped) ----
+  const byMonth={};
+  const mBucket=k=>(byMonth[k]??={vol:0, cardioMin:0});
+  logs.forEach(l=>{ const m=mBucket(l.date.slice(0,7)); l.exercises.forEach(e=>e.sets.forEach(x=>m.vol+=x.kg*x.reps)); });
+  cardio.forEach(c=>{ mBucket(c.date.slice(0,7)).cardioMin+=(c.minutes||0); });
+  const months=Object.keys(byMonth).sort().slice(-6);
+  const volMonths=months.filter(k=>byMonth[k].vol>0);
+  const cardioMonths=months.filter(k=>byMonth[k].cardioMin>0);
+  const monLabel=k=>{ const[y,mo]=k.split("-"); return new Date(y,mo-1,1).toLocaleDateString(undefined,{month:"short"}); };
+
+  // ---- Cardio detail (scoped) ----
+  const zm={1:0,2:0,3:0,4:0,5:0};
+  cardio.forEach(c=>{ if(c.zone) zm[c.zone]+=(c.minutes||0); });
+  const zoneTotal=Object.values(zm).reduce((a,b)=>a+b,0);
+  const byType={};
+  cardio.forEach(c=>{ const e=cardioEff(c); if(e!=null) (byType[c.type]??=[]).push({date:c.date, eff:e}); });
+  const fitTypes=Object.keys(byType).filter(t=>byType[t].length>=3);
+
+  // ---- Bodyweight (not tied to a block, so filter by the scope's dates) ----
+  const bw=(st.bodyweight||[]).filter(b=>{
+    if(!scope || scope.id==="all") return true;
+    if(scope.id==="month") return b.date.slice(0,7)===nowISO.slice(0,7);
+    if(scope.id==="year")  return b.date.slice(0,4)===nowISO.slice(0,4);
+    return spanStart? (b.date>=spanStart && b.date<=spanEnd) : false;
+  }).slice(-30);
+
   // fatigue indicator: recent feedback strain avg
   const recentFb=st.feedback.slice(-3);
   const strain=recentFb.length? recentFb.reduce((t,f)=>t+(f.fatigue+f.jointPain+(6-f.recovery)+(6-f.sleep))/4,0)/recentFb.length : null;
   const fatigueLabel=strain==null?null: strain>=4?["High — consider easing off","red"]: strain>=3?["Moderate","amb"]:["Low — good to push","grn"];
-  $("#view").innerHTML=`
-    <div class="topbar"><div><h1>Stats</h1></div>
-      ${fatigueLabel?`<span class="pill ${fatigueLabel[1]}">Fatigue: ${fatigueLabel[0]}</span>`:""}</div>
-    <select id="statscope" aria-label="What to show stats for" style="margin-bottom:12px">
-      ${scopes.map(sc=>`<option value="${sc.id}" ${sc.id===_statScope?"selected":""}>${esc(sc.label)}</option>`).join("")}
-    </select>
-    <div class="card" style="margin-bottom:14px">
-      <div class="kicker">${esc(scope?scope.label:"Totals")}</div>
-      ${totals.workouts? `<div class="tot-grid">
-        <div><div class="tot-n num">${totals.workouts}</div><div class="faint">workouts</div></div>
-        <div><div class="tot-n num">${totals.sets.toLocaleString()}</div><div class="faint">sets</div></div>
-        <div><div class="tot-n num">${totals.reps.toLocaleString()}</div><div class="faint">reps</div></div>
-        <div><div class="tot-n num">${Math.round(totals.vol).toLocaleString()}</div><div class="faint">${unitLabel()} volume</div></div>
-        <div><div class="tot-n num">${Math.round(totals.mins/60)}</div><div class="faint">hours lifting</div></div>
-        <div><div class="tot-n num">${totals.cardioMin.toLocaleString()}</div><div class="faint">cardio min</div></div>
-      </div>`:`<div class="faint" style="margin-top:6px">Nothing logged in this period yet.</div>`}
-    </div>
-    <div class="grid2">
-      <div class="card" style="margin-bottom:14px"><div class="kicker">Completion</div>
-        <div class="num" style="font-size:26px;font-weight:900">${adherence!=null?clamp(adherence,0,100)+"%":logs.length}</div>
-        <div class="faint num">${meso? `${pos.done}/${pos.total} workouts${missed?` · <span style="color:var(--red)">${missed} missed</span>`:""}`:"workouts all time"}</div></div>
-      <div class="card" style="margin-bottom:14px"><div class="kicker">Avg session</div>
-        <div class="num" style="font-size:26px;font-weight:900">${logs.length?Math.round(logs.reduce((t,l)=>t+(l.durationMin||0),0)/logs.length):0}<small style="font-size:14px"> min</small></div>
-        <div class="faint num">${FUN()?"🔥 ":""}${streakCount()} streak</div></div>
-    </div>
-    ${meso? `
+
+  // ---- Layout: collapsible sections; a section with nothing in it isn't drawn ----
+  const closed=new Set(statsClosed());
+  const section=(id, title, body)=> body.trim()
+    ? `<details class="stat-sec" data-sec="${id}" ${closed.has(id)?"":"open"}><summary>${title}</summary>${body}</details>`
+    : "";
+  const wmLabel={vol:`Volume (${U})`, sets:"Sets", count:"Workouts", dur:"Duration"};
+  const cardioAvg=Math.round(totals.cardioMin/spanWeeks);
+
+  const blockBody = meso? `
     ${cutieCardHTML(logs, meso, pos)}
-    <div class="card"><div class="kicker">Sets per muscle · weekly view</div>
+    <div class="card"><div class="kicker">Sets per muscle · weekly</div>
       <div class="stack" style="margin-top:8px">
         ${(()=>{
           const muscles=[...new Set([...Object.keys(targetPerMuscle),...Object.keys(actualPerMuscle)])];
           if(!muscles.length) return `<div class="faint">No data yet</div>`;
-          // ONE shared scale = the biggest actual (or target) across all muscles, so
-          // bar length is comparable between rows: priority is obvious at a glance.
+          // ONE shared scale so bar length compares across rows
           const gmax=Math.max(1,...muscles.map(m=>Math.max(actualPerMuscle[m]||0, targetPerMuscle[m]||0)));
           return muscles.sort((a,b)=>(actualPerMuscle[b]||0)-(actualPerMuscle[a]||0)).map(mg=>{
             const t=targetPerMuscle[mg]||0, a=actualPerMuscle[mg]||0;
@@ -4345,111 +4379,173 @@ VIEWS.analytics=function(){
           }).join("");
         })()}
       </div>
-      ${(()=>{ const wkN=Math.max(1, weeks.length);
-          const perWk=Math.round(totals.cardioMin/wkN);
-          if(!totals.cardioMin) return "";
-          return `<div class="spm-row" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
+      ${totals.cardioMin? `<div class="spm-row" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
             <span class="spm-label" style="color:var(--cyan)">Cardio</span>
             <div class="spm-track"><div class="spm-fill" style="width:100%;background:var(--cyan);opacity:.55"></div></div>
-            <span class="spm-val num">${perWk}m</span></div>`; })()}
-      <p class="faint" style="margin:8px 0 0">Bars scaled to your highest muscle. Tick = weekly target. Green = target met.${totals.cardioMin?" Cardio is measured in minutes per week, not sets.":""}</p></div>
+            <span class="spm-val num">${cardioAvg}m</span></div>`:""}
+      <p class="faint" style="margin:8px 0 0">Average per week. Tick = weekly target. Green = target met.${
+        partialWeek?` Week ${partialWeek} is in progress and not counted yet.`:""}${
+        totals.cardioMin?" Cardio is minutes per week, not sets.":""}</p></div>
     ${prList.length? `<div class="card"><div class="kicker">PRs this ${term("meso")}</div>
       <div class="stack" style="margin-top:8px">${prList.slice(0,6).map(p=>
         `<div class="row split num"><span>${esc(p.name)}</span>
-         <span class="pill grn">e1RM ${dispW(p.from)} → ${dispW(p.to)}${unitLabel()}</span></div>`).join("")}</div></div>`:""}
-    `:""}
-    ${mesoStats.length>=2? `<div class="card"><div class="kicker">${term("Meso")} comparison</div>
-      <canvas class="chart" id="mc"></canvas>
-      <div class="stack" style="margin-top:10px">${mesoStats.slice(-5).map(m=>
-        `<div class="row split num"><span>${esc(m.name)}${m.archived?' <span class="faint">· archived</span>':""}</span>
-         <span class="muted">${m.workouts} workouts · ${(m.vol/1000).toFixed(1)}t</span></div>`).join("")}</div>
-      <p class="faint" style="margin:8px 0 0">Average volume per workout, oldest to newest.</p></div>`:""}
-    ${liftProg.length? `<div class="card"><div class="kicker">Strength progression across blocks</div>
-      <div class="stack" style="margin-top:8px">${liftProg.slice(0,6).map(p=>
-        `<div class="row split num"><span>${esc(p.name)}</span>
-         <span class="pill grn">+${p.pct}% · ${dispW(p.from)}→${dispW(p.to)}${unitLabel()}</span></div>`).join("")}</div>
-      <p class="faint" style="margin:8px 0 0">Estimated 1RM change, first block to latest.</p></div>`:""}
-    ${months.length>=2? `<div class="card"><div class="kicker">Monthly strength trend (total volume)</div>
-      <canvas class="chart" id="mvol"></canvas></div>
-      <div class="card"><div class="kicker" style="color:var(--cyan)">Monthly cardio trend (minutes)</div>
-      <canvas class="chart" id="mcard"></canvas></div>`:""}
-    <div class="card"><div class="kicker">Weekly volume (kg)</div><canvas class="chart" id="cv"></canvas></div>
-    <div class="card"><div class="kicker">Weekly sets</div><canvas class="chart" id="cs"></canvas></div>
-    <div class="card"><div class="kicker">Training frequency (workouts/week)</div><canvas class="chart" id="cf"></canvas></div>
-    <div class="card"><div class="kicker">Session duration (min)</div><canvas class="chart" id="cd"></canvas></div>
-    ${totals.cardioMin? `<div class="card">
-      <div class="row split"><div class="kicker" style="color:var(--cyan)">Cardio minutes per week</div>
-        <span class="faint num">${Math.round(totals.cardioMin/Math.max(1,weeks.length))} min/wk avg</span></div>
-      <canvas class="chart" id="cw"></canvas></div>`:""}
-    <div class="card"><div class="kicker">Sets per muscle (all time)</div>
-      <div class="stack" style="margin-top:8px">${MUSCLES.filter(m=>setsPerMuscle[m]).sort((a,b)=>setsPerMuscle[b]-setsPerMuscle[a]).map(m=>{
-        const v=setsPerMuscle[m], max=Math.max(...Object.values(setsPerMuscle));
+         <span class="pill grn">e1RM ${dispW(p.from)} → ${dispW(p.to)}${U}</span></div>`).join("")}</div></div>`:""}` : "";
+
+  const muscleTotals=MUSCLES.filter(m=>m!=="Cardio" && setsPerMuscle[m]).sort((a,b)=>setsPerMuscle[b]-setsPerMuscle[a]);
+  const trendsBody = logs.length? `
+    <div class="card"><div class="row split"><div class="kicker">Weekly</div><span class="faint num" id="wkavg"></span></div>
+      <div class="row" style="gap:6px;margin:8px 0;flex-wrap:wrap">${WEEKLY_METRICS.map(m=>
+        `<button class="typechip ${m===_weeklyMetric?"sel":""}" data-wm="${m}">${wmLabel[m]}</button>`).join("")}</div>
+      <canvas class="chart" id="cweek"></canvas></div>
+    ${!meso && muscleTotals.length? `<div class="card"><div class="kicker">Sets per muscle</div>
+      <div class="stack" style="margin-top:8px">${muscleTotals.map(m=>{
+        const v=setsPerMuscle[m], max=setsPerMuscle[muscleTotals[0]];
         return `<div class="row"><span style="width:96px" class="muted">${m}</span>
           <div style="flex:1;height:12px;background:var(--raised);border-radius:99px;overflow:hidden">
             <div style="width:${Math.round(100*v/max)}%;height:100%;background:linear-gradient(90deg,var(--cyan),var(--accent))"></div></div>
           <b class="num" style="width:36px;text-align:right">${v}</b></div>`;
-      }).join("")||`<div class="empty">Log workouts to populate</div>`}</div></div>
+      }).join("")}</div></div>`:""}
+    ${volMonths.length>=2? `<div class="card"><div class="kicker">Monthly volume (${U})</div>
+      <canvas class="chart" id="mvol"></canvas></div>`:""}` : "";
+
+  const blocksBody = showBlocks? `
+    <div class="card"><div class="kicker">${term("Meso")} comparison</div>
+      <canvas class="chart" id="mc"></canvas>
+      <div class="stack" style="margin-top:10px">${mesoStats.slice(-5).map(m=>
+        `<div class="row split num"><span>${esc(m.name)}${m.archived?' <span class="faint">· archived</span>':""}</span>
+         <span class="muted">${m.workouts} workouts · ${tonnes(m.vol)}</span></div>`).join("")}</div>
+      <p class="faint" style="margin:8px 0 0">Average volume per workout, oldest to newest.</p></div>
+    ${liftProg.length? `<div class="card"><div class="kicker">Strength progression across blocks</div>
+      <div class="stack" style="margin-top:8px">${liftProg.slice(0,6).map(p=>
+        `<div class="row split num"><span>${esc(p.name)}</span>
+         <span class="pill grn">+${p.pct}% · ${dispW(p.from)}→${dispW(p.to)}${U}</span></div>`).join("")}</div>
+      <p class="faint" style="margin:8px 0 0">Estimated 1RM change, first block to latest.</p></div>`:""}` : "";
+
+  const cardioBody = cardio.length? `
     <div class="card">
-      <div class="row split"><div class="kicker">Cardio minutes by zone (weekly)</div>
-        <span class="faint num">${Object.values(zoneMinutes(isoWeekStart(todayISO()),null)).reduce((a,b)=>a+b,0)} min this wk</span></div>
-      <canvas class="chart" id="cz"></canvas>
+      <div class="row split"><div class="kicker" style="color:var(--cyan)">Cardio minutes per week</div>
+        <span class="faint num">${cardioAvg} min/wk avg</span></div>
+      <canvas class="chart" id="cw"></canvas></div>
+    ${cardioMonths.length>=2? `<div class="card"><div class="kicker" style="color:var(--cyan)">Monthly cardio (minutes)</div>
+      <canvas class="chart" id="mcard"></canvas></div>`:""}
+    ${zoneTotal? `<div class="card">
+      <div class="row split"><div class="kicker">Minutes by zone</div>
+        <span class="faint num">${zoneTotal} min with HR</span></div>
+      <div class="stack" style="margin-top:8px">${zoneRowsHTML(zm)}</div>
+      <canvas class="chart" id="cz" style="margin-top:10px"></canvas>
       <div class="row" style="gap:10px;margin-top:8px;flex-wrap:wrap">
         ${[1,2,3,4,5].map(z=>`<span class="faint" style="display:flex;align-items:center;gap:4px">
           <span style="width:10px;height:10px;border-radius:3px;background:var(${ZCOLORS[z]})"></span>Z${z}</span>`).join("")}
-      </div>
-    </div>
-    <div class="card"><div class="kicker">This meso by zone</div>
-      <div class="stack" style="margin-top:8px">${zoneRowsHTML(zoneMinutes(mesoStartDate(), null))}</div></div>
-    <div class="card">
+      </div></div>`:""}
+    ${fitTypes.length? `<div class="card">
       <div class="row split"><div class="kicker">Cardio fitness</div><span class="faint">speed per heartbeat</span></div>
       <div class="row" style="flex-wrap:wrap;gap:6px;margin:8px 0" id="fittypes"></div>
       <canvas class="chart" id="cfit"></canvas>
-      <p class="faint" style="margin:8px 0 0">Proxy from logged distance + avg HR — same pace at lower HR trends up. Log distance to feed it.</p>
+      <p class="faint" style="margin:8px 0 0">From logged distance + avg HR — same pace at a lower HR trends up.</p></div>`:""}` : "";
+
+  const bodyBody = bw.length? `<div class="card"><div class="kicker">Bodyweight (${U})</div><canvas class="chart" id="cb"></canvas></div>` : "";
+
+  $("#view").innerHTML=`
+    <div class="topbar"><div><h1>Stats</h1></div>
+      ${fatigueLabel?`<span class="pill ${fatigueLabel[1]}">Fatigue: ${fatigueLabel[0]}</span>`:""}</div>
+    <select id="statscope" aria-label="What to show stats for" style="margin-bottom:12px">
+      ${scopes.map(sc=>`<option value="${sc.id}" ${sc.id===_statScope?"selected":""}>${esc(sc.label)}</option>`).join("")}
+    </select>
+    <div class="card" style="margin-bottom:14px">
+      <div class="kicker">${esc(scope?scope.label:"Totals")}</div>
+      ${(totals.workouts||totals.cardioMin)? `<div class="tot-grid">
+        <div><div class="tot-n num">${totals.workouts}</div><div class="faint">workouts</div></div>
+        <div><div class="tot-n num">${totals.sets.toLocaleString()}</div><div class="faint">sets</div></div>
+        <div><div class="tot-n num">${totals.reps.toLocaleString()}</div><div class="faint">reps</div></div>
+        <div><div class="tot-n num">${Math.round(dispW(totals.vol)).toLocaleString()}</div><div class="faint">${U} volume</div></div>
+        <div><div class="tot-n num">${Math.round(totals.mins/60)}</div><div class="faint">hours lifting</div></div>
+        <div><div class="tot-n num">${totals.cardioMin.toLocaleString()}</div><div class="faint">cardio min</div></div>
+      </div>`:`<div class="faint" style="margin-top:6px">Nothing logged in this period yet.</div>`}
     </div>
-    <div class="card"><div class="kicker">Bodyweight</div><canvas class="chart" id="cb"></canvas></div>`;
-  const cyan=getComputedStyle(document.body).getPropertyValue("--cyan").trim();
-  const green=getComputedStyle(document.body).getPropertyValue("--green").trim();
-  ChartManager.draw($("#cv"), weeks.map(k=>({x:fmtDate(k), y:Math.round(byWeek[k].vol)})), {type:"bar"});
-  ChartManager.draw($("#cs"), weeks.map(k=>({x:fmtDate(k), y:byWeek[k].sets})), {type:"bar", color:cyan});
-  ChartManager.draw($("#cf"), weeks.map(k=>({x:fmtDate(k), y:byWeek[k].count})), {type:"bar", color:green});
-  ChartManager.draw($("#cd"), weeks.map(k=>({x:fmtDate(k), y:byWeek[k].count?Math.round(byWeek[k].dur/byWeek[k].count):0})));
-  if($("#cw")) ChartManager.draw($("#cw"), weeks.map(k=>({x:fmtDate(k), y:byWeek[k].cardioMin||0})), {type:"bar", color:cyan});
-  ChartManager.draw($("#cb"), st.bodyweight.slice(-30).map(b=>({x:fmtDate(b.date), y:dispW(b.kg)})), {color:cyan});
-  drawCutie(logs, meso);
-  if(mesoStats.length>=2)
-    ChartManager.draw($("#mc"), mesoStats.slice(-6).map(m=>({x:m.name.slice(0,6), y:m.avgVol})), {type:"bar"});
-  if(months.length>=2){
-    ChartManager.draw($("#mvol"), months.map(k=>({x:monLabel(k), y:Math.round(byMonth[k].vol)})), {type:"bar"});
-    ChartManager.draw($("#mcard"), months.map(k=>({x:monLabel(k), y:byMonth[k].cardioMin})), {type:"bar", color:cyan});
-  }
-  // cardio weekly stacked zones (last 12 weeks with data)
-  const czWeeks={};
-  st.cardio.forEach(c=>{
-    const k=isoWeekStart(c.date);
-    (czWeeks[k]??={1:0,2:0,3:0,4:0,5:0});
-    if(c.zone) czWeeks[k][c.zone]+=c.minutes;
+    <div class="grid2">
+      <div class="card" style="margin-bottom:14px"><div class="kicker">Completion</div>
+        <div class="num" id="stat-completion" style="font-size:26px;font-weight:900">${adherence!=null?clamp(adherence,0,100)+"%":logs.length}</div>
+        <div class="faint num">${meso? `${doneN}/${pos.total} workouts${skippedN?` · ${skippedN} skipped`:""}${missed?` · <span style="color:var(--red)">${missed} missed</span>`:""}`:"workouts in this period"}</div></div>
+      <div class="card" style="margin-bottom:14px"><div class="kicker">Avg session</div>
+        <div class="num" style="font-size:26px;font-weight:900">${logs.length?Math.round(totals.mins/logs.length):0}<small style="font-size:14px"> min</small></div>
+        <div class="faint num">${FUN()?"🔥 ":""}${streakCount()} streak</div></div>
+    </div>
+    ${section("block", `This ${term("meso")}`, blockBody)}
+    ${section("trends", "Training", trendsBody)}
+    ${section("blocks", `${term("Meso")}s compared`, blocksBody)}
+    ${section("cardio", "Cardio", cardioBody)}
+    ${section("body", "Body", bodyBody)}`;
+
+  // ---- Charts: only drawn while their section is open (a closed <details>
+  //      has no width), and redrawn when a section is opened ----
+  const css=getComputedStyle(document.body);
+  const cyan=css.getPropertyValue("--cyan").trim();
+  const green=css.getPropertyValue("--green").trim();
+  const visible=id=>{ const c=$("#"+id); return c && (c.closest("details")?.open!==false) ? c : null; };
+  const weekly=k=>{
+    const w=byWeek[k];
+    if(_weeklyMetric==="vol")   return Math.round(dispW(w.vol));
+    if(_weeklyMetric==="sets")  return w.sets;
+    if(_weeklyMetric==="count") return w.count;
+    return w.count? Math.round(w.dur/w.count) : 0;
+  };
+  const weeklyAvg=()=>{
+    if(_weeklyMetric==="vol")   return `${Math.round(dispW(totals.vol)/spanWeeks).toLocaleString()} ${U}/wk avg`;
+    if(_weeklyMetric==="sets")  return `${Math.round(totals.sets/spanWeeks)} sets/wk avg`;
+    if(_weeklyMetric==="count") return `${Math.round(totals.workouts/spanWeeks*10)/10} workouts/wk avg`;
+    return `${totals.workouts?Math.round(totals.mins/totals.workouts):0} min/session avg`;
+  };
+  const drawWeekly=()=>{
+    const c=visible("cweek"); if(!c) return;
+    const color=_weeklyMetric==="sets"?cyan:_weeklyMetric==="count"?green:undefined;
+    ChartManager.draw(c, weeks.map(k=>({x:fmtDate(k), y:weekly(k)})),
+      _weeklyMetric==="dur"? {color} : {type:"bar", color});
+    const a=$("#wkavg"); if(a) a.textContent=weeklyAvg();
+  };
+  let fitSel=fitTypes[0];
+  const drawFit=sel=>{
+    const holder=$("#fittypes"), c=visible("cfit"); if(!holder || !c) return;
+    fitSel=sel;
+    holder.innerHTML=fitTypes.map(t=>`<button class="typechip ${t===sel?"sel":""}" data-ft="${t}">${t}</button>`).join("");
+    $$("#fittypes [data-ft]").forEach(b=>b.onclick=()=>drawFit(b.dataset.ft));
+    const pts=byType[sel].sort((a,b)=>a.date.localeCompare(b.date));
+    ChartManager.draw(c, pts.map(p=>({x:fmtDate(p.date), y:p.eff})), {color:css.getPropertyValue("--z2").trim()});
+  };
+  const drawOpen=()=>{
+    drawWeekly();
+    let c;
+    if((c=visible("cw"))) ChartManager.draw(c, weeks.map(k=>({x:fmtDate(k), y:byWeek[k].cardioMin||0})), {type:"bar", color:cyan});
+    if((c=visible("cb"))) ChartManager.draw(c, bw.map(b=>({x:fmtDate(b.date), y:dispW(b.kg)})), {color:cyan});
+    if((c=visible("mc"))) ChartManager.draw(c, mesoStats.slice(-6).map(m=>({x:m.name.slice(0,6), y:Math.round(dispW(m.avgVol))})), {type:"bar"});
+    if((c=visible("mvol"))) ChartManager.draw(c, volMonths.map(k=>({x:monLabel(k), y:Math.round(dispW(byMonth[k].vol))})), {type:"bar"});
+    if((c=visible("mcard"))) ChartManager.draw(c, cardioMonths.map(k=>({x:monLabel(k), y:byMonth[k].cardioMin})), {type:"bar", color:cyan});
+    if((c=visible("cz"))){
+      const czWeeks={};
+      cardio.forEach(x=>{ if(!x.zone) return;
+        const k=isoWeekStart(x.date); (czWeeks[k]??={1:0,2:0,3:0,4:0,5:0})[x.zone]+=(x.minutes||0); });
+      const czKeys=Object.keys(czWeeks).sort().slice(-12);
+      const zcol={}; [1,2,3,4,5].forEach(z=>zcol[z]=css.getPropertyValue(ZCOLORS[z]).trim());
+      ChartManager.stacked(c, czKeys.map(k=>({x:fmtDate(k), parts:czWeeks[k]})), zcol, [1,2,3,4,5]);
+    }
+    if(fitTypes.length) drawFit(fitSel);
+    if(visible("cutiechart")) drawCutie(logs, meso);
+  };
+  drawOpen();
+
+  // weekly metric toggle — redraw just that chart
+  $$("[data-wm]").forEach(b=>b.onclick=()=>{
+    _weeklyMetric=b.dataset.wm;
+    $$("[data-wm]").forEach(x=>x.classList.toggle("sel", x===b));
+    drawWeekly();
   });
-  const czKeys=Object.keys(czWeeks).sort().slice(-12);
-  const zcol={}; [1,2,3,4,5].forEach(z=>zcol[z]=getComputedStyle(document.body).getPropertyValue(ZCOLORS[z]).trim());
-  ChartManager.stacked($("#cz"), czKeys.map(k=>({x:fmtDate(k), parts:czWeeks[k]})), zcol, [1,2,3,4,5]);
-  // cardio fitness trend per type (types with >=3 sessions carrying distance)
-  const byType={};
-  st.cardio.forEach(c=>{ const e=cardioEff(c); if(e!=null) (byType[c.type]??=[]).push({date:c.date, eff:e}); });
-  const fitTypes=Object.keys(byType).filter(t=>byType[t].length>=3);
-  const holder=$("#fittypes");
-  if(!fitTypes.length){
-    holder.innerHTML=`<span class="faint">Needs 3+ sessions of one type with distance logged</span>`;
-    ChartManager.draw($("#cfit"), []);
-  } else {
-    let sel=fitTypes[0];
-    const drawFit=()=>{
-      holder.innerHTML=fitTypes.map(t=>`<button class="typechip ${t===sel?"sel":""}" data-ft="${t}">${t}</button>`).join("");
-      $$("#fittypes [data-ft]").forEach(b=>b.onclick=()=>{ sel=b.dataset.ft; drawFit(); });
-      const pts=byType[sel].sort((a,b)=>a.date.localeCompare(b.date));
-      ChartManager.draw($("#cfit"), pts.map(p=>({x:fmtDate(p.date), y:p.eff})), {color:getComputedStyle(document.body).getPropertyValue("--z2").trim()});
-    };
-    drawFit();
-  }
+  // remember collapsed sections; draw charts when a section opens
+  $$("details.stat-sec").forEach(d=>d.addEventListener("toggle", ()=>{
+    const list=statsClosed(), id=d.dataset.sec, i=list.indexOf(id);
+    if(d.open && i>=0) list.splice(i,1);
+    if(!d.open && i<0) list.push(id);
+    Store.save();
+    if(d.open) drawOpen();
+  }));
   // Scope dropdown — re-render Stats for the selected slice of history.
   const scopeSel=$("#statscope");
   if(scopeSel) scopeSel.onchange=()=>{ _statScope=scopeSel.value; VIEWS.analytics(); };

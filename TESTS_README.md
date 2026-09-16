@@ -31,6 +31,7 @@ node TESTS_ramp.js         # run one suite
 | `TESTS_mesocomplete.js` | Mesocycle completion summary — totals, progression readout, PRs, and repeat/new/archive |
 | `TESTS_cardioskip.js` | In-workout cardio only logs when done — skipped cards never log, untouched (prefilled) cards don't auto-capture, typed or tapped ones do; cardio-only sessions, whole-workout skip, editing a past workout |
 | `TESTS_cardiostats.js` | Cardio in Stats — weekly minutes, HR-less sessions, scope filtering, no sets/minutes mixing |
+| `TESTS_statsfix.js` | Stats numbers and layout — completion ignores skips, PRs per block, block comparison ignores skips, per-week averages over the real span, every card follows the scope, in-progress week left out, lb volume, sections/collapse memory, merged weekly chart, empty cards hidden, bar charts start at 0 |
 | `TESTS_statscope.js` | Stats scope selector — meso/month/year/all-time filtering and the totals card |
 | `TESTS_skip.js` | Skipping a workout — meso advances, markers stay out of streaks/stats/editing |
 | `TESTS_schemes.js` | Fun colour schemes — four options, single-select, Fun-mode gating, persistence |

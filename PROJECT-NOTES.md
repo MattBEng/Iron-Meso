@@ -264,6 +264,15 @@ sets-per-muscle maps and gets its own row and chart.
 any previous meso / this month / this year / all time. A **meso** scope keeps the
 meso-specific panels (adherence, weekly targets, week-by-week, PRs); a **date
 range** turns them off, because they are meaningless outside a single block.
+**Every card reads only the scoped `logs`/`cardio` lists** — don't reach for
+`S().logs` inside the view. Per-week averages divide by every week in the
+scope's span (first activity → today, or → last activity for a finished
+block), not just weeks that had data. Completion excludes skip markers. The
+week in progress is left out of the weekly sets average. The page is built
+from collapsible `<details class="stat-sec">` sections; a section with nothing
+in it isn't rendered, collapsed ones are remembered in `settings.statsClosed`,
+and charts are only drawn while their section is open (a closed section has
+no width).
 
 **Mesocycle completion.** Finishing shows a summary (totals, progression, PRs,
 muscle split) with three ways out: repeat, new, archive. The same view opens for
