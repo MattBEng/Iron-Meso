@@ -2780,7 +2780,7 @@ function saveLogEdit(){
       if(c.fromWorkout && c.mesoId===log.mesoId && c.date===oldDate) return false;
       return true;
     });
-    s.exercises.filter(e=>e.cardio && e.log && e.log.minutes>0).forEach(e=>{
+    s.exercises.filter(e=>e.cardio && !e.skipped && (e.done || e.touched) && e.log && e.log.minutes>0).forEach(e=>{
       const ex=exById(e.exerciseId);
       S().cardio.push({id:uid(), date:log.date, type:ex?ex.name:(e._cardioName||"Cardio"),
         minutes:e.log.minutes, avgHR:e.log.avgHR||null, zone:zoneFor(e.log.avgHR),
@@ -2847,6 +2847,7 @@ function bindWorkout(){
       else if(isFinite(v)){
         ses.log[f]= (f==="distanceKm"||f==="speed"||f==="incline")? Math.round(v*100)/100 : Math.round(v);
       }
+      ses.touched=true;                    // real data entered, not just the prefilled target
       const zc=$(`#cz-${xi}`);
       if(zc){ const z=zoneFor(ses.log.avgHR); zc.dataset.z=z||""; zc.textContent=z?`Zone ${z}`:"Zone —"; }
       save(); return;
@@ -3599,10 +3600,12 @@ function finishWorkout(){
   const s=S().activeSession;
   if(!s) return go("home");
   const liftLogged=s.exercises.filter(e=>!e.cardio && e.sets.some(x=>x.done));
-  // Auto-capture: a cardio card with minutes entered counts as done even if the
-  // user didn't tap "Log cardio" — entering the data is intent enough.
-  s.exercises.forEach(e=>{ if(e.cardio && !e.done && e.log && e.log.minutes>0) e.done=true; });
-  const cardioLogged=s.exercises.filter(e=>e.cardio && e.done);
+  // Auto-capture: a cardio card the user TYPED into counts as done even if they
+  // didn't tap "Log cardio" — entering data is intent enough. The minutes box is
+  // prefilled with the target, so an untouched card is NOT intent. A skipped
+  // card never logs, even if it was ticked before being skipped.
+  s.exercises.forEach(e=>{ if(e.cardio && !e.skipped && !e.done && e.touched && e.log && e.log.minutes>0) e.done=true; });
+  const cardioLogged=s.exercises.filter(e=>e.cardio && e.done && !e.skipped);
   if(!liftLogged.length && !cardioLogged.length){
     toast("Nothing logged — session discarded");
     S().activeSession=null; Store.save(); stopRest(); return go("home");

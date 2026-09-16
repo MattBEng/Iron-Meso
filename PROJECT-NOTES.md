@@ -252,7 +252,11 @@ the rep ceiling; defaults per equipment via `DEFAULT_STEP`), `setup` (the 🔧
 note), cardio (ids prefixed `c_`, `muscle: "Cardio"`).
 
 **Cardio** lives in a separate `cardio` store, never mixed into lifting volume.
-It is written at finish *after* the date is chosen so it matches the log. In Stats
+It is written at finish *after* the date is chosen so it matches the log.
+A cardio card in a workout logs only if it was **tapped "Log this cardio"** or
+the user **typed into it** (`ses.touched`) — the minutes box is prefilled with
+the target, so an untouched card is not proof it was done. A **skipped** card
+never logs, at finish or when editing a past workout. In Stats
 it is measured in **minutes per week**, not sets — it is excluded from the
 sets-per-muscle maps and gets its own row and chart.
 

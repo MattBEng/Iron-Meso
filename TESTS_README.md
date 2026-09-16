@@ -29,6 +29,7 @@ node TESTS_ramp.js         # run one suite
 | `TESTS_loadrep.js` | Load–rep prediction accuracy, the "??" trusted band, per-exercise weight steps, the jump-aware rep ceiling, never-both-at-once, live re-prediction |
 | `TESTS_messages.js` | Message banks — MESSAGES.txt/index.html sync, no blanks or duplicates, pickers still resolve |
 | `TESTS_mesocomplete.js` | Mesocycle completion summary — totals, progression readout, PRs, and repeat/new/archive |
+| `TESTS_cardioskip.js` | In-workout cardio only logs when done — skipped cards never log, untouched (prefilled) cards don't auto-capture, typed or tapped ones do; cardio-only sessions, whole-workout skip, editing a past workout |
 | `TESTS_cardiostats.js` | Cardio in Stats — weekly minutes, HR-less sessions, scope filtering, no sets/minutes mixing |
 | `TESTS_statscope.js` | Stats scope selector — meso/month/year/all-time filtering and the totals card |
 | `TESTS_skip.js` | Skipping a workout — meso advances, markers stay out of streaks/stats/editing |

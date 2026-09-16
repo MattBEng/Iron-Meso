@@ -8,6 +8,27 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### 2026-09-17 (fix — cardio logged when it wasn't done)
+- **Bug:** cardio inside a workout got logged even when you didn't do it.
+  Two paths: (1) *Skip exercise* on a cardio card greyed it out, but finishing
+  ignored `skipped` and logged it anyway; (2) a card you never touched still
+  logged, because the minutes box is **prefilled with the target** and finish
+  auto-captured any card with minutes > 0. Skipping the whole workout was
+  already fine (marker log, no cardio).
+- **Fix:** typing into any cardio field sets `ses.touched`. Finish now
+  auto-captures only touched cards, and never logs a skipped card (even one
+  ticked before being skipped). Tapping *Log this cardio* still logs the
+  prefilled target. Editing a past workout follows the same rules — skipping a
+  cardio card there removes it.
+- **Behaviour change to know:** if you do the cardio exactly as planned and
+  neither type nor tap Log, it won't be recorded. Tap *Log this cardio*.
+- Touches: `index.html` (`finishWorkout`, `saveLogEdit` cardio filter, the
+  `data-card-in` input handler), `sw.js` (BUILD). `PROJECT-NOTES.md` §5 Cardio
+  rule updated. `TESTS_workout.js` now types the minutes instead of setting
+  them directly (it was relying on the old auto-capture).
+- Tests: new `TESTS_cardioskip.js` (16 — fails 5 on the old app). Suite now
+  **355 / 18 suites**, all passing.
+
 ### 2026-09-16 (fix — assisted pull-up progressing backwards)
 - **Bug:** on older installs, Assisted Pull-Up was treated as a normal lift.
   After a short session (30kg × 10/8/7 vs target 10) it said *"back off 5%"*

@@ -20,8 +20,8 @@ run("workout lifecycle", ()=>{
   const s=st().activeSession;
   s.date="2026-08-01";                       // as if the Train tab was opened Aug 1
   logSets(0, 100, 10);                       // but training happens now
-  st().activeSession.exercises[1].log.minutes=15;
-  save();
+  w.go("workout");
+  inp($('[data-card-in="1"][data-cf="minutes"]'), "15");   // type it, like a user (untouched cards don't log)
   const realStart=ev("sessionStartDate")(st().activeSession);
   ok("start date comes from the logged set, not the stale session date",
      realStart===ev("todayISO()"), realStart);
