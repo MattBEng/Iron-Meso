@@ -147,6 +147,38 @@ feed, wearable HR, a named trainer/coach persona.
 
 Newest first. Add an entry when you ship.
 
+### 2026-09-01 (fifth pass — mesocycle completion)
+- **Finishing a block now has an ending.** It used to dead-end on one line
+  ("Meso complete — duplicate it from the Mesos tab"). The Train tab now shows a
+  **completion summary**: totals (workouts, sets, reps, volume, hours, cardio),
+  completion % with skips reported separately, **how it progressed** (volume
+  change from the first week to the last *non-deload* week, and sets/week
+  added), **PRs set during the block**, and **where the work went** by muscle.
+- **Three ways out**, right there: *Run it again*, *Build a new meso*,
+  *Archive & finish here*.
+- **`repeatMeso(id)` extracted** so the completion screen and the Mesos ⋯ menu
+  share one implementation. Repeating now also **archives the finished run** and
+  drops you straight into the first workout.
+- Deload-aware on purpose: the volume comparison uses the last non-deload week,
+  so a deload week doesn't read as "you got weaker".
+- Tests: new `TESTS_mesocomplete.js` (29). Suite now **307 / 15 suites**.
+
+### 2026-09-01 (fourth pass — cardio in Stats)
+- **Fixed: cardio logged inside a workout was nearly invisible in Stats.** It
+  reached the cardio store correctly, but the only weekly cardio view was the
+  zone chart — which counts sessions **with a heart rate**. Log 25 minutes with
+  no HR and nothing appeared.
+- **Added "Cardio minutes per week"** chart alongside the other weekly charts,
+  counting all cardio in the selected scope regardless of HR, with a min/week
+  average. Hidden entirely when there's no cardio.
+- **Cardio now appears in the weekly muscle panel as minutes**, on its own row
+  below the muscles, because cardio has no "sets per muscle" — that mismatch is
+  why it never showed up there.
+- **Fixed a pre-existing duplicate:** cardio slots in a meso were being counted
+  into `targetPerMuscle` (with `sl.sets` undefined), producing a junk "Cardio"
+  sets row. Cardio is now excluded from both the target and actual sets maps.
+- Tests: new `TESTS_cardiostats.js` (17). Suite now **278 / 14 suites**.
+
 ### 2026-09-01 (third pass — Stats scope)
 - **Stats now has a scope dropdown** at the top: **Current meso**, each
   **previous meso** that has logged workouts (newest first), **This month**,
