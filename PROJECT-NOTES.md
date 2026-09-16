@@ -1,145 +1,307 @@
-# Lift Daddy — project notes
+# Lift Daddy — working notes
 
-Working notes for whoever picks this up next (including a future AI session
-with no memory of earlier work). Keep this updated; it's cheaper than
-re-deriving everything.
-
----
-
-## What this is
-
-A single-file, offline-first PWA for hypertrophy training — mesocycle
-programming, RIR-based autoregulated progression, and logging. Modelled on
-the Renaissance Periodization app but warmer and jargon-free.
-
-**Live:** https://lift-daddy.pages.dev/
-**Hosting:** Cloudflare Pages, git-connected to GitHub (user `mattbeng`).
-Framework preset *None*, build command *blank*, output dir `/`.
-Push to the repo → auto-deploys in ~1 min.
+**Read this first.** It is written for whoever picks the project up next,
+including an AI session with no memory of earlier work. It covers what the app
+is, how to change it safely, the domain rules that are easy to get wrong, and
+the decisions already settled. Keep it current — it is cheaper than re-deriving
+everything.
 
 ---
 
-## Repo layout
+## 1. What this is
+
+A single-file, offline-first PWA for hypertrophy training: mesocycle
+programming, RIR-based autoregulated progression, and logging. Modelled on the
+Renaissance Periodization app but warmer and jargon-free.
+
+It is **one person's personal training tracker** (Matt's), not a product. There
+is no backend, no accounts, no users but him. Decisions should favour *his*
+workflow over generality.
+
+- **Live:** https://lift-daddy.pages.dev/
+- **Hosting:** Cloudflare Pages, git-connected to GitHub (user `mattbeng`).
+  Framework preset *None*, build command *blank*, output dir `/`.
+  Push to the repo → auto-deploys in about a minute.
+- **Install:** Android Chrome → ⋮ → Add to Home screen. Data is `localStorage`
+  per-origin, so it lives on one device; move it with Settings → Export/Import.
+
+---
+
+## 2. Repo layout
+
+Everything is flat in the repo root. There are no subfolders and no build step.
 
 | Path | What it is |
 |---|---|
-| `index.html` | **The entire app.** One self-contained file (~230 KB): HTML, CSS, and one big `<script>`. |
+| `index.html` | **The entire app.** One self-contained file (~260 KB): HTML, CSS and one big `<script>`. |
 | `sw.js` | Service worker. Network-first for the HTML shell so updates propagate. |
 | `_headers` | Cloudflare cache headers. |
-| `icon-*.png` | App icons (coral "LD"), incl. maskable variants. |
-| `TESTS_*.js` | Automated test suite, in the repo root — see `TESTS_README.md`. Run `node TESTS_run-all.js`. |
+| `icon-*.png` | App icons (coral "LD"), including maskable variants. |
 | `PROJECT-NOTES.md` | This file. |
-| `PROGRESSION-MODEL.md` | **The science behind the progression maths** — equations, evidence, worked examples, the "??" band, the jump-aware ceiling. Read this before touching the engine. |
+| `PROGRESSION-MODEL.md` | **The science behind the progression maths** — equations, evidence, worked examples, the "??" band, the jump-aware ceiling. Read before touching the engine. |
+| `TESTS_*.js` | Test suite, flat in the root. `TESTS_lib.js` is the harness, `TESTS_run-all.js` the runner, the rest are suites. See `TESTS_README.md`. |
 
-**Deploying a change:** bump the `BUILD` stamp in `sw.js`, then push
-`index.html` + `sw.js`. Without the bump, clients may keep the old shell.
+There is **no `manifest.json`** — the PWA manifest is embedded in `index.html`
+as a `data:` URI. Don't go looking for it.
+
+---
+
+## 3. How to work on this
+
+### The loop
+
+1. Make the change in `index.html`.
+2. Check the JavaScript still parses (see below) — a syntax error bricks the
+   whole app, and it is one file.
+3. Run the tests: `node TESTS_run-all.js`.
+4. Bump the `BUILD` stamp in `sw.js`.
+5. Hand over `index.html` + `sw.js` (+ any test/doc files) to be committed.
+
+### Checking the JS parses
+
+The app is one `<script>` block. Extract and syntax-check it:
+
+```bash
+python3 -c "import re;open('check.js','w').write(re.search(r'<script>(.*)</script>',open('index.html').read(),re.S).group(1))" \
+  && node --check check.js && echo "JS OK"
+```
+
+### Editing safely
+
+`index.html` is far too large to rewrite wholesale. Use targeted string
+replacement, and **never write a partial patch**. The pattern that has worked:
+
+```python
+h=open('index.html').read()
+misses=[]
+def rep(label, old, new):
+    global h
+    if old not in h: misses.append(label); return
+    h=h.replace(old, new, 1)
+
+rep("thing-1", "<exact old text>", "<new text>")
+rep("thing-2", "<exact old text>", "<new text>")
+
+if misses: print("MISSES:", misses)          # write nothing
+else: open('index.html','w').write(h); print("OK")
+```
+
+The all-or-nothing guard matters: a batch that half-applies leaves the file in a
+state that is hard to reason about. If a label misses, fix the anchor and re-run
+the **whole** batch — don't apply the rest separately and patch the straggler
+after, which has caused confusion before.
+
+### Running the tests
+
+```bash
+npm install jsdom      # once per environment
+node TESTS_run-all.js  # everything
+node TESTS_ramp.js     # one suite
+```
+
+The harness boots the real `index.html` in jsdom and drives the actual UI.
+`TESTS_README.md` documents the helpers and the traps (stale DOM nodes after a
+re-render, clearing seeded templates, the three-step finish flow, jsdom not
+firing `popstate` asynchronously). **Read it before writing a test.**
+
+Add a suite as `TESTS_<area>.js` in the root; the runner discovers it.
+
+### Deploying
 
 ```bash
 NEWSTAMP=$(date +%Y%m%d%H%M%S)
 sed -i "s/const BUILD = \"[0-9]*\"/const BUILD = \"$NEWSTAMP\"/" sw.js
 ```
 
----
+Without the bump, clients may keep serving the old shell. The app icon only
+refreshes on remove + re-add (an OS limitation); code updates propagate
+automatically with a ✨ toast.
 
-## Architecture
+### Working style that suits this project
 
-Everything lives in one `<script>` in `index.html`.
-
-- **`Store`** — state in `localStorage` under key `ironmeso_v1` (**do not
-  rename**; it would orphan existing user data). Debounced save + `flush()`,
-  checksummed export/import, `validateState`. Exposed as `window.LiftDaddy`.
-- **`SCHEMA_VERSION`** with a migration chain. Add a migration when you change
-  the shape of stored data; never mutate old data in place without one.
-- **`ProgressionEngine.suggest()`** — the core. RIR-based, whole-workout aware.
-  Handles: assisted machines (inverted — less weight = progress), bodyweight
-  (progress reps, not load), loaded bodyweight (normal load progression),
-  held-weight plateaus (same weight twice → recommend reps), and excludes
-  AMRAP/myorep sets from its judgement.
-- **Views** — hash-free router `go(name)` against a `VIEWS` registry:
-  home, mesos, workout (*Train*), calendar (*History*), exercises,
-  analytics (*Stats*), settings. Seven-tab bottom nav.
-- **Modes** — Serious vs Fun (`FUN()`). Fun replaces RIR with a feel scale
-  (😌/💪/🔥), uses plain language, and adds encouragement. Female + Fun
-  additionally unlocks the "cutie" layer on Stats.
+- **Reproduce before fixing.** Several "bugs" here turned out to be something
+  other than the reported symptom (see §6). Write a probe script, confirm the
+  mechanism, then patch.
+- **Test the fix, not just the feature.** Every bug fixed has a regression check.
+- **Push back on specs that will misbehave.** The flat `+4` rep ceiling and the
+  date-field ordering both looked reasonable and were wrong; saying so early
+  saved rework.
+- Don't add a second way to do something that already exists — consolidate
+  (`repeatMeso` was duplicated inline before being extracted).
 
 ---
 
-## Domain rules worth knowing
+## 4. Architecture
 
-**Volume ramp.** Sets climb from `startSets` (default 2) to a per-muscle
-ceiling, landing on the ceiling in the final *real* week (deload excluded),
-spread evenly. Ceiling comes from `endTargetSets` (default 5) stepped down by
-priority: **High = target, Normal = target − 1, Low (maintain) = target − 2.**
-Priority is set at meso creation and **locked once the meso has any logged
-workout** (selects disable; `collectBasics` skips disabled ones so the stored
-values survive a re-save). A **repeat run**
-(`repeatRun: true`) starts one week in — a repeated 4-real-week High muscle
-goes 3,4,5,5. When the set count holds week to week, load/rep progression
-carries the session.
+All in one `<script>` in `index.html`.
+
+- **`Store`** — state in `localStorage` under key **`ironmeso_v1`**
+  (**do not rename** — it would orphan existing data). Debounced `save()` plus
+  `flush()`, checksummed export/import, `validateState`. Exposed as
+  `window.LiftDaddy` (alias `window.IronMeso`), which is what the tests drive.
+- **`SCHEMA_VERSION`** with a migration chain. Add a migration whenever the shape
+  of stored data changes; never mutate old data in place without one.
+- **`ProgressionEngine.suggest()`** — the core. RIR-based and whole-workout
+  aware. Handles assisted machines (inverted — less weight is progress),
+  bodyweight (reps not load), loaded bodyweight (normal load progression),
+  held-weight plateaus, and excludes AMRAP/myorep sets from its judgement.
+- **Views** — hash-free router `go(name)` against a `VIEWS` registry: home,
+  mesos, workout (*Train*), calendar (*History*), exercises, analytics (*Stats*),
+  settings, mesosummary. Seven-tab bottom nav.
+- **Modes** — Serious vs Fun (`FUN()`). Fun swaps RIR for a feel scale
+  (😌/💪/🔥), plain language, encouragement. Fun **+ Female** (`cutieOn()`)
+  additionally unlocks the cutie layer: the pink Stats card with its levelling
+  title, and the tiered welcome-back card on Home.
+- **Charts** — hand-rolled `ChartManager.draw()` on `<canvas>`. Bars are
+  slot-centred and inset from the axes (an earlier version clipped the first and
+  last bar).
+
+---
+
+## 5. Domain rules worth knowing
+
+**Volume ramp.** Sets climb from `startSets` (default 2) to a per-muscle ceiling,
+landing on the ceiling in the final *real* week (deload excluded), spread evenly.
+The ceiling comes from `endTargetSets` (default 5) stepped down by priority:
+**High = target, Normal = target − 1, Low (maintain) = target − 2.** Priority is
+set at meso creation and **locked once the meso has any logged workout** (selects
+disable; `collectBasics` skips disabled ones so a re-save can't clobber them). A
+**repeat run** (`repeatRun: true`) starts one week in — a repeated 4-real-week
+High muscle goes 3,4,5,5. When the set count holds week to week, load/rep
+progression carries the session.
+
+**Progression maths.** Load↔rep conversion averages **Epley and Brzycki**, applied
+in both directions (individually they disagree ~25% at 12–15 reps and bracket the
+truth from opposite sides). Predictions outside a trusted band (reps <3 or >25, or
+load ≥ estimated 1RM) return `null` and render as **`??`** — never a fake number.
+Weight and reps **never both increase**: held weight → +1 rep; raised weight →
+fewer reps, predicted. The rep ceiling is **jump-aware** (`repCeilingFor`), derived
+from each exercise's own smallest weight jump: a 5→7.5 kg lateral raise (+50%)
+needs ~20 reps banked before the jump is possible, while a 100→102.5 kg squat
+(+2.5%) should jump at ~10. Set the increment per exercise in the exercise editor.
+Full reasoning and evidence in **`PROGRESSION-MODEL.md`**.
 
 **Dates.** `todayISO()` uses **local** date components, never `toISOString()`
-(that's UTC and shifts early-morning sessions to the previous day). A session
+(that is UTC and shifts early-morning sessions to the previous day). A session
 object is created merely by *opening the Train tab*, so its creation date is
 **not** a reliable "start" — `sessionStartDate()` reads the first logged set's
-timestamp instead. The finish prompt asks for date + duration.
+timestamp instead. The finish prompt asks for date and duration together.
 
-**Log editability.** Only the 6 most recent logs of the active meso are
-editable (`logEditable()`), ordered by **creation order (`loggedAt`)**, never
-by the date field — ordering by date created a catch-22 where a wrongly
-back-dated log fell out of the window and could never be corrected.
+**Log editability.** Only the 6 most recent logs of the active meso are editable
+(`logEditable()`), ordered by **creation order (`loggedAt`)**, never by the date
+field — ordering by date created a catch-22 where a wrongly back-dated log fell
+out of the window and could never be corrected.
 
-**Notes — three distinct levels:**
-1. **Session note** — this workout only (`session.notes`).
-2. **Meso slot note** — 📌, specific to that plan.
-3. **Setup note** — 🔧, saved to the **exercise in the library**, so it shows
-   every time you do that exercise, in any meso. Edited from the workout.
+**Skipped workouts.** Position in a meso is derived from its log count, so a skip
+records a **marker log** (`skipped: true`, no exercises) to advance. Markers are
+filtered out of streaks, the welcome-back gap, Stats, monthly rollups and the
+progression history index; they can't be edited, show as a muted calendar dot,
+and never appear as the Home "Last workout".
 
-**Progression maths.** Load↔rep conversion uses an **average of Epley and
-Brzycki**, applied in both directions (they disagree by ~25% individually at
-12-15 reps, and bracket the truth from opposite sides). Predictions outside a
-trusted band (reps <3 or >25, or load ≥ estimated 1RM) return `null` and render
-as **`??`** — never a fake number. Weight and reps **never both increase**:
-held weight → +1 rep; raised weight → fewer reps, predicted. The rep ceiling is
-**jump-aware** (`repCeilingFor`), derived from each exercise's own smallest
-weight jump — a 5→7.5kg lateral raise (+50%) needs ~20 reps banked before the
-jump is even possible, while a 100→102.5kg squat (+2.5%) should jump at ~10.
-Set the increment per exercise in the exercise editor. Full reasoning and
-evidence in `PROGRESSION-MODEL.md`.
+**Notes — three distinct levels.** (1) **Session note**, this workout only
+(`session.notes`); (2) **Meso slot note**, 📌, specific to that plan;
+(3) **Setup note**, 🔧, saved to the **exercise in the library** so it shows every
+time you do that exercise in any meso, edited from the workout.
 
-**Exercise flags:** `assisted` (inverted progression), `equipment:"Bodyweight"`
+**Exercise flags.** `assisted` (inverted progression), `equipment:"Bodyweight"`
 (reps not load when unloaded), `timed` (log seconds, **no progression** — just
 shows "Last time: 45s · 42s · 38s"), `step` (smallest real weight jump, drives
-the rep ceiling; defaults per equipment via `DEFAULT_STEP`), cardio (ids
-prefixed `c_`).
+the rep ceiling; defaults per equipment via `DEFAULT_STEP`), `setup` (the 🔧
+note), cardio (ids prefixed `c_`, `muscle: "Cardio"`).
 
-**Cardio** is logged into a separate `cardio` store (never mixed into lifting
-volume), written at finish *after* the date is chosen so it matches the log.
+**Cardio** lives in a separate `cardio` store, never mixed into lifting volume.
+It is written at finish *after* the date is chosen so it matches the log. In Stats
+it is measured in **minutes per week**, not sets — it is excluded from the
+sets-per-muscle maps and gets its own row and chart.
+
+**Stats scope.** A dropdown (`statScopes()`, `_statScope`) picks current meso /
+any previous meso / this month / this year / all time. A **meso** scope keeps the
+meso-specific panels (adherence, weekly targets, week-by-week, PRs); a **date
+range** turns them off, because they are meaningless outside a single block.
+
+**Mesocycle completion.** Finishing shows a summary (totals, progression, PRs,
+muscle split) with three ways out: repeat, new, archive. The same view opens for
+any past block from the Mesos tab (`showMesoSummary`, `VIEWS.mesosummary`,
+`renderMesoComplete(meso, pos, standalone)`). The volume comparison uses the last
+**non-deload** week so a deload doesn't read as regression.
 
 ---
 
-## Constraints (established, don't re-litigate)
+## 6. Traps that have already bitten
 
-- **No audio, ever.** Rest timer is vibration-only.
+Each of these cost real debugging time. Don't re-learn them.
+
+- **`toISOString()` is UTC.** It shifted early-morning Sydney workouts to the
+  previous day. Always build dates from local components.
+- **Opening the Train tab creates a session.** Its creation timestamp is not when
+  training started. Use the first logged set.
+- **Sorting logs by a user-editable date** created an un-fixable state. Order by
+  creation.
+- **A `??` hint must never hide real data.** An out-of-band prediction once
+  blanked reps the user had typed and logged. Hints are for empty fields only.
+- **jsdom does not fire `popstate` asynchronously** by default, which hid a real
+  back-button bug. Override `history.back` in tests that care.
+- **DOM nodes go stale** after any action that re-renders a card. Re-query.
+- **Fresh installs seed archived starter templates**, so `mesocycles[0]` is not
+  your test meso — call `clearTemplates()`.
+- **Adding an exercise opens the target editor**, so test flows must dismiss it.
+- **Cardio slots have no `sets`**, and were silently polluting the
+  sets-per-muscle targets with a junk row.
+- **The container wipes between sessions.** The tests live in the repo precisely
+  because they were lost once already.
+
+---
+
+## 7. Settled constraints — don't re-litigate
+
+- **No audio, ever.** The rest timer is vibration-only.
 - **Background buzz while the app is closed is impossible** in a PWA. Foreground
   buzz plus catch-up-on-return is what exists.
-- **No backend.** Data is `localStorage`, per-origin, single-device. Migrate
-  between devices via Settings → Export / Import JSON.
-- **No browser storage APIs beyond localStorage**, no external runtime deps.
-- The app icon only refreshes on remove + re-add (OS limitation); code updates
-  propagate automatically.
+- **No backend, no accounts.** Data is `localStorage`, single-device. Migration is
+  Settings → Export/Import JSON.
+- **No browser storage beyond `localStorage`**, no external runtime dependencies,
+  no build step. One file, opens offline, instantly.
+- **Bulk exercise importer: cancelled.**
+- **XSS/CSP hardening: parked** — single-user, no sharing. Revisit only if it
+  goes multi-user.
 
 ---
 
-## Product direction
+## 8. Product direction
 
-The personal app is Matt's own tracker. A separate **market direction** has been
-discussed but not built: a beginner-women-focused version — non-intimidating,
-no jargon, cute, done-for-you plans. Highest-leverage first build would be an
-**onboarding flow** (goal → equipment → experience → "here's your plan").
-Open question: evolve this app vs fork a separate product.
+The app above is the personal tracker. A separate **market direction** has been
+discussed at length but not built: a beginner-women-focused version —
+non-intimidating, no jargon, cute, done-for-you plans. The thesis is
+"RP-grade autoregulation in a warm, jargon-free wrapper", because the market
+rewards *feeling coached*, not the best algorithm.
 
-Deliberately *not* built: exercise demo videos, cloud sync/accounts, social
-feed, wearable HR, a named trainer/coach persona.
+The highest-leverage first build would be an **onboarding flow** (goal →
+equipment → experience → "here's your plan, press start"). Open and unresolved:
+**evolve this app or fork a separate product**, since the two want different
+things (the movement-first naming convention below is great for Matt and slightly
+clinical for a nervous beginner).
+
+Deliberately *not* built: exercise demo videos, cloud sync/accounts, a social
+feed, wearable HR, a named trainer persona. The app must never imply it is
+personalised expert coaching when it is algorithmic defaults.
+
+---
+
+## 9. Parked ideas
+
+- **Exercise naming convention** → movement-first, `Movement - Variation -
+  Equipment` (segments omitted when absent, so "Plank" stays "Plank"), sorted by
+  movement so variations cluster. Structural: add `movement`/`variation`/
+  `equipment` fields and generate the display name. Matt confirmed the format but
+  put it on hold.
+- **RP exercise-library comparison** — a partial list was pasted (cut off at
+  "Back Raise (45 degree)"); the full list is needed. Overlaps with the naming
+  work.
+- **Cardio progression** — cardio is pure logging today; even "last time 25 min
+  @ Z2, try 27" would make it feel programmed.
+- **Bodyweight trend** — tracked and charted, but no trend line or link to
+  training performance.
+- **Exercise demos / setup cues** — the biggest gap for any market version.
 
 ---
 
@@ -161,7 +323,13 @@ Newest first. Add an entry when you ship.
   drops you straight into the first workout.
 - Deload-aware on purpose: the volume comparison uses the last non-deload week,
   so a deload week doesn't read as "you got weaker".
-- Tests: new `TESTS_mesocomplete.js` (29). Suite now **307 / 15 suites**.
+- **Previous blocks are reviewable.** The same summary opens for any past
+  mesocycle: tap an archived block in the Mesos tab (it now shows its workout
+  count and "view summary ›"), or use *View block summary* in the ⋯ menu. In
+  that mode the header reads "Block summary", there's a back route, and the
+  archive action is dropped — but *Run it again* stays. `showMesoSummary(id)`,
+  `VIEWS.mesosummary`, `renderMesoComplete(meso, pos, standalone)`.
+- Tests: new `TESTS_mesocomplete.js` (40). Suite now **318 / 15 suites**.
 
 ### 2026-09-01 (fourth pass — cardio in Stats)
 - **Fixed: cardio logged inside a workout was nearly invisible in Stats.** It
