@@ -336,6 +336,21 @@ personalised expert coaching when it is algorithmic defaults.
 
 Newest first. Add an entry when you ship.
 
+### 2026-09-16 (repo audit — restored a missing test suite)
+- **`TESTS_cardiostats.js` had gone missing from the repo** despite being
+  referenced as shipped in the fourth-pass entry below — the file just wasn't
+  there, so `TESTS_run-all.js` (which discovers suites from the folder) had
+  been silently running one suite short with zero coverage on cardio-in-Stats.
+  Rewrote it: weekly cardio minutes including HR-less sessions and cardio
+  logged inside a workout, the weekly-minutes card appearing/disappearing
+  correctly, scope filtering (current/previous meso, month, year, all-time,
+  including a cardio session with no `mesoId`), skip markers never touching
+  cardio totals, and the sets/minutes-mixing regression (a cardio slot must
+  never leak into the per-muscle sets panel as a sets-based "Cardio" row).
+- Tests: `TESTS_cardiostats.js` restored (15 checks). Suite is genuinely
+  **326 / 16 suites** now — corrects the check count in the entry below,
+  which was written assuming this file already existed.
+
 ### 2026-09-16
 - **Message banks moved to `MESSAGES.txt`.** All 315 Fun-mode messages (rest-over,
   the three welcome-back tiers, cutie titles/messages/footers) now live in a plain
