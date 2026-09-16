@@ -1,0 +1,346 @@
+# Lift Daddy - message banks
+#
+# Edit freely: one message per line under a [SECTION] heading.
+# Blank lines and lines starting with # are ignored.
+# Emoji are fine. Apostrophes and quotes are fine - no escaping needed.
+# Order only matters for CUTIE LEVEL TITLES; the rest are picked at random.
+#
+# AFTER EDITING, RUN:   node MESSAGES_build.js
+# That injects them into index.html. Commit index.html as well.
+# (node TESTS_run-all.js fails if the two drift out of sync.)
+
+[REST OVER]
+# Shown when the rest timer finishes, in Fun mode. Serious mode always says a plain "Rest over - go!" and ignores this list.
+Rest over — slay time, bish 💅
+Break's done, go be iconic 🔥
+Up you get, gorgeous 💪
+Rest's over — back to business, queen 👑
+Enough lounging, hot stuff 😏
+Time's up — show that bar who's boss 💥
+Break over, let's gooo 🚀
+Rest done — reapply that lip gloss and lift 💋
+Chop chop, cutie — next set 💕
+That's enough sitting pretty, superstar ✨
+Rest over — go get 'em, tiger 🐯
+Back to it, babe — you've got this 💪
+Break's up — time to be unstoppable 🔥
+Rest over — let's make it look easy 😌
+Up and at 'em, glamazon 💫
+Done resting — go flex on 'em 💅
+Rest's over, no excuses missy 😤
+Time to move, moneymaker 💰
+Break done — channel your inner beast 🐆
+Rest over — sweat is just sparkle 💦
+Come on legend, next set awaits 🏆
+Enough chilling — go be great 🌟
+Rest's up — make your muscles proud 💪
+Back to work, wonder woman 🦸‍♀️
+Break over — you're built for this, babe 💖
+Rest done — let's raise the bar (literally) 🏋️‍♀️
+Up you get — greatness won't wait ⏰
+Rest over — go on, show off 😏
+Time's up, sweetheart — lift like you mean it 💥
+Break's done — be the main character 🎬
+Rest over — your comeback starts now 🔥
+Enough rest — go collect those gains, hun 💅
+Back at it — the weights missed you 🏋️
+Rest done — strut over and lift 💃
+Break over — you're too fine to quit now 😍
+Up you get — future you says thanks 💕
+Rest's up — go be that girl 💫
+Time to grind, gorgeous 💪
+Break over — sparkle and squat ✨
+Rest done — let's get sweaty and cute 💦
+Come on, cupcake — next set 🧁
+Rest over — flex now, flaunt later 💅
+Enough sitting — go be a force 🌪️
+Back to it — you're on fire today 🔥
+Rest done — the bar's not gonna lift itself, babe 🏋️‍♀️
+Up you get — slay first, rest later 💋
+Break over — make it count, queen 👑
+Rest's up — go get gorgeous and strong 💪
+Time's up — no rest for the fabulous ✨
+Rest over — go be a whole snack 😋
+Break done — you've got unfinished business 💥
+Up and moving, superstar 🌟
+Rest over — dig deep, diva 💎
+Enough lounging — go earn that glow ✨
+Back to work — you're a machine (a cute one) 🤖
+Rest done — lift heavy, look pretty 💅
+Break's up — go make magic 🪄
+Rest over — you didn't come here to sit, babe 😏
+Up you get — greatness is calling 📞
+Time to move it, hot mumma 🔥
+Rest done — go show that weight who's queen 👑
+Break over — sweat now, shine forever ✨
+Come on, gorgeous — one more won't kill you (probably) 😅
+Rest's up — go be undeniable 💫
+Enough rest — your gains are waiting 💪
+Back at it — you're doing amazing, sweetie 💕
+Rest over — lift like everyone's watching 👀
+Up you get — be bold, be strong, be you ✨
+Break done — time to flex, cutie 💪
+Rest over — go crush it, buttercup 🌼
+Time's up — the grind looks good on you 🔥
+Rest done — channel that boss energy 💼
+Break over — go be a little unstoppable 🚀
+Up you get — you're stronger than yesterday 💪
+Rest over — make those muscles work, missy 😤
+Come on, queen — reign over that rack 👑
+Rest's up — go get 'em, glamazon 💅
+Enough chilling — heat things up 🔥
+Back to it — you gorgeous powerhouse 💥
+Rest done — slay the set, sip the water 💦
+Break over — go be iconic (again) ✨
+Up you get — the bar believes in you 🏋️
+Rest over — flex those fabulous muscles 💪
+Time to move, darling — greatness awaits 🌟
+Rest done — go be a hot little legend 🔥
+Break's up — you've got this in the bag, babe 💼
+Come on, cutie — next set, no drama 💅
+Rest over — strong is your best accessory 💎
+Enough rest — go earn your smoothie 🥤
+Back at it — you're literally that girl 💫
+Rest done — lift now, brag later 😏
+Up you get — sparkle through the pain ✨
+Break over — go make it look effortless 😌
+Rest's up — be fierce, be fabulous, be done resting 🔥
+Time to shine — go get 'em, gorgeous 💖
+Rest over — slay, hydrate, repeat 💦
+Break done — go be a bad girl (at the gym) 😈
+Rest over — your muscles called, they want more 📞
+Up you get — cute is temporary, strong is forever 💪
+Rest's up — go be the moment, babe ✨
+
+[WELCOME BACK - 3 TO 5 DAYS]
+# Cutie layer (Fun mode + Female). A short break - playful, treat the rest as earned.
+Lets go babe — even princesses need a rest 👑
+Well well well… look who's back 💅
+Missed you! The weights were getting lonely 🥺
+Rest was earned. Now let's earn the pump 💪
+Back at it, gorgeous — pick up where you left off ✨
+Little break, big comeback. Let's go 🔥
+Your dumbbells have been asking about you 😏
+Recharged and ready? Let's make it count 💖
+A few days off looks good on you. Now move 💫
+Rested, glowing, dangerous. Let's train 😈
+
+[WELCOME BACK - 6 TO 13 DAYS]
+# A longer gap - comeback energy, still light.
+Okay queen, the throne's been empty a minute 👑
+Not gone, just on a strategic break 😌 welcome back!
+The gym called. It wants its favourite back 📞
+Long rest, longer comeback. Let's build 💪
+You're back and that's the hardest part done ✨
+Dust off those trainers, gorgeous — we're going 🥿
+No guilt, just go. Today's a great day to restart 💕
+Comeback szn officially open 🎬
+Muscle memory is real, babe. It's still in there 🧠
+Week off? Consider it a deload. Back to it 😉
+
+[WELCOME BACK - 14 DAYS OR MORE]
+# A long gap. Keep these the KINDEST of the three: they already did the hard part by opening the app. No guilt-tripping.
+Hey stranger 💖 no judgement, just glad you're here
+The best time to start was then. Second best is now ⏰
+You showed up. That already puts you ahead 👏
+Fresh start, clean slate, same strong girl ✨
+It's been a while — let's go gentle and rebuild 🌱
+No lectures, just excitement that you're back 🥳
+Start light, start today. Future you says thanks 💕
+Long time no lift! Let's ease back in, gorgeous 💫
+Every comeback starts with one session. This one 🔥
+Welcome back, legend. Let's rewrite the story 📖
+
+[CUTIE LEVEL TITLES]
+# Levelling titles on the Stats cutie card, EASIEST FIRST - order matters, they unlock in sequence as training adds up.
+Gym Cutie
+Hot Mumma
+Fit Queen
+Strong Sweetheart
+Iron Angel
+Barbell Baddie
+Snack with Muscles
+Certified Powerpuff
+Dumbbell Darling
+Glute Goddess
+
+[CUTIE STATS MESSAGES]
+# Rotating encouragement on the Stats cutie card.
+OMG you're crushing it 💅
+Look at you, absolute unit (affectionate) 🥰
+Strong girl summer is ON 🌞
+Hot mumma in the making 🔥
+Certified gym cutie behaviour 💖
+Your future self is blowing you kisses 😘
+Snack today, whole meal by week 6 😋
+Booked, busy, and buff 💪
+Slaying reps like it's your job 💃
+Queen behaviour, frankly 👑
+That glow? It's the gains talking ✨
+Unbothered, moisturised, mid-set 💧
+You + those weights = iconic duo 🏋️‍♀️
+Barbell said thank you 🏋️
+Serving strength and cuteness 💅
+Main character energy today 🎬
+She lifts AND she sparkles ✨
+Pilates girls could never (jk love them) 😌
+Confidence level: post-workout 🌟
+You're literally so that girl 💕
+Baddie with a training plan 📋
+The bar feared you today 😤
+Cardio conquered, cutie confirmed 🫶
+Making it look easy, show-off 😍
+Strong is your color 💖
+Little sore, very iconic 🥹
+Reps done, vibes immaculate ✨
+Certified stronger than yesterday 📈
+You showed up — that's the flex 🌸
+Sweaty and adorable, balanced 💦
+Powerpuff energy fully charged ⚡
+Yeah you did that 💁‍♀️
+Glow up in progress, please hold ⏳
+Muscles: cute. Discipline: cuter 🥰
+Gym besties would be proud 👯‍♀️
+Serving looks and lifts 💋
+The plan is planning, queen 👑
+Strong hands, soft heart 💗
+You make effort look effortless 😎
+Another one for the highlight reel 🎞️
+Fit, fine, and thriving 🌺
+Weights lifted, standards higher 📊
+Cutie with a mean deadlift 😈
+Consistency looks gorgeous on you 💐
+She came, she saw, she squatted 🍑
+Delulu is the solulu and it's working 😌
+Zero because you're perfect (jk, effort counts) 💯
+Big lifts, bigger sparkle ✨
+Sore muscles, soaring confidence 🚀
+Bra you're literally an athlete now 🏅
+Sweat is just cute glitter 💫
+Booty by barbell, brains by you 🍑
+The gym missed you, welcome back 🫶
+Tiny wins stack into big glow 🌟
+Effort logged, cuteness noted 📝
+You're the moment, always 💖
+Strong girl, soft life 🌸
+Absolute powerhouse in lip gloss 💄
+Reps for the plot 🎬
+She's built different (cutely) 🧁
+Making gains and taking names 📛
+Fabulous form, flirty finish 😘
+One workout closer to unstoppable 🚀
+Certified fine and functional 💪
+Your consistency is so hot 🔥
+Queen of showing up 👑
+Cuteness aggression at the squat rack 🥹
+You lifted that?? Iconic 😳
+Strong today, softer sleep tonight 😴
+Little legend behaviour 🏆
+Gym glow hits different on you ✨
+Proud of you, no notes 💕
+Serving protein-powered radiance 🥤
+Fit queen, reporting for duty 🫡
+That's a wrap, gorgeous 🎀
+
+[CUTIE FOOTERS]
+# Small rotating footer lines under the cutie card.
+You got this, babe 💕
+Damn, you're gonna look good this summer 😏🔥
+Keep going, gorgeous 💋
+Summer body loading… 🩱✨
+She's on a mission 💅
+Trust the process, hot stuff 😘
+Every rep's a little glow-up 🌟
+Sexy never took a rest day 😉
+Future you is already obsessed 💖
+Making it look too easy 😌
+The grind looks good on you 🔥
+Soft life, strong body 🌸
+You're that girl, keep proving it 💫
+One workout closer to unstoppable 🚀
+Confidence is your cardio 💃
+Glow different, lift heavier 😍
+Sweat now, sparkle always ✨
+Babe, you're built for this 💪
+Look at you being consistent 🥰
+Effort this cute should be illegal 😈
+Snatched and self-made 💅
+Hot girl workout complete 🔥
+Strong is the new pretty 💖
+Serving body-ody-ody 🎶
+Bikini season won't know what hit it 🩱
+Little sweat, big glow ✨
+You're literally goals 😍
+Keep that fine form 💋
+Muscle mommy in training 💪
+Beach ready and unbothered 🏖️
+Do it for the summer selfies 📸
+She lifts, she slays, she leaves 💅
+That post-gym glow is unreal ✨
+Getting hotter by the session 🔥
+You're a whole snack, keep cooking 😋
+Discipline is so attractive on you 😘
+Glutes of steel incoming 🍑
+Werk it, queen 👑
+Your confidence is showing (good) 💫
+Toned and totally that girl 💕
+Sweat is just liquid confidence 💦
+Give them something to stare at 😏
+Strong arms, softer life 🌸
+Summer you says thank you ☀️
+Keep slaying, sweetheart 💖
+Fine wine only gets better 🍷
+Built by burpees and bad-assery 💪
+Radiating main-character energy 🎬
+You're a certified stunner 😍
+Lift like nobody's watching 🏋️‍♀️
+Cardio queen, take a bow 👑
+Cute now, unstoppable soon 🚀
+Sculpting the summer silhouette ✨
+You make sweat look sexy 😘
+Progress looks gorgeous on you 📈
+Keep blooming, babe 🌷
+Fierce, fit, and flirty 😈
+One more rep, future baddie 🔥
+So hot it's basically cardio 🥵
+Glow up in full swing 💫
+She came to slay, not to play 💅
+Your dedication is stunning 😍
+Making magic in leggings ✨
+Strong girl, soft heart, hot bod 💗
+Keep that streak sizzling 🔥
+Poolside confident already 🏊‍♀️
+You're doing amazing, sweetie 💕
+Toned goddess in the making 👑
+Serving looks and squats 🍑
+Sweat today, slay tomorrow 💦
+Gorgeous inside and out 💖
+Keep being iconic, babe 💫
+Summer fling? No, summer strong ☀️
+You're the upgrade 💅
+Effortlessly becoming that girl 😌
+Flex now, flaunt later 💪
+Cute face, strong pace 🏃‍♀️
+Your glow could power a city ✨
+Keep cooking, hot stuff 🔥
+She's soft but she squats heavy 🍑
+Beach body? You're the whole ocean 🌊
+Getting fitter and finer daily 😍
+Own it, gorgeous 💋
+Sweaty selfie worthy 📸
+Strong is undeniably sexy 😏
+Keep that momentum, mama 💕
+You're glowing, keep going 🌟
+Fit, fabulous, and ferocious 🔥
+Little legend, big glow ✨
+Confidence level: main character 🎬
+Bloom into that summer baddie 🌸
+You + consistency = dangerous (cute) 💫
+Serving strength with a wink 😉
+Keep being deliciously disciplined 😋
+Hotter than your pre-workout 🔥
+Radiant, resilient, ravishing 💖
+Summer's gonna be jealous ☀️
+Keep shining, snack queen 👑
+Unbothered, moisturised, mid-squat 🍑
+Certified fine and functional 💅

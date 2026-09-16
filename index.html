@@ -1582,11 +1582,16 @@ VIEWS.mesos=function(sub){
         <button class="iconbtn" data-menu="${m.id}" aria-label="Mesocycle options">⋯</button></div>`;
     }).join(""):`<div class="empty">No ${term("Mesos").toLowerCase()} yet.<br>Build your first training block.</div>`}
     ${st.mesocycles.some(m=>m.archived)? `<h3 style="margin:18px 2px 10px;color:var(--faint)">Archived</h3>`+
-      st.mesocycles.filter(m=>m.archived).map(m=>`<div class="listitem" style="opacity:.6" data-id="${m.id}">
-        <div class="grow"><div class="title">${esc(m.name)}</div>
-        <div class="muted num">${m.weeks} wks · ${m.days.length} days/wk</div></div>
-        <button class="iconbtn" data-menu="${m.id}" aria-label="Options">⋯</button></div>`).join(""):""}`;
+      st.mesocycles.filter(m=>m.archived).map(m=>{
+        const n=st.logs.filter(l=>l.mesoId===m.id && !l.skipped).length;
+        return `<div class="listitem" style="opacity:.75" data-id="${m.id}">
+        <div class="grow" ${n?`data-summary="${m.id}" style="cursor:pointer"`:""}>
+          <div class="title">${esc(m.name)}</div>
+          <div class="muted num">${m.weeks} wks · ${m.days.length} days/wk${n?` · ${n} workout${n>1?"s":""} · view summary ›`:" · never started"}</div></div>
+        <button class="iconbtn" data-menu="${m.id}" aria-label="Options">⋯</button></div>`;}).join(""):""}`;
   $("#view").onclick=e=>{
+    const sum=e.target.closest("[data-summary]");
+    if(sum){ showMesoSummary(sum.dataset.summary); return; }
     const menu=e.target.closest("[data-menu]");
     if(menu){ mesoMenu(menu.dataset.menu); return; }
     if(e.target.closest("[data-act='new']")){ editMeso(null); return; }
@@ -1600,6 +1605,8 @@ function mesoMenu(id){
       ? `<button class="btn btn-danger" data-a="endmeso">End mesocycle</button>`
       : `<button class="btn btn-ghost" data-a="activate">Set as active</button>
          <button class="btn btn-ghost" data-a="archive">${m.archived?"Unarchive":"Archive"}</button>`}
+    ${S().logs.some(l=>l.mesoId===m.id && !l.skipped)
+      ? `<button class="btn btn-ghost" data-a="summary">View block summary</button>`:""}
     <button class="btn btn-primary" data-a="repeat">Repeat this ${term("meso")} again</button>
     <button class="btn btn-ghost" data-a="dup">Duplicate mesocycle</button>
     <button class="btn btn-ghost" data-a="export">Export as JSON</button>
@@ -1628,6 +1635,7 @@ function mesoMenu(id){
         return;
       }
       if(a==="archive"){ m.archived=!m.archived; Store.save(); }
+      if(a==="summary"){ closeModal(); showMesoSummary(m.id); return; }
       if(a==="repeat"){ closeModal(); repeatMeso(m.id); return; }
       if(a==="dup"){
         const c=JSON.parse(JSON.stringify(m)); c.id=uid(); c.name=m.name+" (copy)";
@@ -2449,12 +2457,27 @@ function mesoSummary(meso){
           start, end: logs.length? logs[logs.length-1].date : null,
           adherence: pos.total? Math.round(100*pos.done/pos.total) : null};
 }
-function renderMesoComplete(meso, pos){
+/** Show the block summary for any mesocycle, finished or not, from the Mesos tab. */
+function showMesoSummary(id){
+  const m=mesoById(id); if(!m) return;
+  _summaryMesoId=id;
+  go("mesosummary");
+}
+let _summaryMesoId=null;
+VIEWS.mesosummary=function(){
+  const m=mesoById(_summaryMesoId);
+  if(!m){ go("mesos"); return; }
+  renderMesoComplete(m, mesoPosition(m), true);
+};
+function renderMesoComplete(meso, pos, standalone){
   const s=mesoSummary(meso), t=s.t;
   const topMuscles=Object.entries(s.perMuscle).sort((a,b)=>b[1]-a[1]).slice(0,5);
   $("#view").innerHTML=`
-    <div class="topbar"><div><h1>${FUN()?"Block done 🎉":"Mesocycle complete"}</h1>
-      <div class="top-sub">${esc(meso.name)}${s.start?` · ${fmtDate(s.start)} – ${fmtDate(s.end)}`:""}</div></div></div>
+    <div class="topbar">
+      ${standalone?`<button class="iconbtn" data-mc="back" aria-label="Back">‹</button>`:""}
+      <div style="flex:1"><h1>${standalone? "Block summary" : (FUN()?"Block done 🎉":"Mesocycle complete")}</h1>
+      <div class="top-sub">${esc(meso.name)}${s.start?` · ${fmtDate(s.start)} – ${fmtDate(s.end)}`:""}${
+        standalone && !pos.finished?` · in progress`:""}</div></div></div>
 
     <div class="card ${cutieOn()?"cutie-card":""}" style="margin-bottom:14px">
       <div class="kicker">What you did</div>
@@ -2500,8 +2523,10 @@ function renderMesoComplete(meso, pos){
       <div class="kicker">What's next</div>
       <div class="stack" style="margin-top:10px">
         <button class="btn btn-primary" data-mc="repeat">Run it again${FUN()?" 💪":""}</button>
-        <button class="btn btn-ghost" data-mc="new">Build a new ${term("meso")}</button>
-        <button class="btn btn-ghost" data-mc="archive">Archive &amp; finish here</button>
+        ${standalone
+          ? `<button class="btn btn-ghost" data-mc="back">Back to ${term("mesoNav")}</button>`
+          : `<button class="btn btn-ghost" data-mc="new">Build a new ${term("meso")}</button>
+             <button class="btn btn-ghost" data-mc="archive">Archive &amp; finish here</button>`}
       </div>
       <p class="faint" style="margin:10px 0 0">Running it again starts at week-2 volume and carries your
         loads forward, so you pick up where this block left off.</p>
@@ -2510,6 +2535,7 @@ function renderMesoComplete(meso, pos){
     const a=e.target.closest("[data-mc]")?.dataset.mc; if(!a) return;
     if(a==="repeat"){ repeatMeso(meso.id); return; }
     if(a==="new"){ go("mesos","new"); return; }
+    if(a==="back"){ go("mesos"); return; }
     if(a==="archive"){ meso.archived=true; if(S().activeMesoId===meso.id) S().activeMesoId=null;
       Store.save(); Store.flush(); toast("Archived"); go("mesos"); return; }
   };
@@ -3856,34 +3882,93 @@ function returnMessage(days){
   return bank[Math.floor(Math.random()*bank.length)];
 }
 function cutieOn(){ return FUN() && (S().profile?.gender==="Female"); }
-const CUTIE_TITLES=["Gym Cutie","Hot Mumma","Fit Queen","Strong Sweetheart","Iron Angel","Barbell Baddie","Snack with Muscles","Certified Powerpuff","Dumbbell Darling","Glute Goddess"];
+const CUTIE_TITLES=[
+ "Gym Cutie",
+ "Hot Mumma",
+ "Fit Queen",
+ "Strong Sweetheart",
+ "Iron Angel",
+ "Barbell Baddie",
+ "Snack with Muscles",
+ "Certified Powerpuff",
+ "Dumbbell Darling",
+ "Glute Goddess"];
 const CUTIE_MSGS=[
- "OMG you're crushing it 💅","Look at you, absolute unit (affectionate) 🥰","Strong girl summer is ON 🌞",
- "Hot mumma in the making 🔥","Certified gym cutie behaviour 💖","Your future self is blowing you kisses 😘",
- "Snack today, whole meal by week 6 😋","Booked, busy, and buff 💪","Slaying reps like it's your job 💃",
- "Queen behaviour, frankly 👑","That glow? It's the gains talking ✨","Unbothered, moisturised, mid-set 💧",
- "You + those weights = iconic duo 🏋️‍♀️","Barbell said thank you 🏋️","Serving strength and cuteness 💅",
- "Main character energy today 🎬","She lifts AND she sparkles ✨","Pilates girls could never (jk love them) 😌",
- "Confidence level: post-workout 🌟","You're literally so that girl 💕","Baddie with a training plan 📋",
- "The bar feared you today 😤","Cardio conquered, cutie confirmed 🫶","Making it look easy, show-off 😍",
- "Strong is your color 💖","Little sore, very iconic 🥹","Reps done, vibes immaculate ✨",
- "Certified stronger than yesterday 📈","You showed up — that's the flex 🌸","Sweaty and adorable, balanced 💦",
- "Powerpuff energy fully charged ⚡","Yeah you did that 💁‍♀️","Glow up in progress, please hold ⏳",
- "Muscles: cute. Discipline: cuter 🥰","Gym besties would be proud 👯‍♀️","Serving looks and lifts 💋",
- "The plan is planning, queen 👑","Strong hands, soft heart 💗","You make effort look effortless 😎",
- "Another one for the highlight reel 🎞️","Fit, fine, and thriving 🌺","Weights lifted, standards higher 📊",
- "Cutie with a mean deadlift 😈","Consistency looks gorgeous on you 💐","She came, she saw, she squatted 🍑",
- "Delulu is the solulu and it's working 😌","Zero because you're perfect (jk, effort counts) 💯","Big lifts, bigger sparkle ✨",
- "Sore muscles, soaring confidence 🚀","Bra you're literally an athlete now 🏅","Sweat is just cute glitter 💫",
- "Booty by barbell, brains by you 🍑","The gym missed you, welcome back 🫶","Tiny wins stack into big glow 🌟",
- "Effort logged, cuteness noted 📝","You're the moment, always 💖","Strong girl, soft life 🌸",
- "Absolute powerhouse in lip gloss 💄","Reps for the plot 🎬","She's built different (cutely) 🧁",
- "Making gains and taking names 📛","Fabulous form, flirty finish 😘","One workout closer to unstoppable 🚀",
- "Certified fine and functional 💪","Your consistency is so hot 🔥","Queen of showing up 👑",
- "Cuteness aggression at the squat rack 🥹","You lifted that?? Iconic 😳","Strong today, softer sleep tonight 😴",
- "Little legend behaviour 🏆","Gym glow hits different on you ✨","Proud of you, no notes 💕",
- "Serving protein-powered radiance 🥤","Fit queen, reporting for duty 🫡","That's a wrap, gorgeous 🎀"
-];
+ "OMG you're crushing it 💅",
+ "Look at you, absolute unit (affectionate) 🥰",
+ "Strong girl summer is ON 🌞",
+ "Hot mumma in the making 🔥",
+ "Certified gym cutie behaviour 💖",
+ "Your future self is blowing you kisses 😘",
+ "Snack today, whole meal by week 6 😋",
+ "Booked, busy, and buff 💪",
+ "Slaying reps like it's your job 💃",
+ "Queen behaviour, frankly 👑",
+ "That glow? It's the gains talking ✨",
+ "Unbothered, moisturised, mid-set 💧",
+ "You + those weights = iconic duo 🏋️‍♀️",
+ "Barbell said thank you 🏋️",
+ "Serving strength and cuteness 💅",
+ "Main character energy today 🎬",
+ "She lifts AND she sparkles ✨",
+ "Pilates girls could never (jk love them) 😌",
+ "Confidence level: post-workout 🌟",
+ "You're literally so that girl 💕",
+ "Baddie with a training plan 📋",
+ "The bar feared you today 😤",
+ "Cardio conquered, cutie confirmed 🫶",
+ "Making it look easy, show-off 😍",
+ "Strong is your color 💖",
+ "Little sore, very iconic 🥹",
+ "Reps done, vibes immaculate ✨",
+ "Certified stronger than yesterday 📈",
+ "You showed up — that's the flex 🌸",
+ "Sweaty and adorable, balanced 💦",
+ "Powerpuff energy fully charged ⚡",
+ "Yeah you did that 💁‍♀️",
+ "Glow up in progress, please hold ⏳",
+ "Muscles: cute. Discipline: cuter 🥰",
+ "Gym besties would be proud 👯‍♀️",
+ "Serving looks and lifts 💋",
+ "The plan is planning, queen 👑",
+ "Strong hands, soft heart 💗",
+ "You make effort look effortless 😎",
+ "Another one for the highlight reel 🎞️",
+ "Fit, fine, and thriving 🌺",
+ "Weights lifted, standards higher 📊",
+ "Cutie with a mean deadlift 😈",
+ "Consistency looks gorgeous on you 💐",
+ "She came, she saw, she squatted 🍑",
+ "Delulu is the solulu and it's working 😌",
+ "Zero because you're perfect (jk, effort counts) 💯",
+ "Big lifts, bigger sparkle ✨",
+ "Sore muscles, soaring confidence 🚀",
+ "Bra you're literally an athlete now 🏅",
+ "Sweat is just cute glitter 💫",
+ "Booty by barbell, brains by you 🍑",
+ "The gym missed you, welcome back 🫶",
+ "Tiny wins stack into big glow 🌟",
+ "Effort logged, cuteness noted 📝",
+ "You're the moment, always 💖",
+ "Strong girl, soft life 🌸",
+ "Absolute powerhouse in lip gloss 💄",
+ "Reps for the plot 🎬",
+ "She's built different (cutely) 🧁",
+ "Making gains and taking names 📛",
+ "Fabulous form, flirty finish 😘",
+ "One workout closer to unstoppable 🚀",
+ "Certified fine and functional 💪",
+ "Your consistency is so hot 🔥",
+ "Queen of showing up 👑",
+ "Cuteness aggression at the squat rack 🥹",
+ "You lifted that?? Iconic 😳",
+ "Strong today, softer sleep tonight 😴",
+ "Little legend behaviour 🏆",
+ "Gym glow hits different on you ✨",
+ "Proud of you, no notes 💕",
+ "Serving protein-powered radiance 🥤",
+ "Fit queen, reporting for duty 🫡",
+ "That's a wrap, gorgeous 🎀"];
 function cutieScore(logs, meso){
   // encouragement-only: workouts + streak + volume + cardio, never penalised.
   const workouts=logs.length;

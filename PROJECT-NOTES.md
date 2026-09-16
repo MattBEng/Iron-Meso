@@ -39,6 +39,8 @@ Everything is flat in the repo root. There are no subfolders and no build step.
 | `icon-*.png` | App icons (coral "LD"), including maskable variants. |
 | `PROJECT-NOTES.md` | This file. |
 | `PROGRESSION-MODEL.md` | **The science behind the progression maths** — equations, evidence, worked examples, the "??" band, the jump-aware ceiling. Read before touching the engine. |
+| `MESSAGES.txt` | **All the cute/Fun-mode message banks, in plain text.** Edit this, not `index.html`. |
+| `MESSAGES_build.js` | Injects `MESSAGES.txt` into `index.html`. Run after editing messages. |
 | `TESTS_*.js` | Test suite, flat in the root. `TESTS_lib.js` is the harness, `TESTS_run-all.js` the runner, the rest are suites. See `TESTS_README.md`. |
 
 There is **no `manifest.json`** — the PWA manifest is embedded in `index.html`
@@ -53,9 +55,10 @@ as a `data:` URI. Don't go looking for it.
 1. Make the change in `index.html`.
 2. Check the JavaScript still parses (see below) — a syntax error bricks the
    whole app, and it is one file.
-3. Run the tests: `node TESTS_run-all.js`.
-4. Bump the `BUILD` stamp in `sw.js`.
-5. Hand over `index.html` + `sw.js` (+ any test/doc files) to be committed.
+3. If you edited `MESSAGES.txt`, run `node MESSAGES_build.js`.
+4. Run the tests: `node TESTS_run-all.js`.
+5. Bump the `BUILD` stamp in `sw.js`.
+6. Hand over `index.html` + `sw.js` (+ any test/doc files) to be committed.
 
 ### Checking the JS parses
 
@@ -105,6 +108,30 @@ re-render, clearing seeded templates, the three-step finish flow, jsdom not
 firing `popstate` asynchronously). **Read it before writing a test.**
 
 Add a suite as `TESTS_<area>.js` in the root; the runner discovers it.
+
+### Changing the cute / Fun-mode messages
+
+All the message banks live in **`MESSAGES.txt`** — rest-over lines, the three
+welcome-back tiers, cutie titles, stats messages and footers. Plain text, one
+message per line under a `[SECTION]` heading, `#` for comments. Emoji,
+apostrophes and quotes all work with no escaping.
+
+```bash
+# edit MESSAGES.txt, then:
+node MESSAGES_build.js          # writes them into index.html
+node MESSAGES_build.js --check  # report drift without changing anything
+```
+
+`MESSAGES.txt` is the **source of truth**; `index.html` is generated from it.
+Don't hand-edit the banks in `index.html` — the next build overwrites them.
+
+Why a build step rather than loading a text file at runtime: the app is one
+self-contained offline file (§7), so it can't fetch anything. The injector keeps
+the messages editable without breaking that. **`TESTS_messages.js` fails if you
+edit the text and forget to rebuild**, so the gap can't ship silently.
+
+Order only matters for `CUTIE LEVEL TITLES` (they unlock in sequence,
+easiest first). Everything else is picked at random.
 
 ### Deploying
 
@@ -308,6 +335,20 @@ personalised expert coaching when it is algorithmic defaults.
 ## Changelog
 
 Newest first. Add an entry when you ship.
+
+### 2026-09-16
+- **Message banks moved to `MESSAGES.txt`.** All 315 Fun-mode messages (rest-over,
+  the three welcome-back tiers, cutie titles/messages/footers) now live in a plain
+  text file, one per line under `[SECTION]` headings. `MESSAGES_build.js` injects
+  them into `index.html`; `--check` reports drift. The app stays a single
+  self-contained offline file, so a runtime fetch wasn't an option.
+- **`TESTS_messages.js` (27 checks)** guards it: fails if the text file and the app
+  drift apart, and validates every bank for blanks and duplicates.
+- **`PROJECT-NOTES.md` rewritten as a handover doc** — added *How to work on this*
+  (the patch recipe with its all-or-nothing guard, the JS syntax check, the test
+  and deploy loop) and *Traps that have already bitten*. Verified by following it
+  from a folder containing only the repo files.
+- Suite now **345 / 16 suites**.
 
 ### 2026-09-01 (fifth pass — mesocycle completion)
 - **Finishing a block now has an ending.** It used to dead-end on one line

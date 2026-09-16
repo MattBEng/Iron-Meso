@@ -26,6 +26,7 @@ node TESTS_ramp.js         # run one suite
 | `TESTS_integrity.js` | Export/import round-trip, checksum tampering, legacy imports, schema migration, corrupt-state rejection |
 | `TESTS_edge.js` | Empty states, set add/duplicate/delete, input clamping, empty-workout discard, timed exercises not polluting lifting stats |
 | `TESTS_loadrep.js` | Load–rep prediction accuracy, the "??" trusted band, per-exercise weight steps, the jump-aware rep ceiling, never-both-at-once, live re-prediction |
+| `TESTS_messages.js` | Message banks — MESSAGES.txt/index.html sync, no blanks or duplicates, pickers still resolve |
 | `TESTS_mesocomplete.js` | Mesocycle completion summary — totals, progression readout, PRs, and repeat/new/archive |
 | `TESTS_cardiostats.js` | Cardio in Stats — weekly minutes, HR-less sessions, scope filtering, no sets/minutes mixing |
 | `TESTS_statscope.js` | Stats scope selector — meso/month/year/all-time filtering and the totals card |
