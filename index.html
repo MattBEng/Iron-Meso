@@ -1003,7 +1003,9 @@ class ProgressionEngine{
     // full success, not a "missed 14 twice".
     const exp=s=>s.expReps??targetReps;
     const hitAll   = work.every(s=>s.reps>=exp(s));
-    const hitMost  = work.filter(s=>s.reps>=exp(s)).length >= Math.ceil(work.length*0.67);
+    // two thirds of the sets, rounded up: 0.67 made this 3-of-3 for a 3-set
+    // exercise, so "most sets" could never fire and one short rep deloaded you
+    const hitMost  = work.filter(s=>s.reps>=exp(s)).length >= Math.ceil(work.length*2/3);
     const nearAll  = work.every(s=>s.reps>=exp(s)-1);
     const avgRIR   = work.reduce((t,s)=>t+s.rir,0)/work.length;
     const minRIR   = Math.min(...work.map(s=>s.rir));
@@ -1025,18 +1027,24 @@ class ProgressionEngine{
     const bodyweight = !!(ex && ex.equipment==="Bodyweight") && lastKg===0;
     if(bodyweight){
       const avgReps=Math.round(work.reduce((t,s)=>t+s.reps,0)/work.length);
-      let repTarget=targetReps, reason;
+      // What was actually ASKED last time — the plan's target is fixed for the
+      // whole block, so rebuilding from it can never come down to meet you.
+      const lastAsk=Math.max(...work.map(s=>s.expReps??targetReps));
+      let repTarget=lastAsk, reason;
       if(hitAll && avgRIR>targetRIR && minRIR>=targetRIR){
-        repTarget = (recovMod===0? targetReps : avgReps + (recovMod===1?2:1));
+        repTarget = (recovMod===0? lastAsk : avgReps + (recovMod===1?2:1));
         reason = recovMod===0? "Strong, but recovery is poor — hold the rep target."
                : "Beat the target with reps to spare — aim for more reps.";
       } else if(hitAll){
-        repTarget = recovMod===0? targetReps : avgReps+1;
+        repTarget = recovMod===0? lastAsk : avgReps+1;
         reason = "Hit the target — add a rep next time.";
       } else if(hitMost && nearAll){
-        repTarget = targetReps; reason="Most sets there — repeat and complete every rep.";
+        repTarget = lastAsk; reason="Most sets there — repeat and complete every rep.";
       } else {
-        repTarget = Math.max(1, targetReps-1); reason="Short of target — drop a rep and rebuild.";
+        // Rebuild from what you MANAGED, not the plan minus one, or a target you
+        // keep missing just sits there forever.
+        repTarget = clamp(avgReps, 1, lastAsk);
+        reason = `Short of target — rebuild from ${repTarget} across all sets.`;
       }
       return {kg:0, lastKg:0, diff:0, reps:repTarget, bodyweight:true, reason,
         lastSummary:`bodyweight × ${work.map(s=>s.reps).join("/")} @~${Math.round(avgRIR*10)/10}RIR`};
@@ -1064,7 +1072,7 @@ class ProgressionEngine{
         reason:`Held ${dispW(lastKg)}${unitLabel()} last time — aim for ${repTarget} reps.`,
         lastSummary:`${dispW(lastKg)}${unitLabel()} × ${work.map(s=>s.reps).join("/")} @~${Math.round(avgRIR*10)/10}RIR`};
     }
-    let kg=lastKg, reason;
+    let kg=lastKg, reason, repeatReps=false;
     if(hitAll && avgRIR>targetRIR && minRIR>=targetRIR){
       if(recovMod===1){ kg=lastKg+bigInc; reason=assisted?"All sets strong — drop the assistance a notch.":"All sets beat target with reps in reserve — add load."; }
       else if(recovMod===.5){ kg=lastKg+smallInc; reason=assisted?"Strong sets, but recovery is poor — small assistance drop.":"All sets beat target, but recovery is poor — smaller jump."; }
@@ -1074,6 +1082,12 @@ class ProgressionEngine{
       else { reason="Target met at the limit — repeat this."; }
     } else if(hitMost && nearAll){
       reason="Most sets hit target — repeat and complete every set.";
+    } else if(work.every(s=>s.reps>=targetReps)){
+      // Every set cleared the PLAN's target; only the stretch ghost (last week's
+      // reps + 1) was missed. That is a plateau, not a failed session — holding
+      // the load beats deloading someone who just did more than the plan asked.
+      kg=lastKg; repeatReps=true;
+      reason=`Cleared your ${targetReps}-rep target but not the extra rep — repeat ${dispW(lastKg)}${unitLabel()} and beat it.`;
     } else {
       // fell short: assisted → ADD assistance (easier); normal → back off load
       kg = assisted? lastKg*(1+st.backoffPct/100) : lastKg*(1-st.backoffPct/100);
@@ -1083,7 +1097,7 @@ class ProgressionEngine{
     kg=Math.round(kg*100)/100;
     if(assisted) kg=Math.max(0,kg);      // can't have negative assistance
     const bs=last.best;
-    return {kg, lastKg, diff:Math.round((kg-lastKg)*100)/100, reason,
+    return {kg, lastKg, repeatReps, diff:Math.round((kg-lastKg)*100)/100, reason,
       lastSummary:`${dispW(lastKg)}${unitLabel()} × ${work.map(s=>s.reps).join("/")} @~${Math.round(avgRIR*10)/10}RIR`};
   }
 }
@@ -2150,7 +2164,7 @@ function buildGhostRows(exId, count, kg, targetReps, rir, sug, deload){
   return Array.from({length:count},(_,i)=>{
     const base=work.length? work[Math.min(i,work.length-1)].reps : targetReps;
     let reps;
-    if(heldWeight) reps=base+1;                              // same load -> one more rep
+    if(heldWeight) reps = sug.repeatReps? base : base+1;      // same load -> one more rep (unless repeating)
     else {
       const pred=repsAtLoad(sug.lastKg, base, kg);           // heavier -> fewer reps
       reps = pred!==null? pred : Math.max(1, base-Math.round(base*0.15));
@@ -2160,6 +2174,44 @@ function buildGhostRows(exId, count, kg, targetReps, rir, sug, deload){
   });
 }
 /** Older sessions stored steppers + a grow-only sets array; upgrade in place. */
+/* Point a session exercise at a different exercise (Replace exercise, or a
+   library edit that changed what it is). Set count, RIR, rest and notes carry
+   over; everything DERIVED from the exercise has to be rebuilt — bodyweight
+   rows, timed holds, the cardio card, the load suggestion — or a dumbbell
+   movement inherits the "BW" rows of the push-ups it replaced. */
+function retargetSessionExercise(ses, newId, edit){
+  const ex=exById(newId);
+  const n=Math.max(1, (ses.sets&&ses.sets.length) || ses.target?.sets || 3);
+  const rir=ses.target?.rir ?? 2;
+  const rest=ses.target?.rest ?? S().settings.restDefault;
+  const notes=ses.target?.notes || "";
+  const keptReps=ses.target?.reps || 10;
+  ses.exerciseId=newId;
+  ses.holdWeight=false;
+  delete ses.bodyweight; delete ses.timed; delete ses.cardio;
+  delete ses.log; delete ses.done; delete ses.cardioId;
+  if(isCardioEx(newId)){
+    ses.cardio=true; ses.done=false; ses.sets=[]; ses.suggestion=null;
+    ses.target={minutes:20, targetHR:null, notes, tabataOn:false, tabata:null};
+    ses.log={minutes:20, avgHR:null, distanceKm:null, level:null, speed:null, incline:null};
+    return ses;
+  }
+  if(ex && ex.timed){
+    const secs=ses.target?.secs || 30;
+    ses.timed=true; ses.bodyweight=!!(ex.equipment==="Bodyweight"); ses.suggestion=null;
+    ses.target={sets:n, reps:0, rir, rest, notes, secs};
+    ses.sets=buildTimedRows(n, secs, rir);
+    return ses;
+  }
+  const sug=edit? null : ProgressionEngine.suggest(newId, keptReps, rir);
+  const isBW=!!(ex && ex.equipment==="Bodyweight");
+  const reps=(sug && sug.bodyweight)? sug.reps : keptReps;
+  ses.bodyweight=isBW; ses.timed=false; ses.suggestion=sug;
+  ses.target={sets:n, reps, rir, rest, notes};
+  ses.sets= isBW? buildSetRows(n, 0, reps, rir)
+                : buildGhostRows(newId, n, sug? sug.kg : 0, reps, rir, sug, false);
+  return ses;
+}
 function upgradeSession(s){
   s.exercises.forEach(e=>{
     // backfill bodyweight flag from the library (handles exercises added/edited
@@ -2171,6 +2223,17 @@ function upgradeSession(s){
     if(e.timed===undefined && !e.cardio){
       const ex=exById(e.exerciseId);
       e.timed = !!(ex && ex.timed);
+    }
+    // Flags that disagree with the library (a swap done before this was fixed,
+    // or the exercise edited since) — rebuild, unless sets are already logged.
+    const lib=exById(e.exerciseId);
+    if(lib){
+      const wantCardio=isCardioEx(e.exerciseId);
+      const wantTimed=!e.cardio && !!lib.timed;
+      const wantBW=!e.cardio && lib.equipment==="Bodyweight";
+      const mismatch = (!!e.cardio!==wantCardio) || (!e.cardio && (!!e.timed!==wantTimed || !!e.bodyweight!==wantBW));
+      if(mismatch && !(e.sets||[]).some(x=>x.done) && !e.done)
+        retargetSessionExercise(e, e.exerciseId, !!e._edit);
     }
     if(e.rowsReady) return;
     const done=(e.sets||[]).map(x=>({...x, done:true}));
@@ -2248,7 +2311,12 @@ function exCardHTML(ses, xi){
   <div class="card excard ${allDone?"done-card":""} ${ses.skipped?"skipped-card":""}" data-card="${xi}">
     <div class="exhead">
       <div><div class="exname">${esc(ex.name)}</div>
-        <div class="exsub num">${ses.timed?`Hold · target ${t.sets}×${t.secs||30}s`:`${esc(ex.equipment)} · target ${t.sets}×${t.reps} · ${rirTxt(t.rir)}`} · ${doneN}/${ses.sets.length} sets${ses.skipped?" · skipped":""}</div></div>
+        <div class="exsub num">${ses.timed?`Hold · target ${t.sets}×${t.secs||30}s`:`${esc(ex.equipment)} · target ${t.sets}×${t.reps}${(()=>{
+          // ghosts can ask for more than the plan (last week's reps + 1); say so
+          // rather than showing a target the rows don't match
+          const exps=[...new Set((ses.sets||[]).filter(x=>!x.done).map(x=>x.expReps).filter(v=>v>0))];
+          return (exps.length===1 && exps[0]!==t.reps)? ` · aiming ${exps[0]}` : "";
+        })()} · ${rirTxt(t.rir)}`} · ${doneN}/${ses.sets.length} sets${ses.skipped?" · skipped":""}</div></div>
       <button class="iconbtn" data-exmenu="${xi}" aria-label="Exercise options">⋯</button>
     </div>
     ${t.notes?`<div class="pinned"><span aria-hidden="true">📌</span>${esc(t.notes)}</div>`:""}
@@ -3327,13 +3395,13 @@ function exerciseMenu(xi){
         return;
       }
       if(a==="replace"){
+        if(ses.sets?.some(x=>x.done) && !confirm("This exercise has logged sets — replacing clears them. Continue?")) return;
         closeModal();
         pickExercise(newId=>{
           const doReplace=()=>{
-            ses.exerciseId=newId;
-            // set prescriptions (sets/reps/RIR/rest) are preserved; suggestion re-derives
-            ses.suggestion=edit? null : ProgressionEngine.suggest(newId, ses.target.reps, ses.target.rir);
-            if(!edit && ses.suggestion) ses.sets.forEach(x=>{ if(!x.done && !x.touched) x.kg=ses.suggestion.kg; });
+            // sets/reps/RIR/rest carry over; bodyweight, timed, cardio and the
+            // load suggestion are re-derived from the NEW exercise
+            retargetSessionExercise(ses, newId, edit);
             Store.save(); renderWorkout();
           };
           const day=sessionTemplateDay(s);

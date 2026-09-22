@@ -190,6 +190,37 @@ what they already did — the target is always at least `lastReps + 1`.
 
 ---
 
+## 6b. Falling short: judge against what was ASKED, rebuild from what was DONE
+
+Three rules, all learned from the same failure mode — a target that can only go
+up, or a verdict harsher than the session deserved.
+
+**Bodyweight rebuilds from your reps, not the plan's.** The plan's rep target is
+fixed for the whole block. Rebuilding as `target − 1` means someone planned at
+10 who manages 8/8/8 is asked for 9 forever: the number can never come down far
+enough to be completed, so it never climbs again either. The rebuild target is
+now `clamp(avgReps, 1, lastAsk)` — meet them where they are, then double
+progression takes it back up. `lastAsk` is the highest `expReps` of the last
+session, i.e. what was actually asked, not what the block was written with.
+
+**Clearing the plan's target is not a failed session.** After a held weight the
+ghost asks for `lastReps + 1`, which can sit well above the plan (plan 10, last
+12, ghost 13). Missing *that* used to trigger the 5% backoff meant for genuinely
+missed sessions — deloading someone who just beat the plan by two reps. Now: if
+every set cleared the plan's target, the load holds and the suggestion carries
+`repeatReps: true`, so the next ghost repeats the same reps instead of demanding
++1 again. Beat it and normal progression resumes. Below the plan's target, the
+backoff still applies.
+
+**"Most sets there" has to be reachable.** The threshold was
+`ceil(sets × 0.67)`, which for the common 3-set exercise is `ceil(2.01) = 3` —
+every set, so the branch never ran and one short rep on the last set deloaded
+you. It is `ceil(sets × 2/3)` now: 2 of 3, 3 of 4, 4 of 5.
+
+Tests: `TESTS_repprog.js`.
+
+---
+
 ## 7. Where this lives in the code
 
 | Thing | Function |

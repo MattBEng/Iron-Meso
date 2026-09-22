@@ -20,6 +20,7 @@ node TESTS_ramp.js         # run one suite
 |---|---|
 | `TESTS_progression.js` | Load suggestions, bodyweight reps-progression, weighted-bodyweight, held-weight plateau detection, AMRAP/myorep exclusion |
 | `TESTS_assisted.js` | Assisted machines — reversed progression (short → more assistance, strong → less), the v7→v8 re-flag migration, name matching, a user untick sticking, no negative assistance |
+| `TESTS_repprog.js` | Falling short — bodyweight rebuilds from reps achieved, clearing the plan's target holds the load instead of deloading, ghost rows repeat rather than demand +1 again, the two-thirds "most sets" rule, and the card showing the reps actually asked for |
 | `TESTS_ramp.js` | Volume ramp: priority ceilings (High/Normal/Low), meso-length awareness, repeat runs, deload, ramp-off, legacy fallback |
 | `TESTS_workout.js` | Rendering, logging, finish flow (duration + date), date correctness, cardio capture, editing past logs, the editability window |
 | `TESTS_features.js` | Set types, setup notes, workout notes, bodyweight rows, timed holds, gender options, rest-over messages |
@@ -33,6 +34,7 @@ node TESTS_ramp.js         # run one suite
 | `TESTS_cardiostats.js` | Cardio in Stats — weekly minutes, HR-less sessions, scope filtering, no sets/minutes mixing |
 | `TESTS_statsfix.js` | Stats numbers and layout — completion ignores skips, PRs per block, block comparison ignores skips, per-week averages over the real span, every card follows the scope, in-progress week left out, lb volume, sections/collapse memory, merged weekly chart, empty cards hidden, bar charts start at 0 |
 | `TESTS_statscope.js` | Stats scope selector — meso/month/year/all-time filtering and the totals card |
+| `TESTS_swapex.js` | Replace exercise — bodyweight/timed/cardio flags and rows re-derived from the new exercise, prescriptions carried over, stale sessions self-healing, logged sets protected |
 | `TESTS_skip.js` | Skipping a workout — meso advances, markers stay out of streaks/stats/editing |
 | `TESTS_schemes.js` | Fun colour schemes — four options, single-select, Fun-mode gating, persistence |
 | `TESTS_welcome.js` | Welcome-back messages — the 30-message bank, gap tiering, and the Fun+Female gate |

@@ -8,6 +8,53 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### 2026-09-22 (fix — rep targets that could never be met, and unearned deloads)
+- **Bodyweight targets could never rebuild.** Hanging Leg Raise, plan 3×10, did
+  8/8/8: the card said *"drop a rep and rebuild"* and asked for **9** — every
+  session, forever. The rebuild was `plan target − 1`, and the plan's target is
+  fixed for the block, so it never came down to meet the reps actually managed
+  (and the message contradicted the number it showed). Now it rebuilds from
+  `avgReps` — 8/8/8 asks for 8, and completing that climbs again.
+- **Clearing the plan's target triggered a deload.** Machine Hip Thrust, plan
+  3×10, held 20kg, ghost asked 13, did 12/12/12 @2RIR → *"sets fell short — back
+  off 5%"*, dropping to 18.8kg for beating the plan by two reps. Now: every set
+  clearing the plan's target holds the load and sets `repeatReps`, so the next
+  ghost repeats those reps instead of demanding +1 again. Genuinely missing the
+  plan's target still backs off.
+- **"Most sets hit target" was unreachable.** The threshold `ceil(sets × 0.67)`
+  is 3-of-3 for a 3-set exercise, so one short rep on the last set skipped
+  straight to the backoff. Now `ceil(sets × 2/3)`: 2 of 3, 3 of 4, 4 of 5.
+- **The card hid what it was asking for.** It showed the plan ("target 3×10")
+  while the rows were prefilled with the ghost (13). It now reads
+  "target 3×10 · aiming 12" when the two differ.
+- Touches: `index.html` (`ProgressionEngine.suggest` bodyweight + short-of-target
+  branches, `hitMost`, `buildGhostRows` repeat, the exercise card subtitle),
+  `sw.js` (BUILD). `PROGRESSION-MODEL.md` §6b added; `PROJECT-NOTES.md` §5
+  updated.
+- Tests: new `TESTS_repprog.js` (20 — fails 11 on the old app). Suite now
+  **431 / 21 suites**, all passing.
+
+### 2026-09-19 (fix — Replace exercise kept the old exercise's shape)
+- **Bug:** replacing push-ups with a dumbbell movement mid-workout left the card
+  in bodyweight mode — "BW" in every weight box and "Bodyweight — aim for 9 good
+  reps" — because *Replace exercise* only swapped `exerciseId` and re-ran the
+  suggestion. Everything else derived from the old exercise (`bodyweight`,
+  `timed`, `cardio`, the rows themselves) stayed put. The same swap in the other
+  direction was wrong too: to bodyweight, to a timed hold, or to a cardio item.
+- **Fix:** new `retargetSessionExercise(ses, newId, edit)` rebuilds the row from
+  the new exercise — bodyweight rows, timed rows with seconds, the cardio card
+  with its log fields, or normal ghost rows with a fresh suggestion. Set count,
+  RIR, rest and notes carry over. *Replace exercise* now calls it, and warns
+  before clearing logged sets.
+- **Self-heal:** `upgradeSession()` now rebuilds any session row whose flags
+  disagree with the library (a swap made before this fix, or an exercise edited
+  since), so a workout already open repairs itself when reopened — unless it has
+  logged sets, which are never silently rebuilt.
+- Touches: `index.html` (`retargetSessionExercise`, `upgradeSession`, the
+  `replace` menu action), `sw.js` (BUILD). `PROJECT-NOTES.md` §5 rule added.
+- Tests: new `TESTS_swapex.js` (24 — fails 13 on the old app). Suite now
+  **411 / 20 suites**, all passing. Checked visually at phone width.
+
 ### 2026-09-17 (Stats — wrong numbers fixed, screen decluttered)
 - **Numbers that were wrong:**
   - *Completion %* counted skipped workouts as done (it used the position

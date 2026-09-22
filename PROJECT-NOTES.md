@@ -74,6 +74,11 @@ as a `data:` URI. Don't go looking for it.
    committed — together, not split across separate copies. A doc update that
    lands before or after its matching code is how the notes end up claiming
    something that isn't actually true yet.
+8. **Hand over a commit message with them**: a summary line (under ~70 chars,
+   what changed) and a description (what was wrong, what changed, tests, docs
+   touched). Matt pastes these straight into the commit — don't make him write
+   it from the diff. Keep it to the same facts as the `CHANGELOG.md` entry,
+   shorter.
 
 ### Checking the JS parses
 
@@ -221,7 +226,12 @@ fewer reps, predicted. The rep ceiling is **jump-aware** (`repCeilingFor`), deri
 from each exercise's own smallest weight jump: a 5→7.5 kg lateral raise (+50%)
 needs ~20 reps banked before the jump is possible, while a 100→102.5 kg squat
 (+2.5%) should jump at ~10. Set the increment per exercise in the exercise editor.
-Full reasoning and evidence in **`PROGRESSION-MODEL.md`**.
+**Falling short** is judged against what was *asked* (`expReps`, which after a
+held weight is last session's reps + 1), and rebuilt from what was *done*:
+bodyweight targets come down to `avgReps` rather than the block's fixed target
+(which they could never reach), and a session that cleared the plan's own rep
+target holds the load (`repeatReps`) instead of taking the 5% backoff. Full
+reasoning and evidence in **`PROGRESSION-MODEL.md`** §6b.
 
 **Dates.** `todayISO()` uses **local** date components, never `toISOString()`
 (that is UTC and shifts early-morning sessions to the previous day). A session
@@ -244,6 +254,14 @@ and never appear as the Home "Last workout".
 (`session.notes`); (2) **Meso slot note**, 📌, specific to that plan;
 (3) **Setup note**, 🔧, saved to the **exercise in the library** so it shows every
 time you do that exercise in any meso, edited from the workout.
+
+**Session rows are derived, not copied.** A session exercise carries flags taken
+from the library at build time (`bodyweight`, `timed`, `cardio`, plus the rows
+and the load suggestion). Anything that points an existing session row at a
+different exercise must go through **`retargetSessionExercise(ses, newId, edit)`**,
+which rebuilds all of it — set count, RIR, rest and notes carry over, the rest is
+re-derived. `upgradeSession()` repairs a row whose flags disagree with the
+library, unless it already has logged sets.
 
 **Exercise flags.** `assisted` (inverted progression), `equipment:"Bodyweight"`
 (reps not load when unloaded), `timed` (log seconds, **no progression** — just
