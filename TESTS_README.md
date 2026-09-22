@@ -19,6 +19,7 @@ node TESTS_ramp.js         # run one suite
 | File | Covers |
 |---|---|
 | `TESTS_progression.js` | Load suggestions, bodyweight reps-progression, weighted-bodyweight, held-weight plateau detection, AMRAP/myorep exclusion |
+| `TESTS_about.js` | Version and What's new — `RELEASES[0]` matching `WHATS-NEW.md` word for word, the About card, the Home update card showing once, fresh installs not seeing it |
 | `TESTS_assisted.js` | Assisted machines — reversed progression (short → more assistance, strong → less), the v7→v8 re-flag migration, name matching, a user untick sticking, no negative assistance |
 | `TESTS_repprog.js` | Falling short — bodyweight rebuilds from reps achieved, clearing the plan's target holds the load instead of deloading, ghost rows repeat rather than demand +1 again, the two-thirds "most sets" rule, and the card showing the reps actually asked for |
 | `TESTS_ramp.js` | Volume ramp: priority ceilings (High/Normal/Low), meso-length awareness, repeat runs, deload, ramp-off, legacy fallback |

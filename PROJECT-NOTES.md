@@ -45,6 +45,7 @@ Everything is flat in the repo root. There are no subfolders and no build step.
 | `_headers` | Cloudflare cache headers. |
 | `icon-*.png` | App icons (coral "LD"), including maskable variants. |
 | `PROJECT-NOTES.md` | This file — architecture, domain rules, working style. |
+| `WHATS-NEW.md` | **The latest release in plain language**, as the app shows it. Source of truth for `RELEASES[0]` in `index.html`; `TESTS_about.js` fails if they drift. User-facing wording only — engineering detail goes in `CHANGELOG.md`. |
 | `CHANGELOG.md` | **Dated log of every change**, newest first — what shipped, why, what it touches. Update it every time you ship, before handing over. If it's missing, create it; don't fold history back into this file. |
 | `PROGRESSION-MODEL.md` | **The science behind the progression maths** — equations, evidence, worked examples, the "??" band, the jump-aware ceiling. Read before touching the engine. |
 | `MESSAGES.txt` | **All the cute/Fun-mode message banks, in plain text.** Edit this, not `index.html`. |
@@ -66,15 +67,21 @@ as a `data:` URI. Don't go looking for it.
 3. If you edited `MESSAGES.txt`, run `node MESSAGES_build.js`.
 4. Run the tests: `node TESTS_run-all.js`.
 5. Bump the `BUILD` stamp in `sw.js`.
-6. **Add a dated entry to `CHANGELOG.md`** — newest first, what changed, why,
+6. **Version it.** Anything the user would notice gets a version bump:
+   `APP_VERSION` in `index.html` (patch = fixes, minor = new behaviour or
+   screens). Then update **both** `WHATS-NEW.md` and `RELEASES[0]` with the same
+   plain-language notes, and date them. `TESTS_about.js` fails if they differ by
+   so much as a word. Internal-only work (tests, docs, refactors) doesn't need a
+   bump.
+7. **Add a dated entry to `CHANGELOG.md`** — newest first, what changed, why,
    what it touches. Do this before handing over, not after; an undocumented
    change is the thing that caused the audit in the newest entry there. If
    `CHANGELOG.md` doesn't exist, create it.
-7. Hand over `index.html` + `sw.js` (+ any test/doc/changelog files) to be
+8. Hand over `index.html` + `sw.js` (+ any test/doc/changelog files) to be
    committed — together, not split across separate copies. A doc update that
    lands before or after its matching code is how the notes end up claiming
    something that isn't actually true yet.
-8. **Hand over a commit message with them**: a summary line (under ~70 chars,
+9. **Hand over a commit message with them**: a summary line (under ~70 chars,
    what changed) and a description (what was wrong, what changed, tests, docs
    touched). Matt pastes these straight into the commit — don't make him write
    it from the diff. Keep it to the same facts as the `CHANGELOG.md` entry,

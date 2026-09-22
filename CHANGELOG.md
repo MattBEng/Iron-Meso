@@ -1,12 +1,33 @@
 # Lift Daddy — changelog
 
-Newest first. Every entry: **what changed, why, and what it touches** — written
+Newest first, headed with the app version it shipped in (`APP_VERSION` in
+`index.html`). Every entry: **what changed, why, and what it touches** — written
 for another AI (or Matt) picking this up with zero memory of the session that
 made it. Add yours before you consider a change finished; see the loop in
 `PROJECT-NOTES.md` §3. If this file is ever missing, recreate it — don't fold
 history back into `PROJECT-NOTES.md`.
 
 ---
+
+### v1.1.0 — 2026-09-22 (versioning + What's new screen)
+- **Versions.** `APP_VERSION` ("1.1.0") is the user-facing version and moves
+  independently of `SCHEMA_VERSION` (the shape of stored data). Releases from
+  here on are headed with it, patch for fixes, minor for new behaviour.
+- **`WHATS-NEW.md`** holds the latest release in plain language and is the
+  source of truth for the in-app notes. The app is one offline file and can't
+  fetch it, so the same notes live in `RELEASES[0]` in `index.html`;
+  `TESTS_about.js` fails if they drift by a word.
+- **In-app What's new.** Settings → About shows the version, release date and a
+  *What's new in x.y.z* button. After an update, Home shows one dismissable card
+  ("Lift Daddy 1.1.0 · Bug fixes and changes since your last version") with
+  *Dismiss* and *What's new*; reading or dismissing it records
+  `settings.lastSeenVersion` so it doesn't come back. Installs that predate
+  versioning see it once; fresh installs never do.
+- Touches: `index.html` (`APP_VERSION`, `RELEASES`, `whatsNewModal()`, Home
+  update card, Settings About card, `.update-card`/`ul.whatsnew` CSS,
+  `lastSeenVersion` defaulting), `WHATS-NEW.md` (new), `sw.js` (BUILD).
+- Tests: new `TESTS_about.js` (22). Suite now **453 / 22 suites**, all passing.
+  Checked visually at phone width.
 
 ### 2026-09-22 (fix — rep targets that could never be met, and unearned deloads)
 - **Bodyweight targets could never rebuild.** Hanging Leg Raise, plan 3×10, did

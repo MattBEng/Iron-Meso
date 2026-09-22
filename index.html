@@ -298,6 +298,9 @@ canvas.chart{width:100%; height:180px; display:block}
 .linkdate{color:var(--accent);font-weight:700;background:none;border:0;padding:0;font:inherit}
 .cutie-card{border-color:rgba(224,85,156,.35);background:linear-gradient(180deg,rgba(224,85,156,.06),transparent)}
 .welcome-back h3{font-size:17px;line-height:1.35}
+.update-card{border-color:var(--accent);background:var(--accent-soft)}
+ul.whatsnew{margin:8px 0 0;padding-left:20px}
+ul.whatsnew li{margin:0 0 7px;font-size:14px;line-height:1.45;color:var(--text)}
 .scheme-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);
   border-radius:var(--r-sm);text-transform:none;font-size:15px;cursor:pointer}
 .scheme-row.on{border-color:var(--accent);background:var(--accent-soft)}
@@ -493,6 +496,25 @@ STARTER_EXERCISES.push(...STARTER_CARDIO);
 // mark known assisted movements so the engine inverts their progression
 STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|dip|chin)/i.test(e.name)) e.assisted=true; });
 
+/* ---------------- version + release notes ----------------
+   APP_VERSION is what the user sees; SCHEMA_VERSION below is the shape of their
+   stored data and moves independently. RELEASES[0] must match WHATS-NEW.md —
+   the app is one offline file, so the notes are embedded, not fetched.
+   TESTS_about.js fails if the two drift apart. */
+const APP_VERSION = "1.1.0";
+const RELEASES = [
+  {v:"1.1.0", date:"2026-09-22", notes:[
+    "Version numbers, plus this What's new screen (Settings, or the card on Home after an update).",
+    "Bodyweight rep targets now rebuild from the reps you actually managed, instead of sitting on a number you could never reach.",
+    "Beating your plan's rep target no longer drops your weight 5%. It holds the load and asks you to beat it.",
+    "Missing one rep on your last set no longer counts as a failed session.",
+    "Exercise cards show the reps actually being asked for when that differs from the plan.",
+    "Replacing an exercise mid-workout rebuilds the card properly, so a dumbbell move can't inherit bodyweight rows.",
+    "Cardio you skipped, or never filled in, isn't logged any more.",
+    "Stats: fixed completion %, PRs, per-week averages, and the scope dropdown; tidied into collapsible sections.",
+  ]},
+];
+
 /* ---------------- storage ---------------- */
 const SCHEMA_VERSION = 8;
 /** Sequential migrations: MIGRATIONS[n] upgrades a state at version n to n+1. */
@@ -596,7 +618,7 @@ class StorageManager{
       settings:{
         unit:"kg", theme:"light", restDefault:150, restBuzz:true,
         incUpper:2.5, incLower:5, incUpperSmall:1, incLowerSmall:2.5,
-        backoffPct:5, backupEvery:7, lastBackup:null,
+        backoffPct:5, backupEvery:7, lastBackup:null, lastSeenVersion:APP_VERSION,
         maxHR:null, age:null,
         mode:"fun",           // "fun" (default) | "serious"
       },
@@ -618,6 +640,8 @@ class StorageManager{
       STARTER_EXERCISES.forEach(e=>{ if(!have.has(e.id)) st.exercises.push(e); });
       st.profile ??= {gender:"", age:null, weightKg:null, heightCm:null, experience:"", goals:"", setupDismissed:false};
       st.settings.mode ??= "fun";
+      // an install that predates versioning sees the update card once
+      st.settings.lastSeenVersion ??= "0";
     st.settings.funScheme ??= "default";
       st.settings.restBuzz ??= true;
       return Object.assign(this.defaults(), st,
@@ -1487,6 +1511,14 @@ VIEWS.home=function(){
           <h3 style="margin:4px 0 0">${msg}</h3>
           <p class="muted num" style="margin:6px 0 0">${d} days since your last workout</p></div>`;
       })()}
+    ${st.settings.lastSeenVersion && st.settings.lastSeenVersion!==APP_VERSION ? `
+      <div class="card update-card">
+        <div class="row split"><div style="flex:1"><div class="kicker">Updated</div>
+          <h3 style="margin:4px 0 0">Lift Daddy ${APP_VERSION}</h3>
+          <p class="muted" style="margin:4px 0 0">Bug fixes and changes since your last version.</p></div></div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn btn-ghost" style="flex:1" data-act="seenupdate">Dismiss</button>
+          <button class="btn btn-primary" style="flex:1" data-act="whatsnew">What's new</button></div></div>`:""}
     ${mesoCard}
     ${lastCard}
     <div class="card">
@@ -1519,9 +1551,24 @@ VIEWS.home=function(){
     if(act==="logcardio") logCardioModal();
     if(act==="setup") go("settings");
     if(act==="skipsetup"){ S().profile.setupDismissed=true; Store.save(); go("home"); }
+    if(act==="whatsnew") whatsNewModal();
+    if(act==="seenupdate"){ S().settings.lastSeenVersion=APP_VERSION; Store.save(); go("home"); }
   };
 };
 
+/** Release notes, newest first. Opened from Settings or the Home update card. */
+function whatsNewModal(){
+  const seen=()=>{ S().settings.lastSeenVersion=APP_VERSION; Store.save(); };
+  modal(`<h2>What's new</h2>
+    ${RELEASES.map((r,i)=>`<div class="card" style="margin-top:${i?10:12}px">
+      <div class="row split"><div class="kicker">Version ${r.v}</div><span class="faint num">${fmtDate(r.date)}</span></div>
+      <ul class="whatsnew">${r.notes.map(n=>`<li>${esc(n)}</li>`).join("")}</ul>
+    </div>`).join("")}
+    <button class="btn btn-primary btn-block" style="margin-top:14px" data-ok>Got it</button>`, m=>{
+    m.onclick=e=>{ if(!e.target.closest("[data-ok]")) return; seen(); closeModal(); if(currentView==="home") go("home"); };
+  });
+  seen();
+}
 function logCardioModal(){
   const needMax=!effMaxHR();
   let type=S().cardio.length? S().cardio[S().cardio.length-1].type : CARDIO_TYPES[0];
@@ -4697,6 +4744,11 @@ VIEWS.settings=function(){
       </div>
       <p class="faint" style="margin-top:10px">Everything is stored locally in this browser. Export regularly.</p>
     </div>
+    <div class="card"><h3>About</h3>
+      <div class="row split"><span class="muted">Version</span><b class="num" id="appver">${APP_VERSION}</b></div>
+      <div class="row split" style="margin-top:6px"><span class="muted">Released</span><span class="faint num">${fmtDate(RELEASES[0].date)}</span></div>
+      <button class="btn btn-ghost btn-block" style="margin-top:12px" data-a="whatsnew">What's new in ${APP_VERSION}</button>
+    </div>
     <p class="faint" style="text-align:center">Lift Daddy · your pocket training buddy</p>`;
   const persist=()=>{
     s.unit=$("#unit").value; s.theme=$("#theme").value;
@@ -4738,6 +4790,7 @@ VIEWS.settings=function(){
     const md=e.target.closest("[data-mode]");
     if(md){ s.mode=md.dataset.mode; Store.save(); go("settings"); renderNav(); return; }
     const a=e.target.closest("[data-a]")?.dataset.a; if(!a) return;
+    if(a==="whatsnew"){ whatsNewModal(); return; }
     if(a==="export") Store.download();
     if(a==="import"){
       const f=$("#impfile"); f.value="";
