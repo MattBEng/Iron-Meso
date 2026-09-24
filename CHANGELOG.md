@@ -9,6 +9,36 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.2.0 — 2026-09-24 (loads you can actually put on the bar)
+- **Bug: a hold changed the weight.** Walking Lunge, 9kg × 10/10/10, verdict
+  "target met at the limit — repeat this", suggestion **8.8kg**. Every
+  suggestion was rounded to an absolute 1.25kg grid (`wStep()`), so 9 became
+  8.75: lighter than the session it was repeating, and not a loadable dumbbell.
+  Increments had the same problem (9 + 2.5 came out as 11.25).
+- **Fix:** `snapLoad(kg, lastKg, ex)`. A hold returns the exact weight used; any
+  change is whole steps of that exercise's own `exStep()` measured **from** that
+  weight. Also applied to deload weeks and the assisted range readout, which
+  showed "31.3–33.8kg assist" on a 5kg stack.
+- **A change smaller than half a step now holds the weight and asks for a rep**
+  rather than overshooting to a whole step (a 1kg "small increase" on a 5kg
+  machine stack became +5kg).
+- **Backoff floor.** 5% of 20kg is 1kg, which a 5kg stack can't express. A miss
+  within one rep of target repeats the weight ("repeat 20kg and complete every
+  set"); a bigger miss drops a whole step, since that's the only loadable way to
+  make it easier. Messages name the actual weight instead of claiming "5%".
+- **New: "can't drop weight?"**, the mirror of the existing "can't add weight?".
+  Holds the load and rebuilds to the reps completed on every set
+  (`holdWeightRepBackoff`), with the same undo. On assisted machines it reads
+  "can't add assistance?" and the directions swap.
+- Touches: `index.html` (`snapLoad`, `ProgressionEngine.suggest` rounding and
+  backoff branch, three deload call sites, assisted range readout,
+  `holdWeightRepBackoff`, sugline link, workout click handler), `sw.js` (BUILD).
+  `PROGRESSION-MODEL.md` §6c added. `TESTS_assisted.js` updated: a 2.5kg drop
+  isn't loadable on a 5kg stack, so a strong session now holds and adds a rep
+  (it still drops when the exercise's step allows it).
+- Tests: new `TESTS_loadsnap.js` (24). Suite now **479 / 23 suites**, all
+  passing. Checked visually at phone width.
+
 ### v1.1.0 — 2026-09-22 (versioning + What's new screen)
 - **Versions.** `APP_VERSION` ("1.1.0") is the user-facing version and moves
   independently of `SCHEMA_VERSION` (the shape of stored data). Releases from

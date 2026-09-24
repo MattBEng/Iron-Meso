@@ -221,6 +221,39 @@ Tests: `TESTS_repprog.js`.
 
 ---
 
+## 6c. The weight has to be loadable
+
+A suggestion the user can't put on the bar is worse than no suggestion.
+
+**Holds are exact.** Rounding every suggestion to an absolute 1.25 kg grid meant
+a 9 kg dumbbell "repeat this" came back as **8.75** — lighter than the session it
+was repeating, and not a dumbbell that exists. `snapLoad(kg, lastKg, ex)` returns
+`lastKg` untouched when nothing is changing.
+
+**Changes are whole steps measured from the last weight**, using that exercise's
+own `exStep()`, not a global grid: 9 + 2.5 is 11.5, not 11.25. Anchoring also
+means an odd starting weight stays odd instead of being dragged onto a grid it
+never sat on.
+
+**A change smaller than half a step can't be loaded**, so it holds the weight and
+takes the rep instead — double progression, which is what you'd do in the gym. A
+1 kg "small increase" on a 5 kg stack would otherwise overshoot to +5.
+
+**Backoffs get the same treatment, with a floor.** 5% of 20 kg is 1 kg, which no
+5 kg stack can express. After a **narrow** miss (within a rep of target) the
+weight repeats; after a real miss it drops a whole step, even though that
+overshoots 5%, because it's the only loadable way to make the session easier.
+
+**When the user says it can't be done**, both directions have an escape hatch:
+*can't add weight?* (`holdWeightRepProgress`) holds and adds a rep, and
+*can't drop weight?* (`holdWeightRepBackoff`) holds and rebuilds to the reps they
+actually completed on every set. Assisted machines show the same options with the
+directions swapped.
+
+Tests: `TESTS_loadsnap.js`.
+
+---
+
 ## 7. Where this lives in the code
 
 | Thing | Function |

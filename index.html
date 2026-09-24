@@ -501,8 +501,14 @@ STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|
    stored data and moves independently. RELEASES[0] must match WHATS-NEW.md —
    the app is one offline file, so the notes are embedded, not fetched.
    TESTS_about.js fails if the two drift apart. */
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.2.0";
 const RELEASES = [
+  {v:"1.2.0", date:"2026-09-24", notes:[
+    "Suggested weights are now ones you can actually load. \"Repeat this\" keeps the exact weight you used (9kg stays 9kg, not 8.8), and changes move in that exercise's own step.",
+    "When a change is smaller than the smallest plate or pin you have, it holds the weight and asks for an extra rep instead of jumping a whole step.",
+    "New \"can't drop weight?\" option, the mirror of \"can't add weight?\": keeps the weight and rebuilds to the reps you completed.",
+    "Missing your target by one rep now repeats the same weight. A bigger miss still drops a step.",
+  ]},
   {v:"1.1.0", date:"2026-09-22", notes:[
     "Version numbers, plus this What's new screen (Settings, or the card on Home after an update).",
     "Bodyweight rep targets now rebuild from the reps you actually managed, instead of sitting on a number you could never reach.",
@@ -791,6 +797,18 @@ function exStep(ex){
   const v=Number(ex.step);
   if(isFinite(v) && v>0) return v;
   return DEFAULT_STEP[ex.equipment] ?? 2.5;
+}
+/** Snap a suggested load to something actually loadable.
+    A hold returns the EXACT weight used last time, and any change is whole
+    steps of that exercise's own jump measured FROM that weight. Rounding to an
+    absolute 1.25kg grid instead turned a 9kg hold into 8.75 ("repeat this" at a
+    lighter, unloadable weight) and a 9 + 2.5 jump into 11.25. */
+function snapLoad(kg, lastKg, ex){
+  if(kg===lastKg) return lastKg;
+  const step=exStep(ex)||wStep();
+  const dir=kg>lastKg? 1 : -1;
+  const steps=Math.max(1, Math.round(Math.abs(kg-lastKg)/step));
+  return Math.round((lastKg + dir*steps*step)*100)/100;
 }
 /* Jump-aware rep ceiling.
    A fixed "+4 reps" ceiling breaks on small-muscle work: 5kg -> 7.5kg on a
@@ -1113,12 +1131,36 @@ class ProgressionEngine{
       kg=lastKg; repeatReps=true;
       reason=`Cleared your ${targetReps}-rep target but not the extra rep — repeat ${dispW(lastKg)}${unitLabel()} and beat it.`;
     } else {
-      // fell short: assisted → ADD assistance (easier); normal → back off load
-      kg = assisted? lastKg*(1+st.backoffPct/100) : lastKg*(1-st.backoffPct/100);
-      reason=assisted?`Short of target — add ${st.backoffPct}% assistance and rebuild.`:`Sets fell short of target — back off ${st.backoffPct}% and rebuild.`;
+      // fell short: assisted → ADD assistance (easier); normal → back off load.
+      // A 5% cut is often smaller than the smallest plate you own (1kg on a 20kg
+      // machine with 5kg steps): snapping that to a whole step would take 25%
+      // off. When the change can't be loaded, repeat the weight instead.
+      const step=exStep(ex);
+      const want = assisted? lastKg*(1+st.backoffPct/100) : lastKg*(1-st.backoffPct/100);
+      // Only hold when the miss was within a rep. Miss by more and a whole step
+      // is the only loadable way to make it easier, even if it overshoots 5%.
+      const narrowMiss = avgRepsNow >= targetReps-1;
+      if(narrowMiss && Math.abs(want-lastKg) < step/2){
+        kg=lastKg;
+        reason = assisted
+          ? `Short of target — repeat ${dispW(lastKg)}${unitLabel()} of assistance and complete every set.`
+          : `Sets fell short — repeat ${dispW(lastKg)}${unitLabel()} and complete every set.`;
+      } else {
+        kg=snapLoad(want, lastKg, ex);
+        reason = assisted
+          ? `Short of target — up to ${dispW(kg)}${unitLabel()} of assistance and rebuild.`
+          : `Sets fell short of target — back off to ${dispW(kg)}${unitLabel()} and rebuild.`;
+      }
     }
-    kg=Math.round(kg/wStep())*wStep();
-    kg=Math.round(kg*100)/100;
+    // A change smaller than the smallest plate for this exercise can't be
+    // loaded (a 1kg "small increase" on a 5kg machine stack). Hold the weight
+    // and take the rep instead, rather than overshooting to a whole step.
+    const stepNow=exStep(ex);
+    if(kg!==lastKg && Math.abs(kg-lastKg)<=stepNow/2 && !repeatReps){
+      kg=lastKg; repeatReps=false;
+      reason=`${dispW(lastKg)}${unitLabel()} is the smallest step here — repeat it and aim for ${avgRepsNow+1} reps.`;
+    }
+    kg=snapLoad(kg, lastKg, ex);
     if(assisted) kg=Math.max(0,kg);      // can't have negative assistance
     const bs=last.best;
     return {kg, lastKg, repeatReps, diff:Math.round((kg-lastKg)*100)/100, reason,
@@ -2324,7 +2366,7 @@ VIEWS.workout=function(){
         const repTarget = (sug && sug.bodyweight)? sug.reps : slot.reps;
         // volume ramp (per-exercise, per-muscle ceiling, lands in final real week)
         let nSets=rampedSets(meso, slot, pos.week, deload);
-        if(deload && sug && !isBW){ kg=Math.round((sug.lastKg*0.6)/wStep())*wStep(); }
+        if(deload && sug && !isBW){ kg=snapLoad(sug.lastKg*0.6, sug.lastKg, exRef); }
         return {slotId:slot.id, exerciseId:slot.exerciseId, bodyweight:isBW, timed:isTimed,
           target:{sets:nSets, reps:repTarget, rir:slot.rir, rest:slot.rest, notes:slot.notes,
             secs: isTimed? (slot.secs||30) : undefined},
@@ -2374,11 +2416,14 @@ function exCardHTML(ses, xi){
          ? `<div class="sugline num"><b>Hold ${dispW(sug.lastKg)}${unitLabel()} · aim for ${sug.repTarget||(t.reps)} reps</b> · progressing by reps · <button class="linkbtn" data-holdundo="${xi}">undo</button></div>`
          : (()=>{ const exr=exById(ses.exerciseId), up=sug.kg>sug.lastKg && !exr?.assisted;
              const load = exr?.assisted
-               ? `${dispW(Math.max(0,sug.kg-wStep()*2))}–${dispW(sug.kg)}${unitLabel()} assist`
+               ? `${dispW(Math.max(0,sug.kg-exStep(exr)))}–${dispW(sug.kg)}${unitLabel()} assist`
                : `${dispW(sug.kg)}${unitLabel()}`;
              const ghosts = ses.sets.map(x=>x.predReps===null?"??":x.expReps).join("/");
+             // the direction that makes it easier: less load, or MORE assistance
+             const easier = exr?.assisted? sug.kg>sug.lastKg : sug.kg<sug.lastKg;
              return `<div class="sugline num"><b>${load}${up?` × ${ghosts}`:""}</b> · last ${sug.lastSummary} · ${sug.reason}${
-               up?` · <button class="linkbtn" data-cantadd="${xi}">can't add weight?</button>`:""}</div>`; })())
+               up?` · <button class="linkbtn" data-cantadd="${xi}">can't add weight?</button>`:""}${
+               easier?` · <button class="linkbtn" data-cantdrop="${xi}">${exr?.assisted?"can't add assistance?":"can't drop weight?"}</button>`:""}</div>`; })())
          : ses.timed
          ? (()=>{ const h=exerciseHistory(ses.exerciseId);
              const last=h.length? h[0].sets.filter(s=>s.secs!=null) : [];
@@ -2492,6 +2537,25 @@ function setRowHTML(ses, xi, x, si){
    above which the engine will push weight again). Re-decided from history next
    session, so there's no sticky flag to get out of sync. */
 const REP_CEILING_OVER_TARGET=4;
+/** "Can't drop the weight" — the easier load isn't available (a stack that only
+    goes in 5s, dumbbells that jump 2.5). Keep the weight and rebuild by reps:
+    aim for the reps they actually completed on every set. */
+function holdWeightRepBackoff(xi){
+  const s=S().editSession||S().activeSession, ses=s.exercises[xi];
+  const sug=ses.suggestion; if(!sug) return;
+  const holdKg=sug.lastKg;
+  const hist=exerciseHistory(ses.exerciseId);
+  const lastWork=hist.length? hist[0].sets.filter(x=>x.kg===holdKg && (!x.type||x.type==="normal")) : [];
+  // the rep count they managed on EVERY set, so the session is completable
+  const repTarget=Math.max(1, lastWork.length? Math.min(...lastWork.map(x=>x.reps)) : ses.target.reps-1);
+  ses.holdWeight=true;
+  ses.suggestion={...sug, repTarget, kg:holdKg, diff:0,
+    reason:`Holding ${dispW(holdKg)}${unitLabel()} — aim for ${repTarget} reps on every set.`};
+  ses.sets=ses.sets.map(row=>({kg:holdKg, reps:repTarget, rir:ses.target.rir,
+    expReps:repTarget, done:false, at:null, type:row.type||null}));
+  Store.save();
+  renderWorkout();
+}
 function holdWeightRepProgress(xi){
   const s=S().editSession||S().activeSession, ses=s.exercises[xi];
   const sug=ses.suggestion; if(!sug) return;
@@ -2814,7 +2878,7 @@ function startFuturePreview(week, dayIdx){
       const sug=ProgressionEngine.suggest(slot.exerciseId, slot.reps, slot.rir);
       let kg=sug?sug.kg:0;
       let nSets=rampedSets(meso, slot, week, deload);
-      if(deload && sug){ kg=Math.round((sug.lastKg*0.6)/wStep())*wStep(); }
+      if(deload && sug){ kg=snapLoad(sug.lastKg*0.6, sug.lastKg, exById(slot.exerciseId)); }
       return {slotId:slot.id, exerciseId:slot.exerciseId,
         target:{sets:nSets, reps:slot.reps, rir:slot.rir, rest:slot.rest, notes:slot.notes},
         suggestion:sug, notes:"", skipped:false, rowsReady:true, _edit:false,
@@ -3132,6 +3196,8 @@ function bindWorkout(){
     // "Can't add weight" -> progress reps at the held weight instead
     const cant=e.target.closest("[data-cantadd]");
     if(cant){ holdWeightRepProgress(+cant.dataset.cantadd); return; }
+    const cantD=e.target.closest("[data-cantdrop]");
+    if(cantD){ holdWeightRepBackoff(+cantD.dataset.cantdrop); return; }
     const undo=e.target.closest("[data-holdundo]");
     if(undo){ const xi=+undo.dataset.holdundo, ses=s.exercises[xi];
       ses.holdWeight=false;
@@ -3895,7 +3961,7 @@ function previewDay(meso, dayIdx, week){
           const sug=ProgressionEngine.suggest(x.exerciseId, x.reps, x.rir);
           if(sug){
             let kg=sug.kg;
-            if(deload){ kg=Math.round((sug.lastKg*0.6)/wStep())*wStep(); nSets=Math.max(1,Math.ceil(x.sets/2)); }
+            if(deload){ kg=snapLoad(sug.lastKg*0.6, sug.lastKg, exById(x.exerciseId)); nSets=Math.max(1,Math.ceil(x.sets/2)); }
             proj=` · ~${dispW(kg)}${unitLabel()}`;
           }
         }catch(_){}

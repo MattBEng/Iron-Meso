@@ -28,6 +28,7 @@ node TESTS_ramp.js         # run one suite
 | `TESTS_data.js` | Local-date handling (the UTC bug), storage round-trip, meso creation defaults, schema |
 | `TESTS_integrity.js` | Export/import round-trip, checksum tampering, legacy imports, schema migration, corrupt-state rejection |
 | `TESTS_edge.js` | Empty states, set add/duplicate/delete, input clamping, empty-workout discard, timed exercises not polluting lifting stats |
+| `TESTS_loadsnap.js` | Loadable weights — holds keep the exact weight, changes are whole steps from it, sub-plate changes hold and add a rep, narrow misses repeat, and the "can't drop weight?" option |
 | `TESTS_loadrep.js` | Load–rep prediction accuracy, the "??" trusted band, per-exercise weight steps, the jump-aware rep ceiling, never-both-at-once, live re-prediction |
 | `TESTS_messages.js` | Message banks — MESSAGES.txt/index.html sync, no blanks or duplicates, pickers still resolve |
 | `TESTS_mesocomplete.js` | Mesocycle completion summary — totals, progression readout, PRs, and repeat/new/archive |

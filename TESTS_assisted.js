@@ -31,14 +31,24 @@ run("assisted exercises", ()=>{
   ok("state is migrated to the current schema", B.st().version===B.ev("SCHEMA_VERSION"));
   const short=B.ev('ProgressionEngine.suggest("b_assisted_pull_up",10,2)');
   ok("short of target ADDS assistance (easier)", short.kg>30, short.kg);
-  ok("short-of-target message talks about assistance", /add .*assistance/i.test(short.reason), short.reason);
+  ok("short-of-target message names the new assistance", /assistance/i.test(short.reason) && /\d/.test(short.reason), short.reason);
   ok("never says 'back off' for an assisted lift", !/back off/i.test(short.reason), short.reason);
 
   // ---------- STRONG SESSION GOES THE OTHER WAY ----------
   const C=boot(legacy([logOf("b_assisted_pull_up",[set(30,10,3),set(30,11,3),set(30,10,3)])]));
   const strong=C.ev('ProgressionEngine.suggest("b_assisted_pull_up",10,2)');
-  ok("strong sets REMOVE assistance (harder)", strong.kg<30, strong.kg);
-  ok("strong-set message talks about dropping assistance", /assistance/i.test(strong.reason), strong.reason);
+  // the stack only moves in 5s, and the earned drop is 2.5 — hold and take the
+  // rep rather than halving the assistance in one go
+  ok("a strong session never ADDS assistance", strong.kg<=30, strong.kg);
+  ok("an unloadable drop holds the stack and asks for reps",
+     strong.kg===30 && /reps/i.test(strong.reason), `${strong.kg} | ${strong.reason}`);
+
+  // with a stack that can express it, the assistance does come down
+  const S2=boot(legacy([logOf("b_assisted_pull_up",[set(30,10,3),set(30,11,3),set(30,10,3)])]));
+  S2.ev('exById("b_assisted_pull_up").step=2.5; Store.save();');
+  const stepped=S2.ev('ProgressionEngine.suggest("b_assisted_pull_up",10,2)');
+  ok("strong sets REMOVE assistance when the step allows it", stepped.kg===27.5, stepped.kg);
+  ok("…and say so", /assistance/i.test(stepped.reason), stepped.reason);
 
   // ---------- WHICH NAMES GET FLAGGED ----------
   const custom=[

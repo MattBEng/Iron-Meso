@@ -8,13 +8,9 @@ live in `RELEASES[0]` in `index.html`, and `TESTS_about.js` fails if the two dri
 apart. Update both when you ship, and add the engineering detail to
 `CHANGELOG.md` rather than here.
 
-## 1.1.0 — 2026-09-22
+## 1.2.0 — 2026-09-24
 
-- Version numbers, plus this What's new screen (Settings, or the card on Home after an update).
-- Bodyweight rep targets now rebuild from the reps you actually managed, instead of sitting on a number you could never reach.
-- Beating your plan's rep target no longer drops your weight 5%. It holds the load and asks you to beat it.
-- Missing one rep on your last set no longer counts as a failed session.
-- Exercise cards show the reps actually being asked for when that differs from the plan.
-- Replacing an exercise mid-workout rebuilds the card properly, so a dumbbell move can't inherit bodyweight rows.
-- Cardio you skipped, or never filled in, isn't logged any more.
-- Stats: fixed completion %, PRs, per-week averages, and the scope dropdown; tidied into collapsible sections.
+- Suggested weights are now ones you can actually load. "Repeat this" keeps the exact weight you used (9kg stays 9kg, not 8.8), and changes move in that exercise's own step.
+- When a change is smaller than the smallest plate or pin you have, it holds the weight and asks for an extra rep instead of jumping a whole step.
+- New "can't drop weight?" option, the mirror of "can't add weight?": keeps the weight and rebuilds to the reps you completed.
+- Missing your target by one rep now repeats the same weight. A bigger miss still drops a step.
