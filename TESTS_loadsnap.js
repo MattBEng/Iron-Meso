@@ -49,7 +49,8 @@ run("loadable weights", ()=>{
   push(HT, sets(20,10,10));                    // machine, 5kg stack, target met at the limit
   s=sug(HT);
   ok("a sub-plate increase holds the weight", s.kg===20, s.kg);
-  ok("…and asks for a rep instead", /smallest step/i.test(s.reason) && /reps/.test(s.reason), s.reason);
+  ok("…and asks for a rep instead", /can't load less than/i.test(s.reason) && /reps/.test(s.reason), s.reason);
+  ok("…naming the step, not the weight", /less than 5kg/i.test(s.reason) && /repeat 20kg/i.test(s.reason), s.reason);
 
   // ---------- BACKOFF ----------
   clear();

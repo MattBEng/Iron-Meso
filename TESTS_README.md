@@ -18,6 +18,7 @@ node TESTS_ramp.js         # run one suite
 
 | File | Covers |
 |---|---|
+| `TESTS_nuisance.js` | Audit findings — the weight-jump field in lb and at 1.25kg, the unloadable-jump wording, timed holds getting no rep suggestion, future-dated logs ignored by streak/gap, "First time" vs real history |
 | `TESTS_progression.js` | Load suggestions, bodyweight reps-progression, weighted-bodyweight, held-weight plateau detection, AMRAP/myorep exclusion |
 | `TESTS_about.js` | Version and What's new — `RELEASES[0]` matching `WHATS-NEW.md` word for word, the About card, the Home update card showing once, fresh installs not seeing it |
 | `TESTS_assisted.js` | Assisted machines — reversed progression (short → more assistance, strong → less), the v7→v8 re-flag migration, name matching, a user untick sticking, no negative assistance |

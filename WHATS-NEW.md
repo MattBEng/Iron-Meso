@@ -8,9 +8,11 @@ live in `RELEASES[0]` in `index.html`, and `TESTS_about.js` fails if the two dri
 apart. Update both when you ship, and add the engineering detail to
 `CHANGELOG.md` rather than here.
 
-## 1.2.0 — 2026-09-24
+## 1.2.1 — 2026-09-24
 
-- Suggested weights are now ones you can actually load. "Repeat this" keeps the exact weight you used (9kg stays 9kg, not 8.8), and changes move in that exercise's own step.
-- When a change is smaller than the smallest plate or pin you have, it holds the weight and asks for an extra rep instead of jumping a whole step.
-- New "can't drop weight?" option, the mirror of "can't add weight?": keeps the weight and rebuilds to the reps you completed.
-- Missing your target by one rep now repeats the same weight. A bigger miss still drops a step.
+- The "smallest weight jump" box now shows and saves in your unit. In lb it showed the kg number and quietly shrank it every time you saved.
+- A 1.25kg microplate step no longer displays as 1.3.
+- When a jump is too small to load, the message names the jump ("can't load less than 5kg here") instead of the weight you're repeating.
+- Timed holds no longer get a rep suggestion meant for bodyweight exercises.
+- A workout accidentally dated in the future no longer sits at the top of your streak or makes "days since last workout" read 0.
+- An exercise you have done before no longer says "First time" when it can't suggest a weight. It shows what you actually did.

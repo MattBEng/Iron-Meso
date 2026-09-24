@@ -9,6 +9,43 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.2.1 — 2026-09-24 (audit sweep: nuisance bugs)
+A deliberate hunt rather than a reported bug: probed units, rounding, silly
+inputs, empty and extreme states, escaping, stale sessions, deleted exercises,
+import/export, dates, deloads, set types, timers and the meso lifecycle. Six
+things were actually wrong.
+- **The per-exercise "smallest weight jump" field was broken for lb users.** It
+  is stored in kg but rendered raw, so an lb user saw "2.5" labelled lb, and
+  saving the form untouched re-converted it to 1.13kg — halving every time.
+  Now shown in the user's unit and only re-converted when actually edited.
+- **`dispW()` rounds to 1dp**, so a 1.25kg microplate step displayed as "1.3".
+  Added `dispW2()` for that field.
+- **Wording:** the sub-step hold said "20kg is the smallest step here", naming
+  the weight rather than the step. Now "Can't load less than 5kg here — repeat
+  20kg and aim for 11 reps."
+- **Timed holds got a bodyweight rep suggestion** ("aim for 1 reps" off
+  `bodyweight × 0/0`). `suggest()` now returns null for `timed` exercises; the
+  card's "Last time: 50s · 45s" is the right readout.
+- **A future-dated log** (a typo'd year) sat at the head of the streak and made
+  "days since last workout" read 0. `streakCount()` and `daysSinceLastWorkout()`
+  now ignore dates after today.
+- **"First time — find a weight…" on an exercise with history**, when no
+  suggestion could be derived (an AMRAP-only session). The card now shows
+  "Last time: 100kg×20 AMRAP · no suggestion from those sets — pick your load."
+- **Checked and found clean:** XSS via exercise names/notes (escaped), lb input
+  round-trips (225lb → 102.06kg → 225lb, working-weight grouping intact),
+  export/import including the new settings, deleting an exercise that's in an
+  open session or in history, deleting a log mid-meso, back-dated logs and the
+  editability window, add/remove set bounds, deload weeks, weighted vs unloaded
+  bodyweight, repeat meso, rest timer across navigation, tabata minutes, zones
+  with no max HR, empty mesos, 9999kg inputs, and Stats with a single log (no
+  NaN or Infinity).
+- **Known, not fixed:** increments and default steps are kg-based, so an lb user
+  gets 5.5lb jumps rather than 5lb. Worth doing if the app ever ships to lb
+  users; irrelevant for one kg user.
+- Tests: new `TESTS_nuisance.js` (21). Suite now **501 / 24 suites**, all
+  passing.
+
 ### v1.2.0 — 2026-09-24 (loads you can actually put on the bar)
 - **Bug: a hold changed the weight.** Walking Lunge, 9kg × 10/10/10, verdict
   "target met at the limit — repeat this", suggestion **8.8kg**. Every

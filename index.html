@@ -501,8 +501,16 @@ STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|
    stored data and moves independently. RELEASES[0] must match WHATS-NEW.md —
    the app is one offline file, so the notes are embedded, not fetched.
    TESTS_about.js fails if the two drift apart. */
-const APP_VERSION = "1.2.0";
+const APP_VERSION = "1.2.1";
 const RELEASES = [
+  {v:"1.2.1", date:"2026-09-24", notes:[
+    "The \"smallest weight jump\" box now shows and saves in your unit. In lb it showed the kg number and quietly shrank it every time you saved.",
+    "A 1.25kg microplate step no longer displays as 1.3.",
+    "When a jump is too small to load, the message names the jump (\"can't load less than 5kg here\") instead of the weight you're repeating.",
+    "Timed holds no longer get a rep suggestion meant for bodyweight exercises.",
+    "A workout accidentally dated in the future no longer sits at the top of your streak or makes \"days since last workout\" read 0.",
+    "An exercise you have done before no longer says \"First time\" when it can't suggest a weight. It shows what you actually did.",
+  ]},
   {v:"1.2.0", date:"2026-09-24", notes:[
     "Suggested weights are now ones you can actually load. \"Repeat this\" keeps the exact weight you used (9kg stays 9kg, not 8.8), and changes move in that exercise's own step.",
     "When a change is smaller than the smallest plate or pin you have, it holds the weight and asks for an extra rep instead of jumping a whole step.",
@@ -792,6 +800,9 @@ function repsAtLoad(refKg, refReps, kg){
 /** The smallest real weight jump for this exercise (per-exercise, kg). */
 const DEFAULT_STEP={Barbell:2.5, Dumbbell:2.5, Machine:5, Cable:2.5,
                     Smith:2.5, Kettlebell:4, Bodyweight:2.5, Other:2.5};
+/** A weight in the user's unit at 2dp — dispW rounds to 1dp, which turns a
+    1.25kg microplate into "1.3". */
+function dispW2(kg){ const u=S().settings.unit; const v=u==="lb"? kg*KG2LB : kg; return Math.round(v*100)/100; }
 function exStep(ex){
   if(!ex) return 2.5;
   const v=Number(ex.step);
@@ -1030,6 +1041,7 @@ class ProgressionEngine{
     if(!hist.length) return null;
     const last=hist[0];
     const ex=exById(exId);
+    if(ex && ex.timed) return null;   // holds progress by seconds, shown as "Last time"
     const lower=ex && LOWER.has(ex.muscle);
     // Exclude AMRAP / myorep sets: their reps are intentionally variable (to
     // failure), so they shouldn't drive the working-weight or load decision.
@@ -1158,7 +1170,7 @@ class ProgressionEngine{
     const stepNow=exStep(ex);
     if(kg!==lastKg && Math.abs(kg-lastKg)<=stepNow/2 && !repeatReps){
       kg=lastKg; repeatReps=false;
-      reason=`${dispW(lastKg)}${unitLabel()} is the smallest step here — repeat it and aim for ${avgRepsNow+1} reps.`;
+      reason=`Can't load less than ${dispW(stepNow)}${unitLabel()} here — repeat ${dispW(lastKg)}${unitLabel()} and aim for ${avgRepsNow+1} reps.`;
     }
     kg=snapLoad(kg, lastKg, ex);
     if(assisted) kg=Math.max(0,kg);      // can't have negative assistance
@@ -1480,7 +1492,10 @@ function logEditable(log){
   return idx>=0 && idx >= mlogs.length-EDIT_WINDOW;        // within the last 6 logged
 }
 function streakCount(){
-  const dates=[...new Set(S().logs.filter(l=>!l.skipped).map(l=>l.date))].sort().reverse();
+  // a future date is a typo, not a workout: it would otherwise sit at the head
+  // of the streak and make "days since" read 0
+  const today=todayISO();
+  const dates=[...new Set(S().logs.filter(l=>!l.skipped && l.date<=today).map(l=>l.date))].sort().reverse();
   if(!dates.length) return 0;
   let streak=0, cursor=new Date();
   for(const d of dates){
@@ -2159,7 +2174,7 @@ function editExercise(id, done){
       Time-based hold (log seconds, e.g. plank, dead hang)</label>
     <label>Smallest weight jump (${unitLabel()})</label>
     <input id="estep" type="number" inputmode="decimal" step="any" min="0.25"
-      value="${ex.step??""}" placeholder="${DEFAULT_STEP[ex.equipment]??2.5} (default for ${esc(ex.equipment||"this")})">
+      value="${ex.step? dispW2(ex.step) : ""}" placeholder="${dispW2(DEFAULT_STEP[ex.equipment]??2.5)} (default for ${esc(ex.equipment||"this")})">
     <p class="faint" style="margin:4px 0 0">The next weight you can actually load. Drives how many reps
       you build up to before adding weight — a big jump (5→7.5kg dumbbell) needs more reps banked first.</p>
     <label>Notes</label><textarea id="eno" rows="2">${esc(ex.notes||"")}</textarea>
@@ -2175,7 +2190,11 @@ function editExercise(id, done){
       ex.assisted=$("#eassist",m).checked;
       ex.timed=$("#etime",m).checked;
       { const sv=parseFloat($("#estep",m).value);
-        if(isFinite(sv)&&sv>0) ex.step=Math.round(toKg(sv)*100)/100; else delete ex.step; }
+        // the field is shown in the user's unit; only re-convert when they
+        // actually changed it, or a round trip would shrink it every save
+        const shown=ex.step? dispW2(ex.step) : null;
+        if(isFinite(sv)&&sv>0){ if(shown===null || Math.abs(sv-shown)>0.001) ex.step=Math.round(toKg(sv)*100)/100; }
+        else delete ex.step; }
       if(ex.timed) ex.assisted=false;   // mutually exclusive with assisted-weight logic
       if(!id) S().exercises.push(ex);
       Store.save(); closeModal(); done(ex.id);
@@ -2430,7 +2449,10 @@ function exCardHTML(ses, xi){
              return last.length
                ? `<div class="sugline num"><b>Last time: ${last.map(s=>s.secs+"s").join(" · ")}</b></div>`
                : `<div class="faint" style="margin:6px 0 0">First time — log your hold ⏱️</div>`; })()
-         : `<div class="faint" style="margin:6px 0 0">${ses.bodyweight?`Bodyweight — aim for ${t.reps} good reps.`:(FUN()?`First time — find a weight where ${t.reps} reps feels ${feelWord(t.rir).toLowerCase()}.`:`First time — find your ${t.reps}-rep @${t.rir}RIR load.`)}</div>`}
+         : (()=>{ const prev=exerciseHistory(ses.exerciseId)[0];
+             if(prev && prev.sets.length)
+               return `<div class="sugline num"><b>Last time: ${prev.sets.map(x=>`${dispW(x.kg)}${unitLabel()}×${x.reps}${x.type&&x.type!=="normal"?` ${x.type.toUpperCase()}`:""}`).join(" · ")}</b> · no suggestion from those sets — pick your load.</div>`;
+             return `<div class="faint" style="margin:6px 0 0">${ses.bodyweight?`Bodyweight — aim for ${t.reps} good reps.`:(FUN()?`First time — find a weight where ${t.reps} reps feels ${feelWord(t.rir).toLowerCase()}.`:`First time — find your ${t.reps}-rep @${t.rir}RIR load.`)}</div>`; })()}
     <div class="setgrid" data-grid="${xi}">
       ${ses.timed
         ? `<span></span><span class="h">Hold</span><span class="h">Seconds</span><span class="h">${term("rirHead")}</span><span class="h">Log</span>`
@@ -4071,7 +4093,8 @@ const RETURN_MSGS_LONG=[
  "Welcome back, legend. Let's rewrite the story 📖"];
 /** Whole days since the most recent logged workout, or null if none. */
 function daysSinceLastWorkout(){
-  const dates=S().logs.filter(l=>!l.skipped).map(l=>l.date).filter(Boolean).sort();
+  const today=todayISO();
+  const dates=S().logs.filter(l=>!l.skipped && l.date && l.date<=today).map(l=>l.date).sort();
   if(!dates.length) return null;
   const last=new Date(dates[dates.length-1]+"T12:00");
   const now=new Date(); now.setHours(12,0,0,0);
