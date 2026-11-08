@@ -9,6 +9,30 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.3.0 — 2026-11-09 (last-time hints, warm-up sets)
+From a review against Hevy/RP: two low-effort wins.
+- **"last 60×12" hint under every set row.** `prevSessionSets(exId)` reads the
+  most recent logged session of that exercise from raw `S().logs` (so warm-ups
+  are available); while editing a past workout it means the session before
+  that one. `lastHintHTML` matches **warm-up to warm-up and working to working
+  by position**, so adding a warm-up doesn't shift every hint down a row. Hints
+  are full-width grid rows (`.lasthint`, `grid-column:1/-1`); a partial span
+  broke the 5-column grid and wrapped the next row.
+- **Warm-up set type** (`warmup`, badge "W") in the existing Set Type menu.
+  `isWarm()` gates every training total: `HistoryIndex` (so PRs, e1RM, volume,
+  best set and the engine's history), the Home last-workout card, the meso
+  summary, and the Stats totals / per-muscle / weekly / monthly sums. The
+  engine already read only `type` "normal" sets, so it needed no change.
+- Logging a warm-up **doesn't carry its weight forward** into later rows, and a
+  working set doesn't carry into warm-up rows. No PR check or celebration on a
+  warm-up.
+- Changing a set to or from warm-up calls `realignWorkingGhosts`, so working
+  set 1 is prescribed from last time's working set 1 rather than from whatever
+  row it used to be.
+- New `TESTS_warmup.js` (22). `TESTS_features.js` now expects five set types.
+
+---
+
 ### v1.2.2 — 2026-11-09 (new block, old rep targets)
 Reported: a new meso set to 10 reps showed "target 3×10" in the header while the
 rows prefilled 17. The exercise had been trained at 16 reps in the *previous*

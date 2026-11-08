@@ -12,7 +12,7 @@ run("features", ()=>{
   w.go("workout");
   click($$("[data-setmenu]")[0]);
   ok("set-type section in the set menu", !!$("[data-st]"));
-  ok("four set types offered", $$("[data-st]").length===4, $$("[data-st]").length);
+  ok("five set types offered (incl. warm-up)", $$("[data-st]").length===5, $$("[data-st]").length);
   click($("[data-st='amrap']"));
   ok("AMRAP stored on the set", st().activeSession.exercises[0].sets[0].type==="amrap");
   ok("AMRAP badge rendered", $$(".settype-badge").some(b=>b.textContent==="AMRAP"));

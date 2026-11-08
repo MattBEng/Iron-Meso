@@ -363,6 +363,8 @@ ul.whatsnew li{margin:0 0 7px;font-size:14px;line-height:1.45;color:var(--text)}
   border-radius:var(--r-sm); padding:0}
 .setgrid .sn:active{background:var(--raised)}
 .setgrid .sn .dots{font-size:14px; line-height:.7; color:var(--faint)}
+.setgrid .lasthint{grid-column:1/-1; font-size:11px; color:var(--faint); margin:-3px 0 2px; padding-left:34px; line-height:1.1}
+.setgrid .lasthint:empty{display:none}
 .setgrid input{padding:9px 2px; text-align:center; font-weight:800; font-size:16px;
   background:var(--raised); border:1px solid var(--line); min-width:0; font-variant-numeric:tabular-nums}
 .setgrid input::placeholder{color:var(--faint); font-weight:700; opacity:1}
@@ -501,8 +503,12 @@ STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|
    stored data and moves independently. RELEASES[0] must match WHATS-NEW.md —
    the app is one offline file, so the notes are embedded, not fetched.
    TESTS_about.js fails if the two drift apart. */
-const APP_VERSION = "1.2.2";
+const APP_VERSION = "1.3.0";
 const RELEASES = [
+  {v:"1.3.0", date:"2026-11-09", notes:[
+    "Each set now shows what you did last time underneath it, like \"last 100×10\", so you know what to beat without leaving the workout.",
+    "New Warm-up set type in the set menu, alongside AMRAP and Myorep. Warm-ups get a W badge and don't count toward volume, sets, PRs or progression, and logging one won't drag your working weight down.",
+  ]},
   {v:"1.2.2", date:"2026-11-09", notes:[
     "Starting a new block with different rep targets no longer prefills last block's reps. Set 10 and the rows say 10, not 17. Your weights still carry over.",
   ]},
@@ -744,7 +750,7 @@ const HistoryIndex={
     const map=new Map();
     for(const log of S().logs){
       for(const ex of log.exercises){
-        const sets=(ex.sets||[]).filter(s=>s.done);
+        const sets=(ex.sets||[]).filter(s=>s.done && !isWarm(s));
         if(!sets.length) continue;
         const best=sets.reduce((a,b)=>epley(b.kg,b.reps)>epley(a.kg,a.reps)?b:a);
         const entry={date:log.date, mesoId:log.mesoId, week:log.week, sets,
@@ -1549,7 +1555,7 @@ VIEWS.home=function(){
   const lastCard = lastLog? `<div class="card">
       <div class="kicker">Last workout</div>
       <div class="row split"><h3>${esc(lastLog.dayName)}</h3><span class="muted num">${fmtDate(lastLog.date)}</span></div>
-      <div class="muted num">${lastLog.exercises.length} exercises · ${lastLog.exercises.reduce((t,e)=>t+e.sets.filter(s=>s.done).length,0)} sets · ${Math.round(lastLog.exercises.reduce((t,e)=>t+e.sets.filter(s=>s.done).reduce((v,s)=>v+s.kg*s.reps,0),0)).toLocaleString()} kg volume${lastLog.durationMin?` · ${lastLog.durationMin} min`:""}</div>
+      <div class="muted num">${lastLog.exercises.length} exercises · ${lastLog.exercises.reduce((t,e)=>t+e.sets.filter(s=>s.done&&!isWarm(s)).length,0)} sets · ${Math.round(lastLog.exercises.reduce((t,e)=>t+e.sets.filter(s=>s.done&&!isWarm(s)).reduce((v,s)=>v+s.kg*s.reps,0),0)).toLocaleString()} kg volume${lastLog.durationMin?` · ${lastLog.durationMin} min`:""}</div>
       ${lastFb? `<div style="margin-top:8px" class="row"><span class="pill ${lastFb.recovery>=4?"grn":lastFb.recovery>=3?"amb":"red"}">Recovery ${lastFb.recovery}/5</span>
         <span class="pill">Sleep ${lastFb.sleep}/5</span><span class="pill">Fatigue ${lastFb.fatigue}/5</span></div>`:""}
       ${lastLog.notes? `<p class="muted" style="margin:8px 0 0">“${esc(lastLog.notes)}”</p>`:""}
@@ -2470,7 +2476,8 @@ function exCardHTML(ses, xi){
       ${ses.timed
         ? `<span></span><span class="h">Hold</span><span class="h">Seconds</span><span class="h">${term("rirHead")}</span><span class="h">Log</span>`
         : `<span></span><span class="h">Weight (${unitLabel()})</span><span class="h">Reps</span><span class="h">${term("rirHead")}</span><span class="h">Log</span>`}
-      ${ses.sets.map((x,si)=>setRowHTML(ses,xi,x,si)).join("")}
+      ${(()=>{ const prev=prevSessionSets(ses.exerciseId);
+          return ses.sets.map((x,si)=>setRowHTML(ses,xi,x,si)+lastHintHTML(ses,x,si,prev)).join(""); })()}
     </div>
     <button class="addset" data-addset="${xi}">+ Add set</button>
   </div>`;
@@ -2515,7 +2522,13 @@ const SET_TYPES={
   amrap:  {badge:"AMRAP", label:"AMRAP",       desc:"As many reps as possible on the last set"},
   my:     {badge:"MY",  label:"Myorep",        desc:"Rest-pause: short rests, extra mini-sets to failure"},
   mm:     {badge:"MM",  label:"Myorep Match",  desc:"Match the myorep count across clusters"},
+  warmup: {badge:"W",   label:"Warm-up",       desc:"Lighter prep set — not counted in volume, stats or progression"},
 };
+/* Warm-ups are logged so you can see them, but they are prep, not training:
+   they never count toward volume, sets, PRs, e1RM or the progression engine.
+   The engine already only reads type "normal" sets; everything that totals
+   training filters through isWarm(). */
+const isWarm=s=>!!s && s.type==="warmup";
 function setTypeBadge(t){ const d=SET_TYPES[t]; return (d&&d.badge)? `<span class="settype-badge" data-tt="${t}">${d.badge}</span>` : ""; }
 
 /** Update the rep placeholders/hints after a live weight change. */
@@ -2537,6 +2550,45 @@ function repaintPred(xi){
       }
     }
   });
+}
+/* The sets you did last time this exercise came up, from the raw logs (warm-ups
+   included, so a warm-up row can show last warm-up). While editing a past
+   workout, "last time" means the session before that one. */
+function prevSessionSets(exId){
+  const cur=S().editSession||S().activeSession;
+  const editing=!!S().editSession;
+  const logs=S().logs.filter(l=>!l.skipped && (!editing || (l.id!==cur.id && l.date<=cur.date)));
+  for(let i=logs.length-1;i>=0;i--){
+    const e=logs[i].exercises.find(e=>e.exerciseId===exId);
+    const done=e && (e.sets||[]).filter(s=>s.done);
+    if(done && done.length) return done;
+  }
+  return null;
+}
+/** "last 60×12" hint under a row: matched warm-up-to-warm-up and
+    working-to-working by position, so adding a warm-up doesn't shift it. */
+function lastHintHTML(ses, x, si, prev){
+  if(!prev) return "";
+  const warm=isWarm(x);
+  const pos=ses.sets.slice(0,si).filter(r=>isWarm(r)===warm).length;
+  const p=prev.filter(r=>isWarm(r)===warm)[pos];
+  if(!p) return `<div class="lasthint"></div>`;
+  const txt = ses.timed ? `${p.secs??"?"}s`
+            : ses.bodyweight && !p.kg ? `×${p.reps}`
+            : `${dispW(p.kg)}×${p.reps}`;
+  return `<div class="lasthint num">last ${txt}${p.type&&p.type!=="normal"?` ${SET_TYPES[p.type]?.badge||""}`:""}</div>`;
+}
+/* Marking a set as (or no longer) a warm-up shifts which rows are working sets.
+   Re-aim the untouched working rows so working set 1 is prescribed from last
+   time's working set 1, not from whatever sat in that row before. */
+function realignWorkingGhosts(ses){
+  if(ses.timed || ses.cardio || !ses.suggestion) return;
+  const working=ses.sets.filter(r=>!isWarm(r));
+  if(!working.length) return;
+  const t=ses.target, sug=ses.suggestion;
+  const fresh=buildGhostRows(ses.exerciseId, working.length, sug.kg, t.reps, t.rir, sug, false);
+  working.forEach((r,i)=>{ if(r.done || r.touched || !fresh[i]) return;
+    r.reps=fresh[i].reps; r.expReps=fresh[i].expReps; });
 }
 function setRowHTML(ses, xi, x, si){
   const id=`${xi}:${si}`;
@@ -2652,7 +2704,7 @@ function mesoSummary(meso){
     const wk=(byWeek[l.week]??={vol:0,sets:0});
     l.exercises.forEach(e=>{
       const ex=exById(e.exerciseId);
-      e.sets.filter(s=>s.done).forEach(s=>{
+      e.sets.filter(s=>s.done && !isWarm(s)).forEach(s=>{
         t.sets++; t.reps+=s.reps||0;
         const v=(s.kg||0)*(s.reps||0);
         t.vol+=v; wk.vol+=v; wk.sets++;
@@ -3150,7 +3202,7 @@ function bindWorkout(){
       const [xi,si]=chk.dataset.chk.split(":").map(Number);
       const ses=s.exercises[xi], set=ses.sets[si];
       set.done=!set.done;
-      if(set.done && !edit && FUN()){
+      if(set.done && !edit && FUN() && !isWarm(set)){
         // PR? compare this set's e1RM against all history for the exercise
         try{
           const hist=exerciseHistory(ses.exerciseId);
@@ -3163,9 +3215,11 @@ function bindWorkout(){
       if(set.done){
         set.touched=true;                                  // logged values render solid
         // carry weight + RIR forward; per-set rep ghosts are prescriptions, leave them
-        ses.sets.forEach((r,i)=>{ if(i>si && !r.done && !r.touched){ r.kg=set.kg; r.rir=set.rir; } });
+        // ...but never from or into a warm-up: a 40kg warm-up must not drag the
+        // 80kg working sets down, and working weight shouldn't overwrite warm-ups.
+        if(!isWarm(set)) ses.sets.forEach((r,i)=>{ if(i>si && !r.done && !r.touched && !isWarm(r)){ r.kg=set.kg; r.rir=set.rir; } });
         if(!edit){
-          checkPR(ses.exerciseId, set.kg, set.reps);
+          if(!isWarm(set)) checkPR(ses.exerciseId, set.kg, set.reps);
           const remaining=ses.sets.some(r=>!r.done);
           if(remaining) startRest(ses.target.rest);
           else { stopRest(); toast("Exercise done 💪"); }
@@ -3200,7 +3254,9 @@ function bindWorkout(){
         </div>`, m=>{
         m.onclick=ev=>{
           const stBtn=ev.target.closest("[data-st]");
-          if(stBtn){ set.type=stBtn.dataset.st==="normal"?null:stBtn.dataset.st;
+          if(stBtn){ const wasWarm=isWarm(set);
+            set.type=stBtn.dataset.st==="normal"?null:stBtn.dataset.st;
+            if(wasWarm!==isWarm(set)) realignWorkingGhosts(ses);
             save(); closeModal(); refreshCard(xi); return; }
           const sa=ev.target.closest("[data-sa]")?.dataset.sa; if(!sa) return;
           if(sa==="dup"){
@@ -4428,7 +4484,7 @@ VIEWS.analytics=function(){
   // ---- Totals ----
   const totals=logs.reduce((t,l)=>{
     t.workouts++; t.mins+=l.durationMin||0;
-    l.exercises.forEach(e=>e.sets.filter(s=>s.done).forEach(x=>{
+    l.exercises.forEach(e=>e.sets.filter(s=>s.done && !isWarm(s)).forEach(x=>{
       t.sets++; t.vol+=(x.kg||0)*(x.reps||0); t.reps+=(x.reps||0);
     }));
     return t;
@@ -4445,7 +4501,7 @@ VIEWS.analytics=function(){
     w.count++; w.dur+=l.durationMin||0;
     l.exercises.forEach(e=>{
       const ex=exById(e.exerciseId);
-      const done=e.sets.filter(s=>s.done);
+      const done=e.sets.filter(s=>s.done && !isWarm(s));
       w.sets+=done.length;
       w.vol+=done.reduce((t,s)=>t+s.kg*s.reps,0);
       if(ex && ex.muscle!=="Cardio") setsPerMuscle[ex.muscle]=(setsPerMuscle[ex.muscle]||0)+done.length;
@@ -4482,7 +4538,7 @@ VIEWS.analytics=function(){
     const weeksDone=Math.max(1, new Set(counted.map(l=>l.week)).size);
     counted.forEach(l=>l.exercises.forEach(e=>{
       const ex=exById(e.exerciseId);
-      if(ex && ex.muscle!=="Cardio") actualPerMuscle[ex.muscle]=(actualPerMuscle[ex.muscle]||0)+e.sets.length;
+      if(ex && ex.muscle!=="Cardio") actualPerMuscle[ex.muscle]=(actualPerMuscle[ex.muscle]||0)+e.sets.filter(s=>!isWarm(s)).length;
     }));
     Object.keys(actualPerMuscle).forEach(k=>actualPerMuscle[k]=Math.round(actualPerMuscle[k]/weeksDone*10)/10);
   }
@@ -4513,7 +4569,7 @@ VIEWS.analytics=function(){
     if(!mlogs.length) return;
     let vol=0, sets=0; const e1rms={};
     mlogs.forEach(l=>l.exercises.forEach(e=>{
-      e.sets.forEach(x=>{ vol+=x.kg*x.reps; sets++; });
+      e.sets.filter(x=>!isWarm(x)).forEach(x=>{ vol+=x.kg*x.reps; sets++; });
       const best=e.sets.reduce((a,b)=>epley(b.kg,b.reps)>epley(a?.kg||0,a?.reps||0)?b:a,null);
       if(best){ const v=epley(best.kg,best.reps); e1rms[e.exerciseId]=Math.max(e1rms[e.exerciseId]||0,v); }
     }));
@@ -4538,7 +4594,7 @@ VIEWS.analytics=function(){
   // ---- Monthly trends (scoped) ----
   const byMonth={};
   const mBucket=k=>(byMonth[k]??={vol:0, cardioMin:0});
-  logs.forEach(l=>{ const m=mBucket(l.date.slice(0,7)); l.exercises.forEach(e=>e.sets.forEach(x=>m.vol+=x.kg*x.reps)); });
+  logs.forEach(l=>{ const m=mBucket(l.date.slice(0,7)); l.exercises.forEach(e=>e.sets.filter(x=>!isWarm(x)).forEach(x=>m.vol+=x.kg*x.reps)); });
   cardio.forEach(c=>{ mBucket(c.date.slice(0,7)).cardioMin+=(c.minutes||0); });
   const months=Object.keys(byMonth).sort().slice(-6);
   const volMonths=months.filter(k=>byMonth[k].vol>0);
