@@ -8,7 +8,6 @@ live in `RELEASES[0]` in `index.html`, and `TESTS_about.js` fails if the two dri
 apart. Update both when you ship, and add the engineering detail to
 `CHANGELOG.md` rather than here.
 
-## 1.3.0 — 2026-11-09
+## 1.3.1 — 2026-11-09
 
-- Each set now shows what you did last time underneath it, like "last 100×10", so you know what to beat without leaving the workout.
-- New Warm-up set type in the set menu, alongside AMRAP and Myorep. Warm-ups get a W badge and don't count toward volume, sets, PRs or progression, and logging one won't drag your working weight down.
+- Home now shows your total sets per muscle so far this meso, most first, with bars scaled against your most-trained muscle. Tap it for full stats.

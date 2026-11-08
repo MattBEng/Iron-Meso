@@ -9,6 +9,26 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.3.1 — 2026-11-09 (Home meso volume card)
+- **"Mesocycle volume" card on Home**, under the current-workout card: total
+  working sets per muscle **so far this meso**, most first. Bars are **relative
+  to the most-trained muscle** (it fills the bar; Chest 18 / Quads 9 shows Quads
+  at half), so the card answers "where has my volume gone?" at a glance. No
+  targets on purpose: Matt asked for a cumulative comparison, not
+  progress-to-plan (that lives in Stats). Header shows week and workouts done.
+  Hidden until something is logged. Tapping it opens Stats.
+- Counts done, non-warm-up sets in logs of the active meso; skip markers, other
+  mesos and cardio are excluded. `mesoVolume(meso)` also returns each muscle's
+  total planned sets (every week's `rampedSets`, deload included) in case a
+  progress-to-plan view is wanted later; the card doesn't show it.
+- Iterated in-session: a weekly sets-vs-target version was built first, then
+  replaced at Matt's request.
+- Reuses the Stats `.spm-*` bar styles; `.volcard .spm-track` gets a visible
+  background (default track was white-on-white on Home).
+- New `TESTS_homevol.js` (11).
+
+---
+
 ### v1.3.0 — 2026-11-09 (last-time hints, warm-up sets)
 From a review against Hevy/RP: two low-effort wins.
 - **"last 60×12" hint under every set row.** `prevSessionSets(exId)` reads the

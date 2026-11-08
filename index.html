@@ -297,6 +297,7 @@ canvas.chart{width:100%; height:180px; display:block}
 .mgfilter .typechip{white-space:nowrap;flex:0 0 auto}
 .linkdate{color:var(--accent);font-weight:700;background:none;border:0;padding:0;font:inherit}
 .cutie-card{border-color:rgba(224,85,156,.35);background:linear-gradient(180deg,rgba(224,85,156,.06),transparent)}
+.volcard .spm-track{background:var(--line)}
 .welcome-back h3{font-size:17px;line-height:1.35}
 .update-card{border-color:var(--accent);background:var(--accent-soft)}
 ul.whatsnew{margin:8px 0 0;padding-left:20px}
@@ -503,8 +504,11 @@ STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|
    stored data and moves independently. RELEASES[0] must match WHATS-NEW.md —
    the app is one offline file, so the notes are embedded, not fetched.
    TESTS_about.js fails if the two drift apart. */
-const APP_VERSION = "1.3.0";
+const APP_VERSION = "1.3.1";
 const RELEASES = [
+  {v:"1.3.1", date:"2026-11-09", notes:[
+    "Home now shows your total sets per muscle so far this meso, most first, with bars scaled against your most-trained muscle. Tap it for full stats.",
+  ]},
   {v:"1.3.0", date:"2026-11-09", notes:[
     "Each set now shows what you did last time underneath it, like \"last 100×10\", so you know what to beat without leaving the workout.",
     "New Warm-up set type in the set menu, alongside AMRAP and Myorep. Warm-ups get a W badge and don't count toward volume, sets, PRs or progression, and logging one won't drag your working weight down.",
@@ -1515,6 +1519,47 @@ function streakCount(){
 }
 
 /* ================= VIEW: DASHBOARD ================= */
+/* Cumulative sets per muscle across the whole current meso, for the Home card:
+   done working sets so far vs the total the meso plans (every week's ramped
+   sets, deload included). Warm-ups, skips, other mesos and cardio excluded. */
+function mesoVolume(meso){
+  if(!meso) return [];
+  const target={}, actual={};
+  for(let wk=1; wk<=meso.weeks; wk++){
+    const deload=isDeload(meso,wk);
+    meso.days.forEach(d=>d.exercises.forEach(sl=>{
+      if(sl.cardio || isCardioEx(sl.exerciseId)) return;
+      const ex=exById(sl.exerciseId); if(!ex || ex.muscle==="Cardio") return;
+      target[ex.muscle]=(target[ex.muscle]||0)+rampedSets(meso, sl, wk, deload);
+    }));
+  }
+  S().logs.filter(l=>l.mesoId===meso.id && !l.skipped).forEach(l=>
+    l.exercises.forEach(e=>{
+      const ex=exById(e.exerciseId); if(!ex || ex.muscle==="Cardio") return;
+      const n=(e.sets||[]).filter(s=>s.done && !isWarm(s)).length;
+      if(n) actual[ex.muscle]=(actual[ex.muscle]||0)+n;
+    }));
+  return [...new Set([...Object.keys(target),...Object.keys(actual)])]
+    .map(m=>({muscle:m, sets:actual[m]||0, target:target[m]||0}))
+    .sort((a,b)=>(b.sets-a.sets)||(b.target-a.target)||a.muscle.localeCompare(b.muscle));
+}
+function mesoVolumeCardHTML(meso, pos){
+  const rows=mesoVolume(meso).filter(r=>r.sets>0);
+  if(!rows.length) return "";
+  // Bars compare muscles to each other: the most-trained muscle fills the bar,
+  // the rest scale against it (Chest 18 = full, Quads 9 = half).
+  const max=rows[0].sets;
+  return `<div class="card volcard" data-act="volstats" style="cursor:pointer">
+    <div class="row split"><div class="kicker">${term("Meso")} volume</div>
+      <span class="faint num" style="font-size:12px">${pos.finished?"Complete":`Wk ${pos.week} of ${meso.weeks}`} · ${pos.done} of ${pos.total} workouts</span></div>
+    <div style="margin-top:6px">
+    ${rows.map(r=>`<div class="spm-row">
+        <span class="spm-label">${esc(r.muscle)}</span>
+        <div class="spm-track"><div class="spm-fill" style="width:${Math.round(100*r.sets/max)}%;background:var(--accent)"></div></div>
+        <span class="spm-val num">${r.sets}</span></div>`).join("")}
+    </div>
+    <p class="faint" style="margin:6px 0 0;font-size:11px">Total sets so far this ${term("meso")} · tap for full stats</p></div>`;
+}
 VIEWS.home=function(){
   const st=S(), meso=activeMeso(), pos=mesoPosition(meso);
   const lastLog=[...st.logs].reverse().find(l=>!l.skipped)||null;   // skips are not workouts
@@ -1586,6 +1631,7 @@ VIEWS.home=function(){
           <button class="btn btn-ghost" style="flex:1" data-act="seenupdate">Dismiss</button>
           <button class="btn btn-primary" style="flex:1" data-act="whatsnew">What's new</button></div></div>`:""}
     ${mesoCard}
+    ${mesoVolumeCardHTML(meso, pos)}
     ${lastCard}
     <div class="card">
       <div class="row split"><div class="kicker">Cardio this week</div>
@@ -1602,6 +1648,7 @@ VIEWS.home=function(){
     </div>`;
   ChartManager.draw($("#bwchart"), bw.map(b=>({x:fmtDate(b.date), y:dispW(b.kg)})), {color:getComputedStyle(document.body).getPropertyValue("--cyan").trim()});
   $("#view").onclick=e=>{
+    if(e.target.closest('[data-act="volstats"]') && !e.target.closest("button")){ go("analytics"); return; }
     const dc=e.target.closest("[data-delcardio]");
     if(dc){
       if(confirm("Delete this cardio session?")){
