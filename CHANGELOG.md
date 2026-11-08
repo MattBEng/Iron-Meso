@@ -9,6 +9,29 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.2.2 — 2026-11-09 (new block, old rep targets)
+Reported: a new meso set to 10 reps showed "target 3×10" in the header while the
+rows prefilled 17. The exercise had been trained at 16 reps in the *previous*
+block.
+- **`buildGhostRows` carried the last session's rep count forward regardless of
+  which mesocycle it came from.** Within a block that is the point (double
+  progression: hold the load, add a rep to what you actually did). Across
+  blocks it is wrong: 16 reps logged under a 16-rep prescription is not
+  progress against a fresh 10-rep one, so it read as "you smashed 10, do 17".
+- **Fix:** when every history entry for an exercise belongs to a *different*
+  meso than the active one, the slot's rep target is the prescription and the
+  rows start there. Once the current block has logged that exercise itself,
+  history drives rep progression again exactly as before. The **load** still
+  carries across blocks via the suggestion — only the rep count resets.
+- Guarded deliberately: the reset needs a known `activeMesoId` *and* history
+  that all carries a different `mesoId`. Missing or unknown ids fall through to
+  the old behaviour rather than silently resetting reps.
+- Touches `buildGhostRows` only. New suite `TESTS_represet.js` (7 checks) covers
+  the reported case, a raised target, within-block progression still climbing,
+  and a first-ever session.
+
+---
+
 ### v1.2.1 — 2026-09-24 (audit sweep: nuisance bugs)
 A deliberate hunt rather than a reported bug: probed units, rounding, silly
 inputs, empty and extreme states, escaping, stale sessions, deleted exercises,

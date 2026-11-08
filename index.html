@@ -501,8 +501,11 @@ STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|
    stored data and moves independently. RELEASES[0] must match WHATS-NEW.md —
    the app is one offline file, so the notes are embedded, not fetched.
    TESTS_about.js fails if the two drift apart. */
-const APP_VERSION = "1.2.1";
+const APP_VERSION = "1.2.2";
 const RELEASES = [
+  {v:"1.2.2", date:"2026-11-09", notes:[
+    "Starting a new block with different rep targets no longer prefills last block's reps. Set 10 and the rows say 10, not 17. Your weights still carry over.",
+  ]},
   {v:"1.2.1", date:"2026-09-24", notes:[
     "The \"smallest weight jump\" box now shows and saves in your unit. In lb it showed the kg number and quietly shrank it every time you saved.",
     "A 1.25kg microplate step no longer displays as 1.3.",
@@ -2269,7 +2272,17 @@ function buildGhostRows(exId, count, kg, targetReps, rir, sug, deload){
   const hist=exerciseHistory(exId);
   const work=hist.length? hist[0].sets.filter(s=>s.kg===sug.lastKg && (!s.type||s.type==="normal")):[];
   const heldWeight = sug.kg===sug.lastKg;
+  /* A NEW block re-prescribes the exercise. Carrying last block's rep count
+     forward would show 17 under a "target 10" header: the old 16-rep history is
+     a different prescription, not progress against this one. So reps restart at
+     the slot's target until this meso has logged the exercise itself; the LOAD
+     still carries over via the suggestion. Within a block, history keeps
+     driving rep progression as before. */
+  const curMeso=S().activeMesoId;
+  const freshBlock = !!curMeso && hist.length
+    && hist.every(x=>x.mesoId && x.mesoId!==curMeso);
   return Array.from({length:count},(_,i)=>{
+    if(freshBlock) return {kg, reps:targetReps, rir, expReps:targetReps, done:false, at:null};
     const base=work.length? work[Math.min(i,work.length-1)].reps : targetReps;
     let reps;
     if(heldWeight) reps = sug.repeatReps? base : base+1;      // same load -> one more rep (unless repeating)
