@@ -504,8 +504,11 @@ STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|
    stored data and moves independently. RELEASES[0] must match WHATS-NEW.md —
    the app is one offline file, so the notes are embedded, not fetched.
    TESTS_about.js fails if the two drift apart. */
-const APP_VERSION = "1.3.1";
+const APP_VERSION = "1.4.0";
 const RELEASES = [
+  {v:"1.4.0", date:"2026-11-12", notes:[
+    "New Bonus workout: on the Train page tap ⋯ in the top right to do an extra session on a blank page. It's logged in your history and stats, doesn't use up a meso day, and the workout you put on hold is next once you finish.",
+  ]},
   {v:"1.3.1", date:"2026-11-09", notes:[
     "Home now shows your total sets per muscle so far this meso, most first, with bars scaled against your most-trained muscle. Tap it for full stats.",
   ]},
@@ -652,7 +655,7 @@ class StorageManager{
       profile:{gender:"", age:null, weightKg:null, heightCm:null, experience:"", goals:"", setupDismissed:false},
       exercises:[...STARTER_EXERCISES],
       mesocycles:[], logs:[], bodyweight:[], feedback:[], cardio:[], _templatesSeeded:true,
-      activeMesoId:null, activeSession:null, editSession:null,
+      activeMesoId:null, activeSession:null, parkedSession:null, editSession:null,
     };
     seedTemplates(base);       // fresh installs get the starter templates too
     return base;
@@ -757,7 +760,7 @@ const HistoryIndex={
         const sets=(ex.sets||[]).filter(s=>s.done && !isWarm(s));
         if(!sets.length) continue;
         const best=sets.reduce((a,b)=>epley(b.kg,b.reps)>epley(a.kg,a.reps)?b:a);
-        const entry={date:log.date, mesoId:log.mesoId, week:log.week, sets,
+        const entry={date:log.date, mesoId:log.mesoId, week:log.week, sets, bonus:!!log.bonus,
           volume:sets.reduce((t,s)=>t+s.kg*s.reps,0),
           best, e1rm:epley(best.kg,best.reps)};
         if(!map.has(ex.exerciseId)) map.set(ex.exerciseId,[]);
@@ -1003,6 +1006,10 @@ function activeMeso(){ return mesoById(S().activeMesoId); }
 
 /** All logged set entries for an exercise, newest first (index-backed). */
 function exerciseHistory(exId){ return HistoryIndex.get(exId); }
+/* History that drives progression. Bonus workouts are extra, often done tired,
+   so they count for stats/PRs but never become the baseline for the next
+   scheduled session's targets. */
+function progHistory(exId){ return HistoryIndex.get(exId).filter(h=>!h.bonus); }
 function exercisePR(exId){
   let pr=null;
   exerciseHistory(exId).forEach(h=>{ if(!pr || h.e1rm>pr.e1rm) pr=h; });
@@ -1050,7 +1057,7 @@ class ProgressionEngine{
    */
   static suggest(exId, targetReps, targetRIR){
     const st=S().settings;
-    const hist=exerciseHistory(exId);
+    const hist=progHistory(exId);
     if(!hist.length) return null;
     const last=hist[0];
     const ex=exById(exId);
@@ -1533,7 +1540,7 @@ function mesoVolume(meso){
       target[ex.muscle]=(target[ex.muscle]||0)+rampedSets(meso, sl, wk, deload);
     }));
   }
-  S().logs.filter(l=>l.mesoId===meso.id && !l.skipped).forEach(l=>
+  S().logs.filter(l=>(l.mesoId===meso.id || l.bonusOf===meso.id) && !l.skipped).forEach(l=>
     l.exercises.forEach(e=>{
       const ex=exById(e.exerciseId); if(!ex || ex.muscle==="Cardio") return;
       const n=(e.sets||[]).filter(s=>s.done && !isWarm(s)).length;
@@ -1588,7 +1595,7 @@ VIEWS.home=function(){
         ? `<p class="muted">Block complete 🎉 Duplicate it or start a new one.</p>`
         : !pos.day
         ? `<p class="muted">This block has no training days yet — edit it to add some.</p>`
-        : (()=>{ const resuming=st.activeSession && st.activeSession.mesoId===meso.id;
+        : (()=>{ const resuming=st.activeSession && (st.activeSession.mesoId===meso.id || st.activeSession.bonusOf===meso.id);
             return `<div class="row split"><div><div class="faint">${resuming?"In progress":"Next up"}</div>
              <div style="font-weight:800">${esc(resuming?st.activeSession.dayName:pos.day.name)}</div>
              <div class="muted">${resuming?"Pick up where you left off":pos.day.exercises.length+" exercises"}</div></div>
@@ -2678,7 +2685,7 @@ function holdWeightRepBackoff(xi){
   const s=S().editSession||S().activeSession, ses=s.exercises[xi];
   const sug=ses.suggestion; if(!sug) return;
   const holdKg=sug.lastKg;
-  const hist=exerciseHistory(ses.exerciseId);
+  const hist=progHistory(ses.exerciseId);
   const lastWork=hist.length? hist[0].sets.filter(x=>x.kg===holdKg && (!x.type||x.type==="normal")) : [];
   // the rep count they managed on EVERY set, so the session is completable
   const repTarget=Math.max(1, lastWork.length? Math.min(...lastWork.map(x=>x.reps)) : ses.target.reps-1);
@@ -2695,7 +2702,7 @@ function holdWeightRepProgress(xi){
   const sug=ses.suggestion; if(!sug) return;
   const holdKg=sug.lastKg;
   // last session's reps at the working weight
-  const hist=exerciseHistory(ses.exerciseId);
+  const hist=progHistory(ses.exerciseId);
   const lastWork=hist.length? hist[0].sets.filter(x=>x.kg===holdKg && (!x.type||x.type==="normal")) : [];
   const lastReps=lastWork.length? Math.max(...lastWork.map(x=>x.reps)) : ses.target.reps;
   // The user has explicitly said the next weight ISN'T available, so the normal
@@ -2739,7 +2746,7 @@ function repeatMeso(id){
   go("workout");
 }
 function mesoSummary(meso){
-  const logs=S().logs.filter(l=>l.mesoId===meso.id && !l.skipped);
+  const logs=S().logs.filter(l=>(l.mesoId===meso.id || l.bonusOf===meso.id) && !l.skipped);
   const skipped=S().logs.filter(l=>l.mesoId===meso.id && l.skipped).length;
   const cardio=S().cardio.filter(c=>c.mesoId===meso.id);
   const pos=mesoPosition(meso);
@@ -2882,13 +2889,14 @@ function renderWorkout(){
   const dateLbl=s.future? `W${s.week} · planned` : (s.date? fmtDate(s.date):"");
   $("#view").innerHTML=`
     <div class="wk-header">
-      <button class="wk-title" data-a="${ro?"":"picker"}" aria-label="Switch workout">
-        <div class="wk-daynm">${esc(s.dayName)}${ro?"":' <span class="wk-caret">▾</span>'}</div>
-        <div class="wk-meta">${ro?`<span class="wk-badge ${s.future?"prev":"view"}">${s.future?"PREVIEW":"VIEWING"}</span> `:(edit?'<span class="wk-badge edit">EDITING</span> ':"")}Wk ${s.week} · Day ${(s.dayIdx??0)+1}${s.mesoName&&!edit?` · ${esc(s.mesoName)}`:""}${s.deload?` · ${term("Deload")}`:""}</div>
+      <button class="wk-title" data-a="${(ro||s.bonus)?"":"picker"}" aria-label="Switch workout">
+        <div class="wk-daynm">${esc(s.dayName)}${(ro||s.bonus)?"":' <span class="wk-caret">▾</span>'}</div>
+        <div class="wk-meta">${s.bonus?`<span class="wk-badge edit">BONUS</span> Extra session · ${esc(s.nextName||"")} stays next`:""}${ro?`<span class="wk-badge ${s.future?"prev":"view"}">${s.future?"PREVIEW":"VIEWING"}</span> `:(edit?'<span class="wk-badge edit">EDITING</span> ':"")}${s.bonus?"":`Wk ${s.week} · Day ${(s.dayIdx??0)+1}${s.mesoName&&!edit?` · ${esc(s.mesoName)}`:""}${s.deload?` · ${term("Deload")}`:""}`}</div>
       </button>
       <div class="row" style="gap:4px">
         ${ro?"":`<button class="iconbtn" data-a="setdate" aria-label="Change date">📅</button>
-        <button class="iconbtn ${s.notes?"has-note":""}" data-a="wnotes" aria-label="Workout note">📝</button>`}
+        <button class="iconbtn ${s.notes?"has-note":""}" data-a="wnotes" aria-label="Workout note">📝</button>
+        ${(edit||s.bonus)?"":`<button class="iconbtn" data-a="wmenu" aria-label="Workout options">⋯</button>`}`}
         <button class="iconbtn" data-a="quit" aria-label="Close">✕</button>
       </div>
     </div>
@@ -3390,6 +3398,7 @@ function bindWorkout(){
     }
     if(a==="setdate"){ pickWorkoutDate(s); return; }
     if(a==="picker") return workoutPicker();
+    if(a==="wmenu") return workoutMenu();
     if(a==="finish") return edit? saveLogEdit() : finishWorkout();
     if(a==="quit"){
       if(edit){
@@ -3400,6 +3409,18 @@ function bindWorkout(){
           m.onclick=ev=>{ const q=ev.target.closest("[data-q]")?.dataset.q; if(!q) return;
             if(q==="drop"){ S().editSession=null; Store.save(); closeModal(); go("workout"); }
             else closeModal(); };
+        });
+        return;
+      }
+      if(s.bonus){
+        modal(`<h2>Leave bonus workout?</h2><p class="muted">Keep it to resume later, or discard it. ${esc(s.nextName||"Your next workout")} stays next either way.</p>
+          <div class="stack" style="margin-top:14px">
+            <button class="btn btn-ghost" data-q="keep">Keep &amp; leave</button>
+            <button class="btn btn-danger" data-q="discard">Discard bonus</button></div>`, m=>{
+          m.onclick=ev=>{ const q=ev.target.closest("[data-q]")?.dataset.q; if(!q) return;
+            closeModal(); stopRest();
+            if(q==="discard"){ endBonus(); toast("Bonus discarded"); }
+            go("home"); };
         });
         return;
       }
@@ -3523,7 +3544,7 @@ function enableWorkoutSwipe(s){
     tx=e.touches[0].clientX; ty=e.touches[0].clientY;
   };
   $("#view").ontouchend=e=>{
-    if(currentView!=="workout"){ tx=null; return; }
+    if(currentView!=="workout" || s.bonus){ tx=null; return; }
     if(tx==null) return;
     const dx=e.changedTouches[0].clientX-tx, dy=e.changedTouches[0].clientY-ty;
     tx=null;
@@ -3910,6 +3931,58 @@ function skipWorkout(){
   toast(FUN()?"Skipped — onto the next one 💫":"Workout skipped");
   go("home");
 }
+/* ---------- Bonus workout ----------
+   A one-off extra session that does NOT use up a slot in the meso. The
+   scheduled workout is parked and comes back as "next" when the bonus ends.
+   The bonus log has mesoId:null (so meso position, picker, edit window and
+   swipe ordering ignore it) and bonusOf:<meso id> (so meso stats count it).
+   Progression ignores it via progHistory(). */
+function workoutMenu(){
+  modal(`<h2>Workout options</h2>
+    <div class="stack" style="margin-top:14px">
+      <button class="btn btn-ghost" data-wm="bonus">➕ Bonus workout</button></div>
+    <p class="faint" style="margin:10px 0 0">An extra session on a blank page. Doesn't count as a ${term("meso")} day, so this workout stays next.</p>`, m=>{
+    m.onclick=ev=>{ const v=ev.target.closest("[data-wm]")?.dataset.wm; if(!v) return;
+      closeModal(); if(v==="bonus") confirmBonusWorkout(); };
+  });
+}
+function confirmBonusWorkout(){
+  const s=S().activeSession; if(!s || s.bonus) return;
+  const logged=(s.exercises||[]).reduce((n,e)=>n+(e.sets||[]).filter(x=>x.done).length,0);
+  modal(`<h2>Start a bonus workout?</h2>
+    <p class="muted">You'll get a blank workout to add exercises to. <b>${esc(s.dayName)}</b> is put on hold and will be next once the bonus is finished or discarded.${
+      logged?` Your ${logged} logged set${logged>1?"s":""} on ${esc(s.dayName)} are kept.`:""}</p>
+    <p class="faint">Bonus sets count in stats and history but don't change your ${term("meso")} targets.</p>
+    <div class="stack" style="margin-top:14px">
+      <button class="btn btn-ghost" data-bw="no">Cancel</button>
+      <button class="btn btn-primary" data-bw="yes">Start bonus</button></div>`, m=>{
+    m.onclick=ev=>{ const v=ev.target.closest("[data-bw]")?.dataset.bw; if(!v) return;
+      closeModal(); if(v==="yes") startBonusWorkout(); };
+  });
+}
+function startBonusWorkout(){
+  const st=S(), cur=st.activeSession, meso=activeMeso();
+  if(!cur || cur.bonus) return;
+  stopRest();
+  st.parkedSession=cur;
+  st.activeSession={
+    id:uid(), bonus:true, bonusOf:meso?meso.id:null, mesoId:null,
+    week:cur.week, dayIdx:cur.dayIdx, dayId:null, dayName:"Bonus workout",
+    nextName:cur.dayName, mesoName:meso?meso.name:"",
+    date:todayISO(), startedAt:Date.now(), notes:"", deload:false, exercises:[]
+  };
+  Store.save(); Store.flush();
+  go("workout");
+}
+/** Close out a bonus and bring the parked scheduled workout back as next.
+    An untouched parked session is dropped so it rebuilds fresh. */
+function endBonus(){
+  const st=S(), p=st.parkedSession;
+  const keep=p && (p.exercises||[]).some(e=>(e.sets||[]).some(x=>x.done) || e.done);
+  st.activeSession=keep? p : null;
+  st.parkedSession=null;
+  Store.save();
+}
 function confirmSkipWorkout(){
   const s=S().activeSession;
   const logged=(s?.exercises||[]).reduce((n,e)=>n+(e.sets||[]).filter(x=>x.done).length,0);
@@ -3935,7 +4008,8 @@ function finishWorkout(){
   const cardioLogged=s.exercises.filter(e=>e.cardio && e.done && !e.skipped);
   if(!liftLogged.length && !cardioLogged.length){
     toast("Nothing logged — session discarded");
-    S().activeSession=null; Store.save(); stopRest(); return go("home");
+    if(s.bonus) endBonus(); else S().activeSession=null;
+    Store.save(); stopRest(); return go("home");
   }
   const logged=liftLogged;
   stopRest();
@@ -3962,7 +4036,7 @@ function finishWorkout(){
         distanceKm:e.log.distanceKm||null,
         level:e.log.level||null, speed:e.log.speed||null, incline:e.log.incline||null,
         tabata:e.target?.tabataOn?e.target.tabata:null,
-        notes:e.notes||"", mesoId:s.mesoId, fromWorkout:true});
+        notes:e.notes||"", mesoId:s.bonus? s.bonusOf : s.mesoId, fromWorkout:true});
     });
     const log={
       id:s.id, mesoId:s.mesoId, week:s.week, dayId:s.dayId, dayName:s.dayName,
@@ -3970,7 +4044,12 @@ function finishWorkout(){
       exercises:logged.map(e=>({exerciseId:e.exerciseId, target:e.target, notes:e.notes,
         sets:e.sets.filter(x=>x.done)}))
     };
+    if(s.bonus){ log.bonus=true; log.bonusOf=s.bonusOf; }
     if(logged.length) S().logs.push(log);
+    if(s.bonus){
+      endBonus(); Store.save(); Store.flush();
+      toast(FUN()?"Bonus banked 💪":"Bonus workout saved"); go("home"); return;
+    }
     S().activeSession=null;
     Store.save(); Store.flush();
     if(logged.length) feedbackSurvey(log);

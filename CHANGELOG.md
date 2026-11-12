@@ -9,6 +9,29 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.4.0 — 2026-11-12 (Bonus workout)
+- **Bonus workout**: new ⋯ button in the Train header (live sessions only, not
+  edit/preview/bonus) opens `workoutMenu()` → "Bonus workout" → confirm modal →
+  blank session. Matt wanted to add an extra session mid-meso (e.g. a free day
+  when chest is still sore) without wrecking the scheduled day.
+- The scheduled session is parked in `st.parkedSession` (new state key) and
+  restored by `endBonus()` on finish, discard or nothing-logged. An untouched
+  parked session is dropped so it rebuilds fresh; one with logged sets is kept.
+- Bonus log: `mesoId:null`, `bonus:true`, `bonusOf:<meso id>`. `mesoId:null`
+  keeps it out of `mesoPosition`, the picker, edit window and swipe ordering, so
+  it never uses up a meso day and is read-only once saved. `bonusOf` lets
+  `mesoVolume` and `mesoSummary` count it. History, calendar, PRs and streak
+  include it as normal. In-workout cardio is tagged with `bonusOf`.
+- **Progression ignores bonus sets**: `HistoryIndex` entries carry `bonus`;
+  new `progHistory()` filters them, used by `ProgressionEngine.suggest`,
+  `holdWeightRepBackoff`, `holdWeightRepProgress`. "Last time" hints still
+  show bonus sets.
+- No post-workout survey for a bonus (it tunes meso suggestions). Picker caret
+  and swipe are disabled on a bonus; header shows a BONUS badge and which
+  workout stays next; quit modal has Keep / Discard only (no Skip).
+
+---
+
 ### v1.3.1 — 2026-11-09 (Home meso volume card)
 - **"Mesocycle volume" card on Home**, under the current-workout card: total
   working sets per muscle **so far this meso**, most first. Bars are **relative
