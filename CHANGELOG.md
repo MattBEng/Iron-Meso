@@ -9,6 +9,15 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.4.1 — 2026-11-17 (edit-workout data loss)
+- `startLogEdit` copied only kg/reps/RIR per set, so Save changes on a past workout
+  stripped `type` (warmup/amrap/my/mm) and `secs`, and the edit view had no
+  bodyweight/timed flags. Now copies the whole set and runs `upgradeSession` on the
+  edit session. Logs already saved through an edit are not repaired. Test: `TESTS_logedit.js`.
+- `MESSAGES_build.js` now writes and compares using index.html's own line endings, so
+  `TESTS_messages.js` passes on a CRLF (Windows) checkout and a Windows rebuild no
+  longer writes mixed endings. Replacement also no longer interprets `$` in messages.
+
 ### v1.4.0 — 2026-11-12 (Bonus workout)
 - **Bonus workout**: new ⋯ button in the Train header (live sessions only, not
   edit/preview/bonus) opens `workoutMenu()` → "Bonus workout" → confirm modal →

@@ -42,12 +42,15 @@ function parse(){
   return banks;
 }
 
-/** Rewrite one `const NAME=[...]` array in the app source. */
+/** Rewrite one `const NAME=[...]` array in the app source, matching the file's
+    own line endings (Windows checkouts are CRLF) so --check and the rebuild
+    don't see a whole-file difference that is only line endings. */
 function inject(src, name, items){
+  const eol=src.includes("\r\n")? "\r\n" : "\n";
   const re=new RegExp("const "+name+"=\\[.*?\\];","s");
   if(!re.test(src)) throw new Error(`Could not find "const ${name}=[...]" in index.html`);
-  const body=items.map(s=>JSON.stringify(s)).join(",\n ");
-  return src.replace(re, `const ${name}=[\n ${body}];`);
+  const body=items.map(s=>JSON.stringify(s)).join(","+eol+" ");
+  return src.replace(re, ()=>`const ${name}=[${eol} ${body}];`);
 }
 
 const check=process.argv.includes("--check");

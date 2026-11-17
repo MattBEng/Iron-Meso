@@ -8,6 +8,6 @@ live in `RELEASES[0]` in `index.html`, and `TESTS_about.js` fails if the two dri
 apart. Update both when you ship, and add the engineering detail to
 `CHANGELOG.md` rather than here.
 
-## 1.4.0 — 2026-11-12
+## 1.4.1 — 2026-11-17
 
-- New Bonus workout: on the Train page tap ⋯ in the top right to do an extra session on a blank page. It's logged in your history and stats, doesn't use up a meso day, and the workout you put on hold is next once you finish.
+- Editing a past workout no longer wipes your warm-up, AMRAP and myorep markings or your hold times when you tap Save changes. Bodyweight and timed exercises also show properly when you open an old workout.

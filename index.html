@@ -504,8 +504,11 @@ STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|
    stored data and moves independently. RELEASES[0] must match WHATS-NEW.md —
    the app is one offline file, so the notes are embedded, not fetched.
    TESTS_about.js fails if the two drift apart. */
-const APP_VERSION = "1.4.0";
+const APP_VERSION = "1.4.1";
 const RELEASES = [
+  {v:"1.4.1", date:"2026-11-17", notes:[
+    "Editing a past workout no longer wipes your warm-up, AMRAP and myorep markings or your hold times when you tap Save changes. Bodyweight and timed exercises also show properly when you open an old workout.",
+  ]},
   {v:"1.4.0", date:"2026-11-12", notes:[
     "New Bonus workout: on the Train page tap ⋯ in the top right to do an extra session on a blank page. It's logged in your history and stats, doesn't use up a meso day, and the workout you put on hold is next once you finish.",
   ]},
@@ -2979,7 +2982,7 @@ function startLogEdit(logId, forceReadonly){
   const liftEx=log.exercises.map(e=>({slotId:null, exerciseId:e.exerciseId,
     target:e.target||{sets:e.sets.length,reps:10,rir:2,rest:0,notes:""},
     suggestion:null, notes:e.notes||"", skipped:false, rowsReady:true, _edit:true,
-    sets:(e.sets||[]).map(x=>({kg:x.kg, reps:x.reps, rir:x.rir, expReps:x.expReps??x.reps,
+    sets:(e.sets||[]).map(x=>({...x, expReps:x.expReps??x.reps,
       done:true, touched:true, at:x.at||null}))}));
   const dayCardio=S().cardio.filter(c=>c.date===log.date && c.mesoId===log.mesoId && c.fromWorkout);
   const cardioEx=dayCardio.map(c=>{
@@ -2998,6 +3001,9 @@ function startLogEdit(logId, forceReadonly){
     startedAt:Date.now(), notes:log.notes||"", deload:false,
     exercises:[...liftEx, ...cardioEx]
   };
+  // keep warm-up / AMRAP / myorep types and hold seconds (whole set copied above),
+  // and set the bodyweight / timed flags so the rows render correctly.
+  upgradeSession(S().editSession);
   Store.save();
   go("workout");
 }
