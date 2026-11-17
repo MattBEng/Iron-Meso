@@ -342,6 +342,29 @@ body[data-fun="1"]:is([data-scheme="cherry"],[data-scheme="lavender"],[data-sche
 #duck[data-spot="br"] .dk-say{left:auto;right:0;transform:none;animation-name:dkSayE}
 #duck[data-spot="bl"] .dk-say{left:0;transform:none;animation-name:dkSayE}
 #duck.dk-notap{pointer-events:none}
+#duck[data-pose="skate"]{animation-duration:9s}
+#duck .dk-skate{animation:dkWobble 1.3s ease-in-out infinite;transform-origin:50% 100%}
+#duck .dk-skate .dk-rider{animation:dkLean 1.3s ease-in-out infinite;transform-box:fill-box;transform-origin:50% 100%}
+#duck .dk-skate .dk-arm{transform-box:fill-box;transform-origin:100% 100%;animation:dkTail .65s ease-in-out infinite}
+#duck .dk-stab{animation:dkShake .28s linear infinite}
+#duck .dk-stab .dk-tail{animation:none}
+#duck .dk-egg{position:absolute;bottom:0;left:calc(-13px - var(--i,0)*11px);width:14px;height:17px;animation:dkEggPop .45s ease-out 1;pointer-events:none}
+#duck.dk-flip .dk-egg,#duck[data-spot="br"] .dk-egg{left:auto;right:calc(-13px - var(--i,0)*11px)}
+#duck .dk-egg svg{width:100%;height:100%}
+.pet-rain{position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden}
+.pet-rain i{position:absolute;top:-60px;display:block;animation:petFall 2.4s linear 1 forwards}
+.pet-rain i svg{width:100%;height:100%;display:block;overflow:visible;transform:rotate(var(--r,0deg))}
+.pet-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.pet-opt{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border:1px solid var(--line);border-radius:var(--r-md);
+  background:var(--raised);color:var(--text);font:inherit;font-size:13px;min-height:96px;cursor:pointer}
+.pet-opt svg{width:46px;height:46px;overflow:visible}
+.pet-opt .faint{font-size:11px;line-height:1.2;text-align:center}
+.pet-opt.on{border-color:var(--accent);background:var(--accent-soft)}
+.pet-opt.locked{opacity:.45;cursor:default}
+.pet-opt.locked svg{filter:grayscale(1)}
+.pet-none{width:46px;height:46px;display:grid;place-items:center;font-size:20px;color:var(--muted)}
+.tu-pet{width:40px;height:40px;flex:0 0 auto}
+.tu-pet svg{width:100%;height:100%;overflow:visible}
 #duck .dk-say-long{animation-duration:3.1s}
 #duck .dk-flex .dk-arm{transform-box:fill-box;transform-origin:70% 100%;animation:dkPump .5s ease-in-out infinite}
 #duck .dk-flex .dk-spark{animation:dkSpark .5s steps(2) infinite}
@@ -359,6 +382,11 @@ body[data-fun="1"]:is([data-scheme="cherry"],[data-scheme="lavender"],[data-sche
 @keyframes dkStep{0%,100%{transform:translateY(0)}50%{transform:translateY(-2.5px)}}
 @keyframes dkWalk{to{left:calc(100% + 60px)}}
 @keyframes dkPeek{0%,12%{transform:translateY(36px)}28%,72%{transform:translateY(0)}88%,100%{transform:translateY(36px)}}
+@keyframes dkWobble{0%,100%{transform:rotate(-5deg)}30%{transform:rotate(4deg)}55%{transform:rotate(-2deg)}80%{transform:rotate(6deg)}}
+@keyframes dkLean{0%,100%{transform:rotate(4deg)}30%{transform:rotate(-5deg)}55%{transform:rotate(3deg)}80%{transform:rotate(-6deg)}}
+@keyframes dkShake{0%,100%{transform:translateX(0) rotate(0)}25%{transform:translateX(-.8px) rotate(-1.5deg)}75%{transform:translateX(.8px) rotate(1.5deg)}}
+@keyframes dkEggPop{0%{transform:translate(8px,-6px) scale(.2);opacity:0}60%{transform:translate(0,2px) scale(1.15);opacity:1}100%{transform:none}}
+@keyframes petFall{0%{transform:translateY(0)}100%{transform:translateY(calc(100vh + 120px))}}
 @keyframes dkPump{0%,100%{transform:rotate(0)}50%{transform:rotate(-10deg) scale(1.06)}}
 @keyframes dkSpark{0%{opacity:1}100%{opacity:.25}}
 @keyframes dkPant{0%,100%{transform:scale(1,1)}50%{transform:scale(1.03,.95) translateY(1.5px)}}
@@ -5150,6 +5178,9 @@ function titleUnlockModal(k, then){
     ${sc?`<div class="tu-scheme"><span class="scheme-dot" style="background:${sc.swatch}"></span>
       <div style="flex:1;text-align:left"><b>New colour unlocked</b><div class="faint" style="font-size:13px">${esc(sc.name)} · ${esc(sc.hint)}</div></div>
       <button class="btn btn-ghost btn-sm" data-try="${sc.id}">Try it</button></div>`:""}
+    ${(()=>{ const pet=(DEV.on && DEV.duck)? petsLive().find(p=>p.at===k) : null; return pet?`<div class="tu-scheme"><span class="tu-pet">${petSVG("sit", pet)}</span>
+      <div style="flex:1;text-align:left"><b>New pet unlocked</b><div class="faint" style="font-size:13px">${esc(pet.name)} the ${esc(pet.kind)}</div></div>
+      <button class="btn btn-ghost btn-sm" data-pet="${pet.id}">Bring along</button></div>`:""; })()}
     ${tease?`<p class="faint" style="margin:12px 0 0">A new secret title is waiting on Stats 👀</p>`:""}
     ${shareZoneHTML(()=>shareTitleCard(k))}
     <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>Obsessed 😍</button></div>`, m=>{
@@ -5526,61 +5557,131 @@ function confetti(){
   }catch(_){}
 }
 /* ---------- duck (1.8.x, DEV ONLY for now) ----------
-   A small white duck that turns up on a page, in one of a few poses, gently
-   animated; tap it and it does something cute. Drawn in code (inline SVG), so
-   it works offline and adds no files. Original artwork.
+   Pets: a small bird that keeps her company. One unlocks with each title (the
+   same ladder as the colour schemes), she picks one or none in Settings, and
+   only one is ever out. It turns up on a page in one of a few poses, gently
+   animated; tap it and it does something cute. Tap it five times and it lays an
+   egg or its friends rain down the screen; ten quick taps and it has had enough.
+   Drawn in code (inline SVG), so it works offline and adds no files. Original artwork.
    Gated on dev mode + the "Duck" switch in the dev panel: nobody else sees it.
    It sits in fixed safe spots just above the bottom nav (the app can't reliably
    find empty space on a page) and never appears on the Train tab, where a
    tappable creature near the set buttons would get hit by accident. */
-/* Original little white duck, drawn in code. viewBox 0 0 64 64, faces right. */
-function duckSVG(pose){
-  const O='stroke="#352f3d" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"';
-  const W='fill="#FFFDF8"', OR='fill="#F6A21E"';
-  const eyeOpen=`<g class="dk-eye"><circle cx="45.2" cy="15.2" r="1.9" fill="#352f3d"/><circle cx="45.8" cy="14.6" r=".6" fill="#fff"/></g>`;
-  const eyeShut=`<path d="M43.2 15.6q2 1.8 4 0" fill="none" ${O}/>`;
+/* Pets: one small bird rig, drawn in code, in several colourways. Original artwork.
+   viewBox 0 0 64 64, faces right. petSVG(pose, skin) returns an <svg>.
+   Only Daisy the duck is live. The rest are marked wip: unfinished, hidden from
+   everything unless the dev panel's "Show unfinished pets" is on. */
+const PETS=[
+  {id:"daisy",   name:"Daisy",   kind:"duck",        at:0, b:"#FFFDF8", w:"#F3EFF6", k:"#F6A21E", f:"#F6A21E"},
+  {wip:1, id:"peep",    name:"Peep",    kind:"duckling",    at:1, b:"#FFE680", w:"#FFD34F", k:"#F6A21E", f:"#F6A21E", s:.86},
+  {wip:1, id:"skye",    name:"Skye",    kind:"bluebird",    at:2, b:"#93D0FF", w:"#5FAEF2", k:"#F6A21E", f:"#F6A21E", chest:"#FFE9C4"},
+  {wip:1, id:"ruby",    name:"Ruby",    kind:"robin",       at:3, b:"#C19570", w:"#93694B", k:"#F2C230", f:"#F2C230", chest:"#FF6B5E"},
+  {wip:1, id:"waddles", name:"Waddles", kind:"penguin",     at:4, b:"#465066", w:"#343C4E", k:"#F6A21E", f:"#F6A21E", chest:"#FFFDF8", e:1},
+  {wip:1, id:"flo",     name:"Flo",     kind:"flamingo",    at:5, b:"#FFA3C8", w:"#FF7FB0", k:"#4A3F52", f:"#FF7FB0"},
+  {wip:1, id:"duke",    name:"Duke",    kind:"mallard",     at:6, b:"#DCC6A6", w:"#B5906A", h:"#2F9E6B", k:"#F2C230", f:"#F6A21E"},
+  {wip:1, id:"kiwi",    name:"Kiwi",    kind:"parrot",      at:7, b:"#62D18C", w:"#FF6B5E", k:"#C9C3D1", f:"#C9C3D1", x:"crest"},
+  {wip:1, id:"duchess", name:"Duchess", kind:"royal swan",  at:8, b:"#FFFDF8", w:"#EEF1FA", k:"#FF8A3D", f:"#4A3F52", x:"crown"},
+  {wip:1, id:"goldie",  name:"Goldie",  kind:"golden goose",at:9, b:"#FFD24A", w:"#FFB81F", k:"#FF8A3D", f:"#FF8A3D", x:"sparkle"},
+];
+function petSVG(pose, skin){
+  skin=skin||PETS[0];
+  const INK="#352f3d";
+  const O=`stroke="${INK}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"`;
+  const B=`fill="${skin.b}"`, H=`fill="${skin.h||skin.b}"`, WG=`fill="${skin.w}"`, K=`fill="${skin.k}"`, F=`fill="${skin.f}"`;
+  const eyeOpen=skin.e
+    ? `<g class="dk-eye"><circle cx="45.2" cy="15.2" r="2.7" fill="#fff"/><circle cx="45.6" cy="15.2" r="1.5" fill="${INK}"/></g>`
+    : `<g class="dk-eye"><circle cx="45.2" cy="15.2" r="1.9" fill="${INK}"/><circle cx="45.8" cy="14.6" r=".6" fill="#fff"/></g>`;
+  const eyeShut=`<path d="M43.2 15.6q2 1.8 4 0" fill="none" stroke="${skin.e?"#fff":INK}" stroke-width="2.2" stroke-linecap="round"/>`;
   const blush=`<circle cx="42.6" cy="19.6" r="2.3" fill="#FF9DB8" opacity=".55"/>`;
-  const beak=`<path class="dk-beak" d="M50.2 14.4c4.6-.8 8.6.4 10.2 2.6c-2.4 2.8-6.6 3.8-10.6 2.6z" ${OR} ${O}/>`;
-  const beakOpen=`<path d="M50.2 13.4c4.6-1.6 8.8-.8 10.4 1.200c-3 1.8-7 2.2-10.4 1.800z" ${OR} ${O}/><path d="M51 18.400c1.8 2.6 4.6 3.2 6.8 2.200c-1-2-3.6-3-6.8-2.200z" fill="#FF8FA8" ${O}/>`;
-  const head=(eye,bk,extra)=>`<path d="M34.6 37C33 29 33.6 25 35.6 22.2A9.4 9.4 0 1 1 49.6 23C48 27 47.6 32 48 38" ${W} ${O}/>${blush}${eye}${bk||beak}${extra||""}`;
-  const tail=`<path class="dk-tail" d="M14.5 39.5c-5.5-3-6.5-7.5-4.5-10.5c3 3.5 6.5 5 10.5 5.5z" ${W} ${O}/>`;
-  const wing=`<path class="dk-wing" d="M21 41.5c6-5 13-5 18.5-.5c-2.5 8-10 11-17 7.5c-2-2-2.5-4.5-1.5-7z" fill="#F3EFF6" ${O}/>`;
-  const body=(cy,ry)=>`<ellipse cx="30" cy="${cy}" rx="18.5" ry="${ry}" ${W} ${O}/>`;
-  if(pose==="sit") return `<svg viewBox="0 0 64 64" class="dk dk-sit">${tail}${body(44,13.5)}${head(eyeOpen)}${wing}
-    <path d="M25 55.500c3.5-3.5 9-3.5 11.5.5c-2 3.5-8 4.5-12 2.500z" ${OR} ${O}/>
-    <path d="M37.5 54.500c4-3 9-2.5 11 1.500c-2.5 3-8 3.5-11.5 1.500z" ${OR} ${O}/></svg>`;
-  const leg=(x,c)=>`<g class="${c}"><path d="M${x} 49v8" fill="none" stroke="#352f3d" stroke-width="5" stroke-linecap="round"/><path d="M${x} 49v8" fill="none" stroke="#F6A21E" stroke-width="2.2" stroke-linecap="round"/>
-      <path d="M${x-4.5} 60.500c0-3 2-4.5 4.5-4.500s6.5 1.5 7.5 4.500z" ${OR} ${O}/></g>`;
-  if(pose==="stand"||pose==="waddle"){
-    return `<svg viewBox="0 0 64 64" class="dk dk-${pose}">${leg(25,"dk-leg1")}${leg(36,"dk-leg2")}
-    <g class="dk-top" transform="translate(0,-4)">${tail}${body(43,12)}${head(eyeOpen)}${wing}</g></svg>`;
-  }
-  if(pose==="sleep") return `<svg viewBox="0 0 64 64" class="dk dk-sleep">
-    <g transform="translate(0,4)">${tail}<g transform="translate(-1,11)">${head(eyeShut)}</g>${body(46,11.5)}${wing}</g>
-    <g class="dk-zz" fill="currentColor" font-family="system-ui,sans-serif" font-weight="800"><text x="52" y="20" font-size="9">z</text><text x="58" y="11" font-size="7">z</text></g></svg>`;
+  const beak=`<path class="dk-beak" d="M50.2 14.4c4.6-.8 8.6.4 10.2 2.6c-2.4 2.8-6.6 3.8-10.6 2.6z" ${K} ${O}/>`;
+  const beakOpen=`<path d="M50.2 13.4c4.6-1.6 8.8-.8 10.4 1.2c-3 1.8-7 2.2-10.4 1.8z" ${K} ${O}/><path d="M51 18.4c1.8 2.6 4.6 3.2 6.8 2.2c-1-2-3.6-3-6.8-2.200z" fill="#FF8FA8" ${O}/>`;
+  const extra= skin.x==="crown"? `<path d="M36.6 9.200l.6-6.400l3.2 3.400l2.4-4.600l2.4 4.600l3.2-3.400l.6 6.400z" fill="#FFD24A" ${O}/>`
+    : skin.x==="crest"? `<path d="M36.5 9.500c-3-2.5-3.5-6-1.5-8c2 1.5 3 3.5 3.5 6c.5-3 2.5-5 5-5c.5 2.5 0 5-2 7z" ${WG} ${O}/>`
+    : skin.x==="sparkle"? `<g fill="#fff" stroke="${INK}" stroke-width="1.2" stroke-linejoin="round"><path d="M33 5l1.2 2.800l2.8 1.200l-2.8 1.200l-1.2 2.800l-1.2-2.800l-2.8-1.200l2.8-1.200z"/></g>` : "";
+  const head=(eye,bk,more)=>`<path d="M34.6 37C33 29 33.6 25 35.6 22.2A9.4 9.4 0 1 1 49.6 23C48 27 47.6 32 48 38" ${H} ${O}/>${extra}${blush}${eye}${bk||beak}${more||""}`;
+  const tail=`<path class="dk-tail" d="M14.5 39.5c-5.5-3-6.5-7.5-4.5-10.5c3 3.5 6.5 5 10.5 5.5z" ${B} ${O}/>`;
+  const wing=`<path class="dk-wing" d="M21 41.5c6-5 13-5 18.5-.5c-2.5 8-10 11-17 7.500c-2-2-2.5-4.5-1.5-7z" ${WG} ${O}/>`;
+  const chest=(cy,ry)=>skin.chest? `<ellipse cx="40.5" cy="${cy+1.5}" rx="6.5" ry="${ry-4}" fill="${skin.chest}"/>` : "";
+  const body=(cy,ry)=>`<ellipse cx="30" cy="${cy}" rx="18.5" ry="${ry}" ${B} ${O}/>${chest(cy,ry)}`;
+  const leg=(x,c)=>`<g class="${c}"><path d="M${x} 49v8" fill="none" stroke="${INK}" stroke-width="5" stroke-linecap="round"/><path d="M${x} 49v8" fill="none" stroke="${skin.f}" stroke-width="2.2" stroke-linecap="round"/>
+      <path d="M${x-4.5} 60.5c0-3 2-4.5 4.5-4.5s6.5 1.5 7.5 4.500z" ${F} ${O}/></g>`;
+  const wrap=(cls,inner)=>{ const s=skin.s||1; return `<svg viewBox="0 0 64 64" class="dk dk-${cls}">${s===1? inner : `<g transform="translate(${32*(1-s)},${62*(1-s)}) scale(${s})">${inner}</g>`}</svg>`; };
+  const standing=(headHTML,wingHTML,more)=>`${leg(25,"dk-leg1")}${leg(36,"dk-leg2")}<g class="dk-top" transform="translate(0,-4)">${tail}${body(43,12)}${headHTML}${wingHTML}</g>${more||""}`;
+  if(pose==="sit") return wrap("sit", `${tail}${body(44,13.5)}${head(eyeOpen)}${wing}
+    <path d="M25 55.5c3.5-3.5 9-3.5 11.5.5c-2 3.5-8 4.5-12 2.500z" ${F} ${O}/>
+    <path d="M37.5 54.5c4-3 9-2.5 11 1.500c-2.5 3-8 3.5-11.5 1.500z" ${F} ${O}/>`);
+  if(pose==="stand"||pose==="waddle") return wrap(pose, standing(head(eyeOpen), wing));
+  if(pose==="sleep") return wrap("sleep", `<g transform="translate(0,4)">${tail}<g transform="translate(-1,11)">${head(eyeShut)}</g>${body(46,11.5)}${wing}</g>
+    <g class="dk-zz" fill="currentColor" font-family="system-ui,sans-serif" font-weight="800"><text x="52" y="20" font-size="9">z</text><text x="58" y="11" font-size="7">z</text></g>`);
   /* gestures shown for a moment after an exercise is finished */
   if(pose==="flex"){
-    const arm=`<path class="dk-arm" d="M23 40c-5-5-8-11-6-17c1.6-4 6.4-4 7 0c3.4-1.4 6 1.6 5 5c-1.4 4.6-3.6 7-2 11z" fill="#F3EFF6" ${O}/>`;
-    const brow=`<path d="M42.4 11.400l5 1.4" fill="none" ${O}/>`;
-    return `<svg viewBox="0 0 64 64" class="dk dk-flex">${leg(25,"dk-leg1")}${leg(36,"dk-leg2")}
-    <g class="dk-top" transform="translate(0,-4)">${tail}${body(43,12)}${head(eyeOpen,null,brow)}${arm}</g>
-    <g class="dk-spark" fill="none" stroke="#F6A21E" stroke-width="2" stroke-linecap="round"><path d="M9 12l-3-3M14 8V4M19 11l3-3"/></g></svg>`;
+    const arm=`<path class="dk-arm" d="M23 40c-5-5-8-11-6-17c1.6-4 6.4-4 7 0c3.4-1.4 6 1.6 5 5c-1.4 4.6-3.6 7-2 11z" ${WG} ${O}/>`;
+    const brow=`<path d="M42.4 11.4l5 1.4" fill="none" ${O}/>`;
+    return wrap("flex", standing(head(eyeOpen,null,brow), arm,
+      `<g class="dk-spark" fill="none" stroke="#F6A21E" stroke-width="2" stroke-linecap="round"><path d="M9 12l-3-3M14 8V4M19 11l3-3"/></g>`));
   }
   if(pose==="tired"){
-    const eyeT=`<path d="M43 14l4 1.400l-4 1.6" fill="none" ${O}/>`;
-    const sweat=`<path class="dk-sweat" d="M55.5 3.500c2 3 3.2 4.8 3.2 6.400a3.2 3.2 0 0 1-6.4 0c0-1.6 1.2-3.4 3.2-6.400z" fill="#8FD0FF" ${O}/>`;
-    return `<svg viewBox="0 0 64 64" class="dk dk-tired"><g transform="translate(0,4)">${tail}<g transform="translate(0,7) rotate(6 40 30)">${head(eyeT,beakOpen)}</g>${body(46,11.5)}
-      <path d="M20 46c6-3 13-2 18 2c-3 5-10 7-16 4c-2-2-2.5-4-2-6z" fill="#F3EFF6" ${O}/></g>${sweat}</svg>`;
+    const eyeT=`<path d="M43 14l4 1.4l-4 1.6" fill="none" stroke="${skin.e?"#fff":INK}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;
+    const sweat=`<path class="dk-sweat" d="M55.5 3.5c2 3 3.2 4.8 3.2 6.400a3.2 3.2 0 0 1-6.4 0c0-1.6 1.2-3.4 3.2-6.400z" fill="#8FD0FF" ${O}/>`;
+    return wrap("tired", `<g transform="translate(0,4)">${tail}<g transform="translate(0,7) rotate(6 40 30)">${head(eyeT,beakOpen)}</g>${body(46,11.5)}
+      <path d="M20 46c6-3 13-2 18 2c-3 5-10 7-16 4c-2-2-2.5-4-2-6z" ${WG} ${O}/></g>${sweat}`);
   }
   if(pose==="cool"){
-    const shades=`<g><path d="M40.4 12.200h9.600l-.8 4.400c-.4 1.4-1.8 2-3.2 2h-2.400c-1.6 0-3-1-3.2-2.600z" fill="#352f3d" ${O}/><path d="M40.4 13l-5-1.6" fill="none" ${O}/><path d="M43 13.600l2 .1" stroke="#fff" stroke-width="1.2" stroke-linecap="round"/></g>`;
-    return `<svg viewBox="0 0 64 64" class="dk dk-cool">${leg(25,"dk-leg1")}${leg(36,"dk-leg2")}
-    <g class="dk-top" transform="translate(0,-4)">${tail}${body(43,12)}${head("",null,shades)}${wing}</g></svg>`;
+    const shades=`<g><path d="M40.4 12.2h9.600l-.8 4.400c-.4 1.4-1.8 2-3.2 2h-2.400c-1.6 0-3-1-3.2-2.600z" fill="${INK}" ${O}/><path d="M40.4 13l-5-1.6" fill="none" ${O}/><path d="M43 13.600l2 .1" stroke="#fff" stroke-width="1.2" stroke-linecap="round"/></g>`;
+    return wrap("cool", standing(head("",null,shades), wing));
+  }
+  /* add-on: a skateboard. It rolls across the page, wobbling. */
+  if(pose==="skate"){
+    const board=`<g class="dk-board"><path d="M9 54.500c1.5 3 3.5 4.5 6.5 4.500h33c3 0 5-1.5 6.5-4.5" fill="none" stroke="${INK}" stroke-width="6.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M9 54.500c1.5 3 3.5 4.5 6.5 4.500h33c3 0 5-1.5 6.5-4.5" fill="none" stroke="#FF7AB6" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle class="dk-wheel" cx="19" cy="61.2" r="2.3" fill="#FFF6DD" ${O}/><circle class="dk-wheel" cx="45" cy="61.2" r="2.3" fill="#FFF6DD" ${O}/></g>`;
+    const arm=`<path class="dk-arm" d="M22 42c-6-2-10-6-11-11c3-1.5 6.5 0 9 3c3 3 5 6 8 7z" ${WG} ${O}/>`;
+    return wrap("skate", `${board}<g class="dk-rider" transform="translate(0,-5.5)">${standing(head(eyeOpen), arm)}</g>`);
+  }
+  /* tapped too many times, too fast: cross, and holding a very small knife. Still cute. */
+  if(pose==="stab"){
+    const brow=`<path d="M41.2 10.400l6.4 2.6" fill="none" stroke="${skin.e?"#fff":INK}" stroke-width="2.6" stroke-linecap="round"/>`;
+    const vein=`<g fill="none" stroke="#FF4D6D" stroke-width="1.8" stroke-linecap="round"><path d="M30.5 6.500q2.5 1.5 1 4M35 5.500q-2.5 1.5-1 4M30 12.500q2.5-1.5 5 0"/></g>`;
+    const knife=`<g class="dk-knife" transform="translate(51,40) rotate(30)"><path d="M-2.8 -3L0 -20L2.8 -3z" fill="#EAF0F6" ${O}/><rect x="-4" y="-4" width="8" height="2.6" rx="1.3" fill="${INK}"/><rect x="-2" y="-1.8" width="4" height="8.5" rx="1.6" fill="#9A6240" ${O}/></g>`;
+    const hand=`<path d="M41 39.500c3.5-2 7.5-1.5 9.5 1c-1 4-5 5.5-8.5 4.200c-1.3-1.4-1.6-3.2-1-5.200z" ${WG} ${O}/>`;
+    return wrap("stab", standing(head(eyeOpen,null,brow+vein), knife+hand));
   }
   /* peek: head and neck only, rising from the bottom edge */
-  return `<svg viewBox="0 0 64 64" class="dk dk-peek"><g transform="translate(-8,22)">${head(eyeOpen)}</g></svg>`;
+  return wrap("peek", `<g transform="translate(-8,22)">${head(eyeOpen)}</g>`);
 }
-const DUCK_POSES=["sit","stand","sleep","peek","waddle"];
+function eggSVG(){
+  return `<svg viewBox="0 0 24 28" class="dk-eggsvg"><path d="M12 2c5 0 9.5 8 9.5 14.500a9.5 9.5 0 0 1-19 0C2.5 10 7 2 12 2z" fill="#FFF6DD" stroke="#352f3d" stroke-width="2.2" stroke-linejoin="round"/><circle cx="8.5" cy="15" r="1.2" fill="#E9C98A"/><circle cx="14.5" cy="19.5" r="1.4" fill="#E9C98A"/><circle cx="14" cy="10.5" r="1" fill="#E9C98A"/></svg>`;
+}
+/* Which pets she has, and which one is out. A pet unlocks with each title, like
+   the colour schemes. settings.pet: undefined = the newest unlocked one,
+   "" = no pet, otherwise a pet id. One active at a time, at most. */
+/** Pets that exist as far as the app is concerned. Unfinished ones (wip) only
+    count while the dev panel's "Show unfinished pets" is on. */
+function petsLive(){ return PETS.filter(p=>!p.wip || (DEV.on && DEV.allPets)); }
+function petUnlocked(p){ return petsLive().includes(p) && cutieUnlockedIdx()>=p.at; }
+function petPick(){
+  const id=S().settings.pet;
+  if(id==="") return null;
+  const p=PETS.find(x=>x.id===id);
+  if(p && petUnlocked(p)) return p;
+  const un=petsLive().filter(petUnlocked);
+  return un[un.length-1]||null;
+}
+function duckSVG(pose){ return petSVG(pose, petPick()||PETS[0]); }
+function petsCardHTML(){
+  if(!(DEV.on && DEV.duck)) return "";
+  const cur=petPick(), vis=cutieVisibleMax(), live=petsLive(), hidden=live.filter(p=>p.at>vis).length;
+  return `<div class="card"><h3>${live.length>1?"Pets":"Pet"}</h3>
+    <p class="faint" style="margin:4px 0 10px">${live.length>1?"A new pet joins you with every title. Pick one to keep you company, or none.":"A little duck to keep you company. Turn her off any time."}</p>
+    <div class="pet-grid">
+      <button class="pet-opt ${cur?"":"on"}" data-pet=""><div class="pet-none">✕</div><b>No pet</b></button>
+      ${live.filter(p=>p.at<=vis).map(p=>{ const ok=petUnlocked(p); return `
+      <button class="pet-opt ${cur&&cur.id===p.id?"on":""} ${ok?"":"locked"}" data-pet="${p.id}" ${ok?"":"disabled"}>
+        ${petSVG("sit", p)}<b>${esc(p.name)}</b><span class="faint">${ok? esc(p.kind) : "🔒 "+esc(CUTIE_TITLES[p.at])}</span></button>`; }).join("")}
+    </div>
+    ${hidden?`<p class="faint" style="margin:10px 0 0">${hidden} more secret pet${hidden>1?"s":""} to find 👀</p>`:""}</div>`;
+}
+const DUCK_POSES=["sit","stand","sleep","peek","waddle","skate"];
 const DUCK_VIEWS=["home","mesos","exercises","calendar","analytics","settings","workout"];
 /* On the Train tab it keeps to the bottom-left corner in a still pose and can't be
    tapped (taps pass straight through), so it never steals a tap meant for a set.
@@ -5593,25 +5694,28 @@ const DUCK_CHEERS={
 };
 let _duckCheerT=null;
 const DUCK_SAYS=["Quack!","Quack quack 💕","*happy wiggle*","Proud of you 🥹","Hi cutie!","Boop!","*quack*","You got this 💪"];
+const DUCK_STAB_SAYS=["Tap me again. I dare you. 🔪","Enough. 🔪","We don't do that here. 🔪","I said stop. 🔪","Choose your next tap wisely. 🔪"];
+const DUCK_EGG_SAYS=["Oh! 🥚","…that wasn't me 🥚","Surprise 🥚","Breakfast? 🥚"];
 let _duckPose=null;
-function duckOn(){ return !!(DEV.on && DEV.duck); }
+function duckOn(){ return !!(DEV.on && DEV.duck && petPick()); }
 function duckRemove(){ const d=document.getElementById("duck"); if(d) d.remove(); }
 /** Put the duck on this page (or take it away). Called by go() after every render. */
 function duckPlace(view){
   duckRemove(); clearTimeout(_duckCheerT);
+  document.querySelectorAll(".pet-rain").forEach(x=>x.remove());
   if(!duckOn() || !DUCK_VIEWS.includes(view)) return;
   const train=view==="workout";
   const poses=(train? DUCK_TRAIN_POSES : DUCK_POSES).filter(p=>p!==_duckPose);
   const pose=_duckPose=poses[Math.floor(Math.random()*poses.length)];
   const d=document.createElement("div");
-  d.id="duck"; d.dataset.pose=pose; d.setAttribute("role","button"); d.setAttribute("aria-label","Duck");
-  if(pose==="waddle") d.dataset.spot="walk";
+  d.id="duck"; d.dataset.pose=pose; d.setAttribute("role","button"); d.setAttribute("aria-label",(petPick()||PETS[0]).name);
+  if(pose==="waddle" || pose==="skate") d.dataset.spot="walk";
   else if(pose==="peek"){ d.dataset.spot="peek"; d.style.left=(12+Math.floor(Math.random()*60))+"%"; }
   else if(train){ d.dataset.spot="bl"; d.classList.add("dk-notap"); }
   else { d.dataset.spot=Math.random()<.5? "bl":"br"; if(d.dataset.spot==="br") d.classList.add("dk-flip"); }
   d.innerHTML=`<div class="dk-wrap">${duckSVG(pose)}</div>`;
   d.addEventListener("click", duckTap);
-  if(pose==="waddle") d.addEventListener("animationend", e=>{ if(e.animationName==="dkWalk") duckRemove(); });
+  if(pose==="waddle" || pose==="skate") d.addEventListener("animationend", e=>{ if(e.animationName==="dkWalk") duckRemove(); });
   document.body.appendChild(d);
 }
 /** Tap: wake it if asleep, otherwise a random little reaction. */
@@ -5620,6 +5724,17 @@ function duckTap(e){
   const d=document.getElementById("duck"); if(!d) return;
   d.querySelectorAll(".dk-say,.dk-heart").forEach(x=>x.remove());
   const say=t=>{ const b=document.createElement("div"); b.className="dk-say"; b.textContent=t; d.appendChild(b); setTimeout(()=>b.remove(), 1900); };
+  // tap counting: every 5th tap does something silly; 10 quick ones in a row and it has had enough
+  const now=Date.now();
+  d._streak=(now-(d._last||0)<1000)? (d._streak||0)+1 : 1; d._last=now; d._taps=(d._taps||0)+1;
+  if(d.dataset.gesture==="stab") return;
+  if(d._streak>=10){ d._streak=0; duckStab(d); return; }
+  if(d._taps%5===0){
+    if(d.dataset.pose==="sleep"){ d.dataset.pose="sit"; d.querySelector(".dk-wrap").innerHTML=duckSVG("sit"); }
+    const calm=window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if(calm || Math.random()<.5) duckEgg(d); else duckFlock(d);
+    return;
+  }
   if(d.dataset.pose==="sleep"){
     d.dataset.pose="sit"; d.querySelector(".dk-wrap").innerHTML=duckSVG("sit"); say("…quack? 😴"); return;
   }
@@ -5632,6 +5747,43 @@ function duckTap(e){
     setTimeout(()=>d.classList.remove(cls), 1000);
     if(act==="hop") say("Quack!");
   }
+}
+/** Tapped ten times quickly: cross, holding a very small knife, for a few seconds. */
+function duckStab(d){
+  if(!d.dataset.gesture) d.dataset.rest=d.dataset.pose==="sleep"? "sit" : d.dataset.pose;
+  d.dataset.gesture="stab"; d.dataset.act="stab";
+  d.querySelector(".dk-wrap").innerHTML=duckSVG("stab");
+  d.querySelectorAll(".dk-say,.dk-heart").forEach(x=>x.remove());
+  const b=document.createElement("div"); b.className="dk-say dk-say-long";
+  b.textContent=DUCK_STAB_SAYS[Math.floor(Math.random()*DUCK_STAB_SAYS.length)]; d.appendChild(b);
+  clearTimeout(_duckCheerT); _duckCheerT=setTimeout(duckCheerEnd, 3600);
+}
+/** Every fifth tap, one of two silly things. It lays an egg... */
+function duckEgg(d){
+  d.dataset.act="egg";
+  const n=d.querySelectorAll(".dk-egg").length;
+  if(n<3){
+    const e=document.createElement("div"); e.className="dk-egg"; e.style.setProperty("--i", n); e.innerHTML=eggSVG(); d.appendChild(e);
+    if(d.dataset.spot==="bl") d.style.left=(10+(n+1)*12)+"px";      // shuffle along so the egg isn't off the edge
+  }
+  d.classList.remove("dk-hop"); void d.offsetWidth; d.classList.add("dk-hop"); setTimeout(()=>d.classList.remove("dk-hop"), 1000);
+  const b=document.createElement("div"); b.className="dk-say"; b.textContent=DUCK_EGG_SAYS[Math.floor(Math.random()*DUCK_EGG_SAYS.length)];
+  d.appendChild(b); setTimeout(()=>b.remove(), 1900);
+}
+/** ...or its friends rain down the screen like confetti. */
+function duckFlock(d){
+  d.dataset.act="flock";
+  document.querySelectorAll(".pet-rain").forEach(x=>x.remove());
+  const layer=document.createElement("div"); layer.className="pet-rain";
+  const mine=petsLive().filter(petUnlocked), pool=mine.length? mine : [PETS[0]], poses=["sit","stand","flex","cool"];
+  let html="";
+  for(let i=0;i<18;i++){
+    const p=pool[Math.floor(Math.random()*pool.length)], sz=26+Math.floor(Math.random()*22);
+    html+=`<i style="left:${Math.floor(Math.random()*92)}%;width:${sz}px;height:${sz}px;animation-duration:${(1.8+Math.random()*1.4).toFixed(2)}s;animation-delay:${(Math.random()*.7).toFixed(2)}s;--r:${Math.floor(Math.random()*90-45)}deg">${petSVG(poses[i%poses.length], p)}</i>`;
+  }
+  layer.innerHTML=html; document.body.appendChild(layer);
+  setTimeout(()=>layer.remove(), 3600);
+  const b=document.createElement("div"); b.className="dk-say"; b.textContent="Everybody in! 🎉"; d.appendChild(b); setTimeout(()=>b.remove(), 1900);
 }
 /** An exercise was just finished on the Train tab: the duck reacts for a moment
     (strong, tired or cool), then goes back to what it was doing. A hard exercise
@@ -5655,7 +5807,7 @@ function duckCheerEnd(){
   clearTimeout(_duckCheerT);
   const d=document.getElementById("duck"); if(!d || !d.dataset.gesture) return;
   const p=d.dataset.rest||"sit";
-  delete d.dataset.gesture; d.dataset.pose=p;
+  delete d.dataset.gesture; d.dataset.pose=p; d._streak=0;
   d.querySelector(".dk-wrap").innerHTML=duckSVG(p);
   d.querySelectorAll(".dk-say").forEach(x=>x.remove());
 }
@@ -5692,6 +5844,7 @@ function devPanelHTML(){
     <p class="faint" style="margin:4px 0 10px">Testing only. Nothing here touches workouts or backups. Tap the version 7 times to turn off and clear.</p>
     <label class="row" style="gap:10px"><input type="checkbox" data-dev="preview" ${DEV.preview?"checked":""} style="width:22px;height:22px"> Preview Cutie features</label>
     <label class="row" style="gap:10px;margin-top:8px"><input type="checkbox" data-dev="duck" ${DEV.duck?"checked":""} style="width:22px;height:22px"> Duck (testing): shows on every page</label>
+    <label class="row" style="gap:10px;margin-top:8px"><input type="checkbox" data-dev="allpets" ${DEV.allPets?"checked":""} style="width:22px;height:22px"> Show unfinished pets (the other birds)</label>
     <p class="num" style="margin:10px 0 6px">Points: real ${T.real.toLocaleString()} · showing <b>${T.total.toLocaleString()}</b> (${esc(cutieTitle(T.total))})</p>
     <div class="row" style="gap:6px;flex-wrap:wrap">
       <input id="devpts" type="number" inputmode="numeric" placeholder="Points" style="width:110px">
@@ -5720,8 +5873,18 @@ document.addEventListener("click", e=>{
     if(k==="workout"){ cutieWorkoutModal(c.dataset.id); return; }
     if(k==="titles"){ cutieTitlesModal(); return; }
   }
+  const pb=e.target.closest("[data-pet]");
+  if(pb && DEV.on && DEV.duck){
+    const id=pb.dataset.pet, p=PETS.find(x=>x.id===id);
+    if(id!=="" && !(p && petUnlocked(p))) return;
+    S().settings.pet=id; Store.save();
+    toast(p? `${p.name} is with you now 💕` : "No pet for now");
+    if(currentView==="settings") go("settings"); else duckPlace(currentView);
+    return;
+  }
   const d=e.target.closest("[data-dev]"); if(!d || !DEV.on) return;
   const k=d.dataset.dev;
+  if(k==="allpets"){ DEV.allPets=d.checked; devSave(); toast(DEV.allPets?"Unfinished pets shown":"Unfinished pets hidden"); go("settings"); return; }
   if(k==="duck"){ DEV.duck=d.checked; devSave(); duckPlace(currentView); toast(DEV.duck?"Duck on 🦆":"Duck off"); return; }
   if(k==="preview"){ DEV.preview=d.checked; devSave(); devSchemeCheck(); toast(DEV.preview?"Cutie preview on":"Cutie preview off"); return; }
   if(k==="setpts"){ const v=parseInt($("#devpts")?.value,10); if(!Number.isFinite(v)||v<0){ toast("Enter a number"); return; } DEV.points=v; }
@@ -6441,6 +6604,7 @@ VIEWS.settings=function(){
       <div class="row split" style="margin-top:6px"><span class="muted">Released</span><span class="faint num">${fmtDate(RELEASES[0].date)}</span></div>
       <button class="btn btn-ghost btn-block" style="margin-top:12px" data-a="whatsnew">What's new in ${APP_VERSION}</button>
     </div>
+    ${petsCardHTML()}
     ${devPanelHTML()}
     <p class="faint" style="text-align:center">Lift Daddy · your pocket training buddy</p>`;
   const persist=()=>{

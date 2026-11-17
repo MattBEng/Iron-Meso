@@ -9,18 +9,21 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
-### v1.8.1 (no version bump) — 2026-11-17 (duck, dev only)
-- A small white duck (`duckSVG`, original inline SVG) placed by `duckPlace(view)` from `go()`, in fixed safe spots
-  above the nav. Poses: sit, stand, sleep, peek, waddle. `duckTap`: wakes it, or a random say / hop / spin /
-  heart / wiggle. CSS is the `#duck` block; all motion respects reduce-motion.
-- **Train tab:** bottom-left only, still poses only, and not tappable (`dk-notap`, taps pass through) so it never
-  steals a set tap. `duckCheer(ses)` is called where "Exercise done" is toasted: the duck shows a gesture for
-  ~3s (`flex`, `tired`, `cool`) with a line from `DUCK_CHEERS`, then `duckCheerEnd` restores it. Hard exercises
-  (working sets averaging 1 RIR or less) mostly get `tired`.
-- **Hidden from everyone:** shows only with dev mode on AND the "Duck" switch in the dev panel (`DEV.duck`, stored
-  in `liftdaddy_dev`, never in app data). In dev it shows on every page visit. No version bump and no What's new
-  entry, so users get no update card. Still to decide before release: how it unlocks, how often it appears, an
-  off switch in Settings. Test: `TESTS_duck.js` (36).
+### v1.8.1 (no version bump) — 2026-11-17 (duck / pets, dev only)
+- **Pet duck** ("Daisy"): `petSVG(pose, skin)` is one bird rig drawn as inline SVG (original art); `duckSVG(pose)`
+  draws the active pet. `duckPlace(view)` runs from `go()`: fixed safe spots above the nav. Poses: sit, stand,
+  sleep, peek, waddle, and **skate** (skateboard add-on, wobbles across the page). All motion respects reduce-motion.
+- **Taps** (`duckTap`): a random say / hop / spin / heart / wiggle; every 5th tap `duckEgg` (lays an egg, max 3) or
+  `duckFlock` (18 ducks rain down, `.pet-rain`); 10 taps each under 1s apart `duckStab` (cross, little knife, ~3.5s).
+- **Train tab:** bottom-left, still poses, not tappable (`dk-notap`). `duckCheer(ses)` fires where "Exercise done"
+  is toasted: `flex` / `tired` / `cool` for ~3s, hard exercises (avg 1 RIR or less) mostly `tired`.
+- **Pets framework, mostly hidden:** `PETS` has 10 birds, one per title (`at`), but only Daisy is live; the rest
+  are `wip:1` and ignored by `petsLive()` unless the dev panel's "Show unfinished pets" (`DEV.allPets`) is on.
+  `settings.pet`: undefined = newest unlocked, "" = none, else an id; one active at most (`petPick`). Settings
+  gets a Pet card (`petsCardHTML`); title unlocks announce a live pet at that title.
+- **Dev only:** everything needs dev mode AND the "Duck" switch (`DEV.duck`). No version bump, no What's new,
+  no update card. Before release: decide the unlock, how often it shows, and swap the `DEV` gate for `cutieOn()`.
+  Test: `TESTS_duck.js` (77).
 
 ### v1.8.1 — 2026-11-17 (theme colours, Feel label)
 - `--cutie` = `--accent` on every Fun scheme; the 17 fixed rgba(224,85,156) tints now `color-mix` of `--cutie`.
