@@ -8,9 +8,7 @@ live in `RELEASES[0]` in `index.html`, and `TESTS_about.js` fails if the two dri
 apart. Update both when you ship, and add the engineering detail to
 `CHANGELOG.md` rather than here.
 
-## 1.8.0 — 2026-11-17
+## 1.8.1 — 2026-11-17
 
-- Share your wins: a new Share button on the finish screen and on title and badge unlocks makes a little picture card in your colours and opens your phone's share sheet, ready for Messages or any chat.
-- The workout card leads with what you lifted, like 12 corgis or 3 grand pianos, never the actual kilos. Tap Another one to swap it for a funnier one before you send.
-- You can also share a past workout: open it from your cutest workouts and tap its points.
-- The lifted total on the finish screen now shows in pounds if that's your unit.
+- The Cutie points card now matches whichever colour theme you pick, instead of always being magenta.
+- The Feel button on each set no longer cuts off: it now reads Easy, OK, Hard or Max.

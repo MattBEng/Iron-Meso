@@ -115,6 +115,12 @@ Everyone else sees the original Stats page.
   her workouts, days and badges, and the Goddess colour (`S().cutie.finaleShown`). After that: a crown next
   to LIFT DADDY on Home for good, and her points turn gold. Dev mode has a Goddess finale button.
 
+## Colours (1.8.1)
+
+All Cutie colouring (`--cutie`, and its tints via `color-mix`) follows the theme's accent on every Fun
+scheme, so each theme has one main colour. Two things never follow the theme (Matt's rules): the LIFT DADDY
+logo stays coral (branding), and each muscle keeps its own fixed colour in workouts (`MUSCLE_COLORS`).
+
 ## Celebrations
 
 - **New all-time best**: banner plus confetti. Never on the first ever workout.

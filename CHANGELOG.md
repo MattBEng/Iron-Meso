@@ -9,6 +9,12 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.8.1 — 2026-11-17 (theme colours, Feel label)
+- `--cutie` = `--accent` on every Fun scheme; the 17 fixed rgba(224,85,156) tints now `color-mix` of `--cutie`.
+- Set-row Feel select: `FEELS_SHORT` (Easy/OK/Hard/Max) and a 76px column in Fun mode (was cut off as "Cha").
+- Matt's standing rules, now guarded by comments and `TESTS_themecolours.js`: the LIFT DADDY logo is always
+  `--brand-coral` (branding), and `MUSCLE_COLORS` never change or follow the theme (recognition by colour).
+
 ### v1.8.0 — 2026-11-17 (share cards, Cutie only)
 - `shareZoneHTML(make)` adds a Share button + `#sharezone` to the finish screen, title/badge popups, the finale
   and `cutieWorkoutModal`; returns "" unless `cutieOn()`. Cards are data (`shareWorkoutCard`, `shareTitleCard`,
