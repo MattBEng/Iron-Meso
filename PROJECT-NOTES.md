@@ -13,6 +13,13 @@ count, a "shipped" feature, a file's existence), confirm it against the real
 repo: list the folder, run the tests, grep the code. Don't assume the notes
 are current just because they read confidently.
 
+**Before any major change, read `APP-STORE-OPTIONS.md`.** Matt may put this on
+Google Play (and possibly Apple) later. That file lists the options and a short
+checklist of things a big change must not break (the site address, the storage
+key, offline use, installability, no network calls). Run the checklist before
+restructuring the app, changing hosting, adding a backend, or adding anything
+that talks to the network.
+
 ---
 
 ## 1. What this is
@@ -47,6 +54,7 @@ Everything is flat in the repo root. There are no subfolders and no build step.
 | `PROJECT-NOTES.md` | This file — architecture, domain rules, working style. |
 | `WHATS-NEW.md` | **The latest release in plain language**, as the app shows it. Source of truth for `RELEASES[0]` in `index.html`; `TESTS_about.js` fails if they drift. User-facing wording only — engineering detail goes in `CHANGELOG.md`. |
 | `CHANGELOG.md` | **Dated log of every change**, newest first — what shipped, why, what it touches. Update it every time you ship, before handing over. If it's missing, create it; don't fold history back into this file. |
+| `APP-STORE-OPTIONS.md` | **App store plans and the pre-change checklist.** Read before any major change. |
 | `PROGRESSION-MODEL.md` | **The science behind the progression maths** — equations, evidence, worked examples, the "??" band, the jump-aware ceiling. Read before touching the engine. |
 | `MESSAGES.txt` | **All the cute/Fun-mode message banks, in plain text.** Edit this, not `index.html`. |
 | `MESSAGES_build.js` | Injects `MESSAGES.txt` into `index.html`. Run after editing messages. |
