@@ -9,6 +9,15 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.8.1 (no version bump) — 2026-11-17 (duck, dev only)
+- A small white duck (`duckSVG`, original inline SVG, 5 poses: sit, stand, sleep, peek, waddle) placed by
+  `duckPlace(view)` from `go()`. Fixed safe spots above the nav, never on Train. `duckTap`: wakes it, or a random
+  say / hop / spin / heart / wiggle. CSS is the `#duck` block; all motion respects reduce-motion.
+- **Hidden from everyone:** shows only with dev mode on AND the new "Duck" switch in the dev panel (`DEV.duck`,
+  stored in `liftdaddy_dev`, never in app data). In dev it shows on every page visit. No version bump and no
+  What's new entry, so users get no update card. Still to decide before release: how it unlocks, how often it
+  appears, an off switch in Settings. Test: `TESTS_duck.js` (24).
+
 ### v1.8.1 — 2026-11-17 (theme colours, Feel label)
 - `--cutie` = `--accent` on every Fun scheme; the 17 fixed rgba(224,85,156) tints now `color-mix` of `--cutie`.
 - Set-row Feel select: `FEELS_SHORT` (Easy/OK/Hard/Max) and a 76px column in Fun mode (was cut off as "Cha").

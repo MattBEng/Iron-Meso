@@ -315,6 +315,47 @@ body{--cutie:#E0559C}
 body[data-fun="1"]{--cutie:var(--accent)}   /* 1.8.1: one main colour per theme */
 body[data-fun="1"]:is([data-scheme="cherry"],[data-scheme="lavender"],[data-scheme="ocean"],[data-scheme="mint"],[data-scheme="angel"],[data-scheme="midnight"],[data-scheme="bubblegum"],[data-scheme="rosegold"],[data-scheme="goddess"]){--cutie:var(--accent)}
 .confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:9999}
+/* ---- duck (dev-only for now): a small creature that turns up on a page ---- */
+#duck{position:fixed;z-index:40;width:54px;height:54px;bottom:calc(64px + env(safe-area-inset-bottom));color:var(--muted);
+  -webkit-tap-highlight-color:transparent;cursor:pointer;user-select:none;touch-action:manipulation}
+#duck svg{width:100%;height:100%;display:block;overflow:visible}
+#duck .dk-wrap{width:100%;height:100%}
+#duck.dk-flip .dk-wrap{transform:scaleX(-1)}
+#duck[data-spot="bl"]{left:10px} #duck[data-spot="br"]{right:10px}
+#duck[data-spot="peek"]{bottom:calc(60px + env(safe-area-inset-bottom));z-index:45;animation:dkPeek 5.5s ease-in-out infinite}
+#duck[data-spot="walk"]{left:-60px;animation:dkWalk 16s linear 1 forwards}
+#duck .dk{animation:dkBob 2.6s ease-in-out infinite}
+#duck .dk-eye{transform-box:fill-box;transform-origin:center;animation:dkBlink 4.2s infinite}
+#duck .dk-tail{transform-box:fill-box;transform-origin:100% 100%;animation:dkTail 3.1s ease-in-out infinite}
+#duck .dk-sleep{animation:dkBreathe 3.4s ease-in-out infinite}
+#duck .dk-sleep .dk-tail{animation:none}
+#duck .dk-zz{animation:dkZz 2.8s ease-in-out infinite}
+#duck .dk-waddle{animation:dkWaddle .5s ease-in-out infinite}
+#duck .dk-waddle .dk-leg1{animation:dkStep .5s ease-in-out infinite}
+#duck .dk-waddle .dk-leg2{animation:dkStep .5s ease-in-out infinite -.25s}
+#duck.dk-hop{animation:dkHop .6s ease-out 1}
+#duck.dk-spin svg{animation:dkSpin .7s ease-in-out 1}
+#duck.dk-wig .dk-tail{animation:dkTail .18s ease-in-out 5}
+#duck .dk-say{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:2px;white-space:nowrap;
+  background:var(--raised);color:var(--text);border:1px solid var(--line);border-radius:12px;padding:4px 9px;
+  font:700 12px/1.2 system-ui,sans-serif;box-shadow:var(--shadow);animation:dkSay 1.9s ease-out 1 forwards;pointer-events:none}
+#duck[data-spot="br"] .dk-say{left:auto;right:0;transform:none;animation-name:dkSayE}
+#duck[data-spot="bl"] .dk-say{left:0;transform:none;animation-name:dkSayE}
+#duck .dk-heart{position:absolute;left:50%;top:0;font-size:16px;animation:dkHeart 1.2s ease-out 1 forwards;pointer-events:none}
+@keyframes dkBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.5px)}}
+@keyframes dkBlink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
+@keyframes dkTail{0%,100%{transform:rotate(0)}50%{transform:rotate(-12deg)}}
+@keyframes dkBreathe{0%,100%{transform:scale(1,1)}50%{transform:scale(1.02,.97) translateY(1px)}}
+@keyframes dkZz{0%{opacity:0;transform:translate(0,3px)}40%{opacity:1}100%{opacity:0;transform:translate(3px,-5px)}}
+@keyframes dkWaddle{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+@keyframes dkStep{0%,100%{transform:translateY(0)}50%{transform:translateY(-2.5px)}}
+@keyframes dkWalk{to{left:calc(100% + 60px)}}
+@keyframes dkPeek{0%,12%{transform:translateY(36px)}28%,72%{transform:translateY(0)}88%,100%{transform:translateY(36px)}}
+@keyframes dkHop{0%,100%{transform:translateY(0)}35%{transform:translateY(-22px)}70%{transform:translateY(-4px)}}
+@keyframes dkSpin{to{transform:rotate(360deg)}}
+@keyframes dkSay{0%{opacity:0;transform:translate(-50%,6px)}12%,80%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,0)}}
+@keyframes dkSayE{0%{opacity:0;transform:translateY(6px)}12%,80%{opacity:1;transform:none}100%{opacity:0;transform:none}}
+@keyframes dkHeart{0%{opacity:0;transform:translate(-50%,0) scale(.6)}20%{opacity:1}100%{opacity:0;transform:translate(-50%,-34px) scale(1.2)}}
 #devbadge{position:fixed;top:6px;right:6px;z-index:9998;background:#F5C542;color:#000;font:800 10px/1 system-ui;padding:4px 6px;border-radius:6px;pointer-events:none}
 .dev-card{border:1px dashed #F5C542}
 /* Cutie unlockable schemes (1.6.0): shown only with Cutie on and the title reached */
@@ -1722,6 +1763,7 @@ function go(view, ...args){
   }
   syncHistory(name);
   renderNav();
+  try{ duckPlace(name); }catch(_){}
 }
 /** Keep a single synthetic history entry per non-home view, and a base entry
     for home, so the hardware back button maps to in-app navigation instead of
@@ -5470,6 +5512,82 @@ function confetti(){
     requestAnimationFrame(tick);
   }catch(_){}
 }
+/* ---------- duck (1.8.x, DEV ONLY for now) ----------
+   A small white duck that turns up on a page, in one of a few poses, gently
+   animated; tap it and it does something cute. Drawn in code (inline SVG), so
+   it works offline and adds no files. Original artwork.
+   Gated on dev mode + the "Duck" switch in the dev panel: nobody else sees it.
+   It sits in fixed safe spots just above the bottom nav (the app can't reliably
+   find empty space on a page) and never appears on the Train tab, where a
+   tappable creature near the set buttons would get hit by accident. */
+/* Original little white duck, drawn in code. viewBox 0 0 64 64, faces right. */
+function duckSVG(pose){
+  const O='stroke="#352f3d" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"';
+  const W='fill="#FFFDF8"', OR='fill="#F6A21E"';
+  const eyeOpen=`<g class="dk-eye"><circle cx="45.2" cy="15.2" r="1.9" fill="#352f3d"/><circle cx="45.8" cy="14.6" r=".6" fill="#fff"/></g>`;
+  const eyeShut=`<path d="M43.2 15.6q2 1.8 4 0" fill="none" ${O}/>`;
+  const blush=`<circle cx="42.6" cy="19.6" r="2.3" fill="#FF9DB8" opacity=".55"/>`;
+  const beak=`<path class="dk-beak" d="M50.2 14.4c4.6-.8 8.6.4 10.2 2.6c-2.4 2.8-6.6 3.8-10.6 2.6z" ${OR} ${O}/>`;
+  const head=(eye)=>`<path d="M34.6 37C33 29 33.6 25 35.6 22.2A9.4 9.4 0 1 1 49.6 23C48 27 47.6 32 48 38" ${W} ${O}/>${blush}${eye}${beak}`;
+  const tail=`<path class="dk-tail" d="M14.5 39.5c-5.5-3-6.5-7.5-4.5-10.5c3 3.5 6.5 5 10.5 5.5z" ${W} ${O}/>`;
+  const wing=`<path class="dk-wing" d="M21 41.5c6-5 13-5 18.5-.5c-2.5 8-10 11-17 7.5c-2-2-2.5-4.5-1.5-7z" fill="#F3EFF6" ${O}/>`;
+  const body=(cy,ry)=>`<ellipse cx="30" cy="${cy}" rx="18.5" ry="${ry}" ${W} ${O}/>`;
+  if(pose==="sit") return `<svg viewBox="0 0 64 64" class="dk dk-sit">${tail}${body(44,13.5)}${head(eyeOpen)}${wing}
+    <path d="M25 55.500c3.5-3.5 9-3.5 11.5.5c-2 3.5-8 4.5-12 2.500z" ${OR} ${O}/>
+    <path d="M37.5 54.500c4-3 9-2.5 11 1.500c-2.5 3-8 3.5-11.5 1.500z" ${OR} ${O}/></svg>`;
+  if(pose==="stand"||pose==="waddle"){
+    const leg=(x,c)=>`<g class="${c}"><path d="M${x} 49v8" fill="none" stroke="#352f3d" stroke-width="5" stroke-linecap="round"/><path d="M${x} 49v8" fill="none" stroke="#F6A21E" stroke-width="2.2" stroke-linecap="round"/>
+      <path d="M${x-4.5} 60.500c0-3 2-4.5 4.5-4.500s6.5 1.5 7.5 4.500z" ${OR} ${O}/></g>`;
+    return `<svg viewBox="0 0 64 64" class="dk dk-${pose}">${leg(25,"dk-leg1")}${leg(36,"dk-leg2")}
+    <g class="dk-top" transform="translate(0,-4)">${tail}${body(43,12)}${head(eyeOpen)}${wing}</g></svg>`;
+  }
+  if(pose==="sleep") return `<svg viewBox="0 0 64 64" class="dk dk-sleep">
+    <g transform="translate(0,4)">${tail}<g transform="translate(-1,11)">${head(eyeShut)}</g>${body(46,11.5)}${wing}</g>
+    <g class="dk-zz" fill="currentColor" font-family="system-ui,sans-serif" font-weight="800"><text x="52" y="20" font-size="9">z</text><text x="58" y="11" font-size="7">z</text></g></svg>`;
+  /* peek: head and neck only, rising from the bottom edge */
+  return `<svg viewBox="0 0 64 64" class="dk dk-peek"><g transform="translate(-8,22)">${head(eyeOpen)}</g></svg>`;
+}
+const DUCK_POSES=["sit","stand","sleep","peek","waddle"];
+const DUCK_VIEWS=["home","mesos","exercises","calendar","analytics","settings"];
+const DUCK_SAYS=["Quack!","Quack quack 💕","*happy wiggle*","Proud of you 🥹","Hi cutie!","Boop!","*quack*","You got this 💪"];
+let _duckPose=null;
+function duckOn(){ return !!(DEV.on && DEV.duck); }
+function duckRemove(){ const d=document.getElementById("duck"); if(d) d.remove(); }
+/** Put the duck on this page (or take it away). Called by go() after every render. */
+function duckPlace(view){
+  duckRemove();
+  if(!duckOn() || !DUCK_VIEWS.includes(view)) return;
+  const poses=DUCK_POSES.filter(p=>p!==_duckPose);
+  const pose=_duckPose=poses[Math.floor(Math.random()*poses.length)];
+  const d=document.createElement("div");
+  d.id="duck"; d.dataset.pose=pose; d.setAttribute("role","button"); d.setAttribute("aria-label","Duck");
+  if(pose==="waddle") d.dataset.spot="walk";
+  else if(pose==="peek"){ d.dataset.spot="peek"; d.style.left=(12+Math.floor(Math.random()*60))+"%"; }
+  else { d.dataset.spot=Math.random()<.5? "bl":"br"; if(d.dataset.spot==="br") d.classList.add("dk-flip"); }
+  d.innerHTML=`<div class="dk-wrap">${duckSVG(pose)}</div>`;
+  d.addEventListener("click", duckTap);
+  if(pose==="waddle") d.addEventListener("animationend", e=>{ if(e.animationName==="dkWalk") duckRemove(); });
+  document.body.appendChild(d);
+}
+/** Tap: wake it if asleep, otherwise a random little reaction. */
+function duckTap(e){
+  e.stopPropagation();
+  const d=document.getElementById("duck"); if(!d) return;
+  d.querySelectorAll(".dk-say,.dk-heart").forEach(x=>x.remove());
+  const say=t=>{ const b=document.createElement("div"); b.className="dk-say"; b.textContent=t; d.appendChild(b); setTimeout(()=>b.remove(), 1900); };
+  if(d.dataset.pose==="sleep"){
+    d.dataset.pose="sit"; d.querySelector(".dk-wrap").innerHTML=duckSVG("sit"); say("…quack? 😴"); return;
+  }
+  const acts=["say","hop","spin","heart","wig"], act=acts[Math.floor(Math.random()*acts.length)];
+  d.dataset.act=act;
+  if(act==="say") say(DUCK_SAYS[Math.floor(Math.random()*DUCK_SAYS.length)]);
+  else if(act==="heart"){ const h=document.createElement("div"); h.className="dk-heart"; h.textContent="💖"; d.appendChild(h); setTimeout(()=>h.remove(), 1200); }
+  else {
+    const cls="dk-"+act; d.classList.remove(cls); void d.offsetWidth; d.classList.add(cls);
+    setTimeout(()=>d.classList.remove(cls), 1000);
+    if(act==="hop") say("Quack!");
+  }
+}
 /* ---------- dev mode: Settings > tap the version 7 times ----------
    Sandboxed: everything lives in DEV (own localStorage key), never in the
    training data, exports or backups. Turning it off deletes the key. */
@@ -5502,6 +5620,7 @@ function devPanelHTML(){
   return `<div class="card dev-card"><h3>Dev mode</h3>
     <p class="faint" style="margin:4px 0 10px">Testing only. Nothing here touches workouts or backups. Tap the version 7 times to turn off and clear.</p>
     <label class="row" style="gap:10px"><input type="checkbox" data-dev="preview" ${DEV.preview?"checked":""} style="width:22px;height:22px"> Preview Cutie features</label>
+    <label class="row" style="gap:10px;margin-top:8px"><input type="checkbox" data-dev="duck" ${DEV.duck?"checked":""} style="width:22px;height:22px"> Duck (testing): shows on every page except Train</label>
     <p class="num" style="margin:10px 0 6px">Points: real ${T.real.toLocaleString()} · showing <b>${T.total.toLocaleString()}</b> (${esc(cutieTitle(T.total))})</p>
     <div class="row" style="gap:6px;flex-wrap:wrap">
       <input id="devpts" type="number" inputmode="numeric" placeholder="Points" style="width:110px">
@@ -5532,6 +5651,7 @@ document.addEventListener("click", e=>{
   }
   const d=e.target.closest("[data-dev]"); if(!d || !DEV.on) return;
   const k=d.dataset.dev;
+  if(k==="duck"){ DEV.duck=d.checked; devSave(); duckPlace(currentView); toast(DEV.duck?"Duck on 🦆":"Duck off"); return; }
   if(k==="preview"){ DEV.preview=d.checked; devSave(); devSchemeCheck(); toast(DEV.preview?"Cutie preview on":"Cutie preview off"); return; }
   if(k==="setpts"){ const v=parseInt($("#devpts")?.value,10); if(!Number.isFinite(v)||v<0){ toast("Enter a number"); return; } DEV.points=v; }
   if(k==="add1000") DEV.points=(devPoints()??cutieTotals().real)+1000;
