@@ -8,9 +8,9 @@ live in `RELEASES[0]` in `index.html`, and `TESTS_about.js` fails if the two dri
 apart. Update both when you ship, and add the engineering detail to
 `CHANGELOG.md` rather than here.
 
-## 1.6.0 — 2026-11-17
+## 1.7.0 — 2026-11-17
 
-- Reach a new Cutie title and you get the full treatment: a shower of hearts and emojis, and your new title in lights.
-- Six new colour schemes to unlock as you level up: Mint Mojito, Angel Glow (with gold sparkle), Midnight Baddie, Bubblegum Pop, Rose Gold and Goddess. Locked ones show in Settings with the title that unlocks them, and you keep them for good once earned.
-- A progress bar under your title shows how many points to the next one. Tap your title to see every title, when you earned it, and what's still to come.
-- Stats now shows your points this week and this month, your best week and month, and a bar for each week of your plan.
+- Bonus Cutie Points from today: +50 for each PR (up to 3 a workout), +30 for finishing every planned set, +10 for each lift where you beat last time, and +75 welcome-back points after two weeks or more off.
+- Ten badges to collect, from First Step to Ton Up and Early Bird. Each new one is worth 50 points and comes with confetti. Any you've already earned are there too. Tap your title to see your badges next to your titles.
+- Stats now compares this plan with your last one: points, workouts and points per workout.
+- New Holiday pause in Settings: pick your dates away and your streak is safe while you're gone. Home shows you're on holiday instead of nagging you to come back.

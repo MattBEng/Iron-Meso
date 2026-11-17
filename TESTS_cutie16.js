@@ -10,21 +10,21 @@ run("cutie titles + schemes", ()=>{
   const SQ="b_back_squat", today=ev("todayISO()");
   st().settings.mode="fun"; st().profile.gender="Female"; save();
   A.makeMeso([{id:"s1",exerciseId:SQ,sets:3,reps:8,rir:2,rest:90}]);
-  const bulk=n=>Array.from({length:n},()=>({kg:50,reps:8,rir:2,done:true}));
+  const bulk=n=>Array.from({length:n},()=>({kg:2,reps:8,rir:2,done:true}));   // light: stays under the Ton Up badge
   st().logs.push({id:"big",mesoId:"m",week:1,dayId:"d",dayName:"Big day",date:ev("isoShift")(today,-3),
-    notes:"",durationMin:60,loggedAt:1,exercises:[{exerciseId:SQ,target:{sets:3,reps:8,rir:2},sets:bulk(485)}]});
+    notes:"",durationMin:60,loggedAt:1,exercises:[{exerciseId:SQ,target:{sets:999,reps:8,rir:2},sets:bulk(475)}]});
   save();
 
   // ---------- FIRST RUN: EXISTING TITLES RECORDED SILENTLY ----------
-  ok("setup: 4,950 points", ev("cutieTotals()").real===4950, ev("cutieTotals()").real);
   const c=ev("cutieState()");
+  ok("setup: 4,850 points (First Step badge recorded, no points)", ev("cutieTotals()").real===4850, ev("cutieTotals()").real);
   ok("titles reached so far recorded, dated today", c.titles[0]===today && c.titles[1]===today && !c.titles[2]);
   w.LiftDaddy.Store.flush();
   ok("records are part of the saved data (backed up)", /"cutie"/.test(w.localStorage.getItem("ironmeso_v1")));
 
   // ---------- PROGRESS BAR ----------
   w.go("home");
-  ok("progress shows points to the next title", /50 points to Fit Queen/.test($("#view").textContent));
+  ok("progress shows points to the next title", /150 points to Fit Queen/.test($("#view").textContent));
   ok("a progress bar is drawn", !!$(".cutie-prog [role='progressbar']"));
 
   // ---------- SCHEMES LOCKED BELOW THEIR TITLE ----------
@@ -52,6 +52,8 @@ run("cutie titles + schemes", ()=>{
   click($("[data-try='mint']"));
   ok("Try it applies the scheme", st().settings.funScheme==="mint" && w.document.body.dataset.scheme==="mint");
   click($("[data-ok]"));
+  ok("then the badge popup (Glow Up for the new title)", /Badge/.test($("#overlay").textContent) && /Glow Up/.test($("#overlay").textContent));
+  click($("[data-ok]"));
   ok("tapping through goes Home", !$("#overlay").innerHTML);
   ok("Fit Queen recorded with today's date", ev("cutieState()").titles[2]===today);
   ok("no second celebration for the same title", ev("cutieSyncTitles()").length===0);
@@ -72,7 +74,7 @@ run("cutie titles + schemes", ()=>{
 
   // ---------- WEEK / MONTH ----------
   const P=ev("cutiePeriods()");
-  ok("this week and best week", P.thisWeek>=0 && P.bestWeek>=P.thisWeek && P.bestWeek>=4950);
+  ok("this week and best week", P.thisWeek>=0 && P.bestWeek>=P.thisWeek && P.bestWeek>=4800);
   ok("this month and best month", P.bestMonth>=P.thisMonth);
   ok("a bar per week is drawn", $$(".cutie-weeks .cw").length===P.bars.length && P.bars.length>=1);
 

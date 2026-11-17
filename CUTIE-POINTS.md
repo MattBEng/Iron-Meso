@@ -20,9 +20,22 @@ import brings them all back.
 | Workout finished | 100 | Skipped workouts earn nothing |
 | Working set | 10 each | Warm-up sets don't count |
 | Cardio | 3 per minute | In-workout and standalone cardio both count |
-| Streak week | 50 | First scheduled workout of a Mon-Sun week when the week before also had one |
+| Streak week | 50 | First scheduled workout of a Mon-Sun week when the week before also had one (holiday-paused weeks are skipped over) |
+| PR | 50 each, max 3 | A working set's e1RM beats that lift's best from earlier workouts (warm-ups never count; first time on a lift isn't a PR) |
+| Full workout | 30 | Every lift in the plan's day logged with all its target sets (not bonus workouts) |
+| Beat last time | 10 per lift, max 50 | A lift's working volume beats the last time it was done (kg x reps; reps or seconds for bodyweight and holds) |
+| Welcome back | 75 | First workout after 14 or more days off |
+| Badge | 50 each | See Badges |
 
-- Bonus workouts earn the base, sets and cardio, but not the streak bonus.
+- Bonus workouts earn the base, sets, cardio, PR, beat-last-time and welcome-back points, but not the
+  streak or full-workout bonus (they aren't part of the plan).
+- **Bonuses are not retroactive** (Matt: points she didn't see happen wouldn't feel earned).
+  `S().cutie.bonusFrom` is set to the moment 1.7.0 first runs; only workouts with `loggedAt` after it get
+  bonus points. Earlier workouts are still read to know her previous bests and last-time volumes.
+- Pace check on her backup (17 Nov): last 8 weeks averaged about 440 points a week, plus about 120 a week
+  of bonuses going forward, so about 560. That puts Strong Sweetheart about 2 weeks away, Iron Angel about
+  7, and Glute Goddess about 29 weeks (around June 2027). Matt doesn't want her finishing in a month; recheck
+  if the pace changes a lot.
 - In-workout cardio belongs to the first workout that day for the same meso
   (`mesoId`, or `bonusOf` for a bonus). Each cardio entry counts once.
 - Cardio left in the cardio log after its workout is deleted counts as
@@ -122,11 +135,46 @@ off.
 - On these schemes the Cutie pink (`--cutie`) follows the scheme's accent.
 - Sparkle and shimmer stop when the phone asks for reduced motion.
 
-## Still to build (from the spec)
+## Badges (1.7.0)
 
-- 1.7.0: bonus points (PR, full workout, beat last time, comeback), badges
-  (50 points each, names in `MESSAGES.txt`), meso comparison in Stats.
+| # | Name (MESSAGES.txt) | Earned when |
+|---|---|---|
+| 1 | First Step | First workout logged |
+| 2 | Ten Down | 10 workouts in one plan |
+| 3 | Hundred Club | 100 workouts all-time |
+| 4 | Triple Digits | A working set at 100 kg or more |
+| 5 | Ton Up | 10,000 kg working volume in one workout |
+| 6 | Never Missed | A finished plan with no skipped workouts |
+| 7 | Cardio Cutie | 300 min of cardio in one plan |
+| 8 | Early Bird | A workout's first set before 7 am |
+| 9 | Bonus Babe | First bonus workout |
+| 10 | Glow Up | A title beyond Gym Cutie reached |
+
+- Rules in `BADGE_DEFS`; names in `MESSAGES.txt` `[BADGE NAMES]`, same order (rebuild after editing).
+- Saved in `S().cutie.badges` (id to date), backed up. Kept once earned, even if the workout is deleted.
+- Badges already qualified for when 1.7.0 first opens are recorded silently, dated that day, and carry
+  **no points** (`S().cutie.badgesFree`). Only badges earned after that are worth 50.
+- At finish: finish screen, then any title unlocks, then a badge popup with confetti.
+- Listed under the titles (tap the title). Dev mode has a Badge button.
+
+## Plan comparison (1.7.0)
+
+Stats shows this plan's points, workouts and points per workout against the most recent other plan with
+workouts (bonus workouts count toward the plan they were done in).
+
+## Holiday pause (1.7.0)
+
+- Settings > Holiday pause: from and to dates (up to 90 days, must not be over already). Stored in
+  `S().pauses` [{id, from, to}], backed up, for everyone (not just Cutie).
+- Paused days don't count as a gap in the workout streak (`streakCount`), and paused weeks are skipped
+  when checking the Cutie streak week, so the streak carries on after the holiday.
+- While a pause is on, Home shows an "On holiday" card and the streak pill says paused; the welcome-back
+  card is hidden. The welcome-back bonus still applies on return (it's about motivation).
+
+## Next (1.8.0, from the spec)
+
+- Monthly recap, share card, seasonal points (e.g. double points over Christmas: needs to ship before then).
 
 ## Tests
 
-`TESTS_cutie.js` (1.5.0), `TESTS_cutie16.js` (1.6.0).
+`TESTS_cutie.js` (1.5.0), `TESTS_cutie16.js` (1.6.0), `TESTS_cutie17.js` (1.7.0).

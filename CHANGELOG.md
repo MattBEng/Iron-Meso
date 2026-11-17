@@ -9,6 +9,15 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.7.0 — 2026-11-17 (Cutie bonuses, badges, holiday pause)
+- `cutieLedger` adds `CUTIE_BONUS`: PR (e1RM beats earlier best, 50, max 3), full workout (30, not bonus
+  workouts), beat last time (10/lift, max 50), welcome back (75 after 14+ days). Going forward only:
+  `S().cutie.bonusFrom` (first run) vs `log.loggedAt`; badges already earned then are in `badgesFree` (no points).
+- `BADGE_DEFS` (10), saved in `S().cutie.badges`, 50 pts each, names from MESSAGES.txt `[BADGE NAMES]`
+  (8th section: build script + TESTS_messages updated). Badge popup after title unlocks at finish.
+- Plan comparison on Stats. New `S().pauses` [{id,from,to}]: `streakCount` and the Cutie streak week skip
+  paused days/weeks; Home holiday card; Settings card. Fixed doubled CRs in the 1.6.0 block. Test: TESTS_cutie17.js.
+
 ### v1.6.0 — 2026-11-17 (Cutie Points v2, part 2)
 - New saved state `S().cutie.titles` (title index -> date first reached); pre-1.6.0 titles recorded silently
   on first run. `cutieSyncTitles()` at finish; unlock modal + `emojiRain()` (hearts/emoji shower) after Yay.

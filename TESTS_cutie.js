@@ -11,7 +11,8 @@ run("cutie points", ()=>{
   A.makeMeso([{id:"s1",exerciseId:SQ,sets:3,reps:8,rir:2,rest:90}]);
   const set=(t)=>Object.assign({kg:50,reps:8,rir:2,done:true},t?{type:t}:{});
   const add=(id,date,sets,o)=>{ st().logs.push(Object.assign({id,mesoId:"m",week:1,dayId:"d",dayName:"Day "+id,date,
-    notes:"",durationMin:40,loggedAt:Date.parse(date),exercises:[{exerciseId:SQ,target:{sets:3,reps:8,rir:2},sets}]},o||{})); save(); };
+    notes:"",durationMin:40,loggedAt:Date.parse(date),exercises:[{exerciseId:SQ,target:{sets:9,reps:8,rir:2},sets}]},o||{})); save(); };
+  // target 9 sets: these fixtures never complete the plan, so no 1.7.0 "full workout" bonus muddies the base numbers
   const W=id=>ev("cutieWorkout")(id);
 
   // ---------- PER-WORKOUT FORMULA ----------
