@@ -341,7 +341,7 @@ body[data-fun="1"]:is([data-scheme="cherry"],[data-scheme="lavender"],[data-sche
   font:700 12px/1.2 system-ui,sans-serif;box-shadow:var(--shadow);animation:dkSay 1.9s ease-out 1 forwards;pointer-events:none}
 #duck[data-spot="br"] .dk-say{left:auto;right:0;transform:none;animation-name:dkSayE}
 #duck[data-spot="bl"] .dk-say{left:0;transform:none;animation-name:dkSayE}
-#duck.dk-notap{pointer-events:none}
+#duck.dk-leave{transition:transform .8s ease-in,opacity .8s ease-in;transform:translateY(90px);opacity:0;pointer-events:none}
 #duck[data-pose="skate"]{animation-duration:9s}
 #duck .dk-skate{animation:dkWobble 1.3s ease-in-out infinite;transform-origin:50% 100%}
 #duck .dk-skate .dk-rider{animation:dkLean 1.3s ease-in-out infinite;transform-box:fill-box;transform-origin:50% 100%}
@@ -809,8 +809,11 @@ STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|
    stored data and moves independently. RELEASES[0] must match WHATS-NEW.md —
    the app is one offline file, so the notes are embedded, not fetched.
    TESTS_about.js fails if the two drift apart. */
-const APP_VERSION = "1.9.0";
+const APP_VERSION = "1.9.1";
 const RELEASES = [
+  {v:"1.9.1", date:"2026-11-18", notes:[
+    "Daisy can now be tapped on the Train page too. After her fifth-tap trick she waddles to the other corner, and if you push your luck with the knife she leaves that page for a couple of minutes.",
+  ]},
   {v:"1.9.0", date:"2026-11-17", notes:[
     "Meet Daisy 🦆 Your new little duck keeps you company around the app. Tap her and see what happens.",
     "She cheers you on while you train: finish an exercise and watch her.",
@@ -5709,8 +5712,9 @@ function petsCardHTML(){
 const DUCK_POSES=["sit","stand","sleep","peek","waddle","skate"];
 /* Every page except Plans: a duck wandering about while a meso is being set up gets in the way. */
 const DUCK_VIEWS=["home","exercises","calendar","analytics","settings","workout"];
-/* On the Train tab it keeps to the bottom-left corner in a still pose and can't be
-   tapped (taps pass straight through), so it never steals a tap meant for a set.
+/* On the Train tab it keeps to a bottom corner in a still pose. It can be tapped like
+   anywhere else; to stay out of the way it swaps corners after every fifth-tap trick,
+   and after the knife it leaves that page for two minutes.
    There it reacts on its own when an exercise is finished: see duckCheer(). */
 const DUCK_TRAIN_POSES=["sit","stand","sleep"];
 const DUCK_CHEERS={
@@ -5723,6 +5727,9 @@ const DUCK_SAYS=["Quack!","Quack quack 💕","*happy wiggle*","Proud of you 🥹
 const DUCK_STAB_SAYS=["Tap me again. I dare you. 🔪","Enough. 🔪","We don't do that here. 🔪","I said stop. 🔪","Choose your next tap wisely. 🔪"];
 const DUCK_EGG_SAYS=["Oh! 🥚","…that wasn't me 🥚","Surprise 🥚","Breakfast? 🥚"];
 let _duckPose=null;
+/* Pages she has left in a huff (after the knife), view -> time she may come back. Not saved. */
+const _duckAway={};
+const DUCK_AWAY_MS=2*60*1000;
 /* Live for Cutie profiles (Fun mode + Female) since 1.9.0. Off in Serious mode, off
    for everyone else, and off when she picks "no pet" in Settings. */
 function duckOn(){ return !!(cutieOn() && petPick()); }
@@ -5742,6 +5749,7 @@ function duckPlace(view, force){
   duckRemove(); clearTimeout(_duckCheerT);
   document.querySelectorAll(".pet-rain").forEach(x=>x.remove());
   if(!duckOn() || !DUCK_VIEWS.includes(view)) return;
+  if((_duckAway[view]||0)>Date.now()) return;              // still sulking on this page
   const train=view==="workout";
   const poses=(train? DUCK_TRAIN_POSES : DUCK_POSES).filter(p=>p!==_duckPose && (p!=="skate" || addonOn("skate")));
   const pose=_duckPose=force||poses[Math.floor(Math.random()*poses.length)];
@@ -5749,7 +5757,7 @@ function duckPlace(view, force){
   d.id="duck"; d.dataset.pose=pose; d.setAttribute("role","button"); d.setAttribute("aria-label",(petPick()||PETS[0]).name);
   if(pose==="waddle" || pose==="skate") d.dataset.spot="walk";
   else if(pose==="peek"){ d.dataset.spot="peek"; d.style.left=(12+Math.floor(Math.random()*60))+"%"; }
-  else if(train){ d.dataset.spot="bl"; d.classList.add("dk-notap"); }
+  else if(train) d.dataset.spot="bl";
   else { d.dataset.spot=Math.random()<.5? "bl":"br"; if(d.dataset.spot==="br") d.classList.add("dk-flip"); }
   d.innerHTML=`<div class="dk-wrap">${duckSVG(pose)}</div>`;
   d.addEventListener("click", duckTap);
@@ -5771,6 +5779,7 @@ function duckTap(e){
     if(d.dataset.pose==="sleep"){ d.dataset.pose="sit"; d.querySelector(".dk-wrap").innerHTML=duckSVG("sit"); }
     const calm=window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if(calm || Math.random()<.5) duckEgg(d); else duckFlock(d);
+    setTimeout(()=>duckMove(d), 1600);                     // then she shuffles out of the way
     return;
   }
   if(d.dataset.pose==="sleep"){
@@ -5794,7 +5803,26 @@ function duckStab(d){
   d.querySelectorAll(".dk-say,.dk-heart").forEach(x=>x.remove());
   const b=document.createElement("div"); b.className="dk-say dk-say-long";
   b.textContent=DUCK_STAB_SAYS[Math.floor(Math.random()*DUCK_STAB_SAYS.length)]; d.appendChild(b);
-  clearTimeout(_duckCheerT); _duckCheerT=setTimeout(duckCheerEnd, 3600);
+  clearTimeout(_duckCheerT); _duckCheerT=setTimeout(()=>duckLeave(d), 3200);
+}
+/** Swap to the other bottom corner, so she isn't sitting on whatever was under her. */
+function duckMove(d){
+  if(!d || !d.isConnected || d.dataset.gesture==="stab") return;
+  if(!["bl","br"].includes(d.dataset.spot)) return;        // walking or peeking: already moving
+  d.querySelectorAll(".dk-egg").forEach(x=>x.remove());
+  d.style.left="";
+  d.dataset.spot= d.dataset.spot==="bl"? "br" : "bl";
+  d.classList.toggle("dk-flip", d.dataset.spot==="br");
+}
+/** After the knife: she storms off this page and stays away for two minutes. */
+function duckLeave(d){
+  clearTimeout(_duckCheerT);
+  if(!d || !d.isConnected) return;
+  _duckAway[currentView]=Date.now()+DUCK_AWAY_MS;
+  d.querySelectorAll(".dk-say").forEach(x=>x.remove());
+  const b=document.createElement("div"); b.className="dk-say"; b.textContent="I'm out. 🔪"; d.appendChild(b);
+  d.classList.add("dk-leave");
+  setTimeout(()=>{ if(d.isConnected) d.remove(); }, 900);
 }
 /** Every fifth tap, one of two silly things. It lays an egg... */
 function duckEgg(d){
@@ -5941,6 +5969,7 @@ document.addEventListener("click", e=>{
   if(["confetti","best","week","finish"].includes(k)){ devFire(k); return; }
   if(k.startsWith("dk")){
     if(!duckOn()){ toast("Turn on Cutie preview and the duck first"); return; }
+    for(const v in _duckAway) delete _duckAway[v];          // let her back for testing
     if(k==="dkskate"){ duckPlace("settings", "skate"); return; }
     let dd=document.getElementById("duck"); if(!dd){ duckPlace("settings"); dd=document.getElementById("duck"); }
     if(dd){ if(k==="dkegg") duckEgg(dd); if(k==="dkflock") duckFlock(dd); if(k==="dkknife") duckStab(dd); }

@@ -9,6 +9,12 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.9.1 — 2026-11-18 (duck: tappable on Train, gets out of the way)
+- Bug: on Train the duck had `pointer-events:none` (`dk-notap`), so tapping her hit the card underneath. Removed;
+  she is tappable everywhere. To stay out of the way: after each fifth-tap trick `duckMove` swaps her bl/br corner,
+  and after the knife `duckLeave` sends her off and `_duckAway[view]` keeps her off that page for 2 min (not saved).
+  Dev panel duck buttons clear `_duckAway`. Test: `TESTS_duck.js` (81).
+
 ### v1.9.0 — 2026-11-17 (the duck goes live, Cutie only)
 - **Live:** `duckOn()` is now `cutieOn() && petPick()` (was dev mode + a dev switch, now removed). Daisy is there
   from the start for Fun mode + Female; never in Serious mode or for other profiles.

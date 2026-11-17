@@ -90,7 +90,7 @@ run("duck", ()=>{
   // ---------- Train tab: there, still, and out of the way ----------
   w.go("workout");
   ok("on the Train tab it sits bottom-left", duck().dataset.spot==="bl");
-  ok("…and can't be tapped, so it never steals a set tap", duck().classList.contains("dk-notap"));
+  ok("…and can be tapped there like anywhere else", !duck().classList.contains("dk-notap") && w.getComputedStyle(duck()).pointerEvents!=="none");
   const trainPoses=new Set(); for(let i=0;i<30;i++){ w.go("workout"); trainPoses.add(duck().dataset.pose); }
   ok("only still poses on Train (no walking, skating or peeking)", [...trainPoses].every(p=>["sit","stand","sleep"].includes(p)), [...trainPoses].join(","));
 
@@ -117,7 +117,7 @@ run("duck", ()=>{
   ok("no reaction when the duck is switched off", !duck());
   delete st().settings.pet; save();
   w.go("home");
-  ok("leaving Train puts it back to normal and tappable", !!duck() && !duck().classList.contains("dk-notap"));
+  ok("leaving Train it's still there", !!duck());
 
   // ---------- taps ----------
   let clock=1e6; const realNow=w.Date.now; w.Date.now=()=>clock;
@@ -145,6 +145,13 @@ run("duck", ()=>{
   w.Math.random=rnd;
   w.go("analytics");
   ok("eggs and the flock are gone on the next page", !duck().querySelector(".dk-egg") && !$(".pet-rain"));
+  // after the fifth-tap trick she moves to the other corner, out of the way
+  w.go("home"); force("sit");
+  const corner=duck().dataset.spot;
+  for(let i=0;i<5;i++) tap(3000);
+  ev("duckMove")(duck());
+  ok("after the fifth-tap trick she swaps corners", ["bl","br"].includes(corner) && duck().dataset.spot!==corner && ["bl","br"].includes(duck().dataset.spot));
+  ok("…and faces the right way for that corner", duck().classList.contains("dk-flip")===(duck().dataset.spot==="br"));
   // ten quick taps
   w.go("home"); force("sit");
   for(let i=0;i<9;i++) tap(200);
@@ -154,8 +161,15 @@ run("duck", ()=>{
   ok("…and a line to match", /🔪/.test(duck().querySelector(".dk-say").textContent));
   const before=duck().querySelector(".dk-wrap").innerHTML; tap(200); tap(200);
   ok("tapping it while cross does nothing more", duck().querySelector(".dk-wrap").innerHTML===before);
-  ev("duckCheerEnd")();
-  ok("then it calms down again", !duck().dataset.gesture && !duck().querySelector(".dk-knife"));
+  const d0=duck(); ev("duckLeave")(d0);
+  ok("then she storms off", d0.classList.contains("dk-leave") && /I'm out/.test(d0.textContent));
+  d0.remove();
+  w.go("analytics"); w.go("home");
+  ok("…and stays off that page", !duck());
+  w.go("analytics");
+  ok("other pages still have her", !!duck());
+  clock+=2*60*1000+1000; w.go("home");
+  ok("she's back on that page after two minutes", !!duck());
   force("sit");
   for(let i=0;i<9;i++) tap(200); tap(2500);
   ok("a pause in the middle resets the count", duck().dataset.gesture!=="stab");
