@@ -297,22 +297,128 @@ canvas.chart{width:100%; height:180px; display:block}
 .mgfilter .typechip{white-space:nowrap;flex:0 0 auto}
 .linkdate{color:var(--accent);font-weight:700;background:none;border:0;padding:0;font:inherit}
 .cutie-card{border-color:rgba(224,85,156,.35);background:linear-gradient(180deg,rgba(224,85,156,.06),transparent)}
-.cutie-total{display:block;background:none;border:0;padding:0;font:inherit;font-size:30px;font-weight:900;color:#E0559C;cursor:pointer;text-align:left}
-.cutie-pill{border:0;cursor:pointer;background:rgba(224,85,156,.15);color:#E0559C;font-weight:700}
+.cutie-total{display:block;background:none;border:0;padding:0;font:inherit;font-size:30px;font-weight:900;color:var(--cutie);cursor:pointer;text-align:left}
+.cutie-pill{border:0;cursor:pointer;background:rgba(224,85,156,.15);color:var(--cutie);font-weight:700}
 .cutie-top{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border:1px solid rgba(224,85,156,.25);border-radius:12px;background:rgba(224,85,156,.05);color:var(--text);font:inherit;cursor:pointer}
 .cutie-medal{font-size:22px}
 .cutie-earned{margin:12px 0 4px;padding:12px;border-radius:14px;background:rgba(224,85,156,.08);border:1px solid rgba(224,85,156,.3)}
-.cutie-plus{font-size:34px;font-weight:900;color:#E0559C}
-.cutie-best{font-weight:800;color:#E0559C;margin-bottom:4px}
+.cutie-plus{font-size:34px;font-weight:900;color:var(--cutie)}
+.cutie-best{font-weight:800;color:var(--cutie);margin-bottom:4px}
 .cutie-best.wk{font-weight:700}
 .cutie-lines{margin-top:8px;text-align:left}
 .cutie-line{font-size:13px;padding:2px 0}
 .cutie-bar{height:6px;border-radius:3px;background:rgba(224,85,156,.15);margin:4px 0 2px;overflow:hidden}
-.cutie-bar>div{height:100%;background:#E0559C}
-.linkbtn{background:none;border:0;padding:0;font:inherit;cursor:pointer}
+.cutie-bar>div{height:100%;background:var(--cutie)}
+.cutie-link{background:none;border:0;padding:0;font:inherit;cursor:pointer;text-decoration:none}
+body{--cutie:#E0559C}
+body[data-fun="1"]:is([data-scheme="mint"],[data-scheme="angel"],[data-scheme="midnight"],[data-scheme="bubblegum"],[data-scheme="rosegold"],[data-scheme="goddess"]){--cutie:var(--accent)}
 .confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:9999}
 #devbadge{position:fixed;top:6px;right:6px;z-index:9998;background:#F5C542;color:#000;font:800 10px/1 system-ui;padding:4px 6px;border-radius:6px;pointer-events:none}
 .dev-card{border:1px dashed #F5C542}
+/* Cutie unlockable schemes (1.6.0): shown only with Cutie on and the title reached */
+body[data-fun="1"][data-scheme="mint"][data-theme="light"]{
+  --bg:#F0FAF7; --surface:#FFFFFF; --raised:#F7FDFB; --line:#D3EEE6;
+  --accent:#1FA58F; --accent-soft:rgba(31,165,143,.14);
+  --text:#12302A; --muted:#4F7A70; --faint:#93B8AF;
+  --cyan:#2BB5C9; --green:#3DBB7E; --amber:#E9A83C; --red:#EC6475;
+  --shadow:0 6px 22px rgba(30,120,100,.10);
+}
+body[data-fun="1"][data-scheme="mint"][data-theme="dark"]{
+  --bg:#0E1916; --surface:#162521; --raised:#1C2E29; --line:#274038;
+  --accent:#4FD8C2; --accent-soft:rgba(79,216,194,.18);
+  --text:#E6FBF6; --muted:#8FBDB2; --faint:#5C857B;
+  --cyan:#5FD4E6; --green:#5FD69C; --amber:#FFC061; --red:#FF7A88;
+}
+body[data-fun="1"][data-scheme="angel"][data-theme="light"]{
+  --bg:#FCFAF4; --surface:#FFFFFF; --raised:#FFFDF8; --line:#EFE5CC;
+  --accent:#C49A1F; --accent-soft:rgba(196,154,31,.14);
+  --text:#2E2716; --muted:#7C6E4E; --faint:#B9AC8B;
+  --cyan:#4FB8C9; --green:#5BBE84; --amber:#D9A23A; --red:#E46B74;
+  --shadow:0 6px 22px rgba(160,130,50,.12);
+}
+body[data-fun="1"][data-scheme="angel"][data-theme="dark"]{
+  --bg:#16140F; --surface:#211E16; --raised:#2A261C; --line:#3B3527;
+  --accent:#E8C35A; --accent-soft:rgba(232,195,90,.18);
+  --text:#FBF6E8; --muted:#C2B48E; --faint:#7F7458;
+  --cyan:#6FD0DE; --green:#6FD5A6; --amber:#F0C06E; --red:#F08C92;
+}
+body[data-fun="1"][data-scheme="angel"]::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background-image:radial-gradient(1.6px 1.6px at 12% 18%,rgba(212,175,55,.9),transparent),radial-gradient(1.2px 1.2px at 72% 9%,rgba(212,175,55,.8),transparent),
+    radial-gradient(1.8px 1.8px at 38% 42%,rgba(212,175,55,.7),transparent),radial-gradient(1.2px 1.2px at 86% 55%,rgba(212,175,55,.85),transparent),
+    radial-gradient(1.5px 1.5px at 22% 78%,rgba(212,175,55,.75),transparent),radial-gradient(1.3px 1.3px at 60% 88%,rgba(212,175,55,.8),transparent),
+    radial-gradient(1.1px 1.1px at 92% 30%,rgba(212,175,55,.7),transparent),radial-gradient(1.4px 1.4px at 50% 65%,rgba(212,175,55,.6),transparent);
+  background-size:260px 260px;animation:sparkle 4s ease-in-out infinite alternate}
+@keyframes sparkle{from{opacity:.35}to{opacity:1}}
+body[data-fun="1"][data-scheme="midnight"][data-theme="light"]{
+  --bg:#F5F1F3; --surface:#FFFFFF; --raised:#FBF8FA; --line:#E7DCE2;
+  --accent:#E8167F; --accent-soft:rgba(232,22,127,.13);
+  --text:#1A0D14; --muted:#6E5463; --faint:#AE98A4;
+  --cyan:#3DB8D6; --green:#33B97B; --amber:#E9A030; --red:#E8385F;
+}
+body[data-fun="1"][data-scheme="midnight"][data-theme="dark"]{
+  --bg:#08060A; --surface:#120C11; --raised:#1A1118; --line:#2A1A25;
+  --accent:#FF2E93; --accent-soft:rgba(255,46,147,.20);
+  --text:#FFE9F4; --muted:#B07F99; --faint:#6E4B5E;
+  --cyan:#4FE3FF; --green:#4FE39E; --amber:#FFC24F; --red:#FF4F7A;
+}
+body[data-fun="1"][data-scheme="bubblegum"][data-theme="light"]{
+  --bg:#FFF4FA; --surface:#FFFFFF; --raised:#FFF9FC; --line:#FAD7EA;
+  --accent:#FF5FAE; --accent-soft:rgba(255,95,174,.15);
+  --text:#3A1230; --muted:#8C5779; --faint:#C99AB8;
+  --cyan:#3EB8F0; --green:#46C78E; --amber:#F2AE45; --red:#F2507A;
+}
+body[data-fun="1"][data-scheme="bubblegum"][data-theme="dark"]{
+  --bg:#1A1220; --surface:#251A2E; --raised:#2E2139; --line:#3E2D4C;
+  --accent:#FF85C2; --accent-soft:rgba(255,133,194,.20);
+  --text:#FFEDF7; --muted:#C29BB8; --faint:#7E6588;
+  --cyan:#7AD7FF; --green:#6FDDAA; --amber:#FFC774; --red:#FF7B98;
+}
+body[data-fun="1"][data-scheme="rosegold"][data-theme="light"]{
+  --bg:#FCF5F2; --surface:#FFFFFF; --raised:#FFFAF8; --line:#F0DCD4;
+  --accent:#B9786A; --accent-soft:rgba(185,120,106,.15);
+  --text:#3B2420; --muted:#86625A; --faint:#BFA098;
+  --cyan:#55B5BE; --green:#5CBB8B; --amber:#E2A65A; --red:#DF6A72;
+}
+body[data-fun="1"][data-scheme="rosegold"][data-theme="dark"]{
+  --bg:#1B1413; --surface:#271D1B; --raised:#312523; --line:#433331;
+  --accent:#E8AE9E; --accent-soft:rgba(232,174,158,.18);
+  --text:#FBEDE8; --muted:#BF9D94; --faint:#80655E;
+  --cyan:#6FCFD6; --green:#6FD0A0; --amber:#F2C27A; --red:#F28A90;
+}
+body[data-fun="1"][data-scheme="goddess"][data-theme="light"]{
+  --bg:#FAF4FA; --surface:#FFFFFF; --raised:#FDF9FD; --line:#EADAE8;
+  --accent:#8E3A7F; --accent-soft:rgba(142,58,127,.13);
+  --text:#2B1228; --muted:#7A5674; --faint:#B69AB1;
+  --cyan:#4FB0C6; --green:#4DB884; --amber:#C99A2E; --red:#D8506E;
+}
+body[data-fun="1"][data-scheme="goddess"][data-theme="dark"]{
+  --bg:#150B14; --surface:#21121F; --raised:#2B1828; --line:#3E2238;
+  --accent:#D9AE3F; --accent-soft:rgba(217,174,63,.18);
+  --text:#F9ECF6; --muted:#BF98B6; --faint:#7C5B74;
+  --cyan:#6FCFDE; --green:#6FD3A3; --amber:#E9BE55; --red:#F07E96;
+}
+body[data-fun="1"][data-scheme="goddess"] .cutie-card{background:linear-gradient(110deg,transparent 30%,rgba(217,174,63,.16) 45%,transparent 60%),linear-gradient(180deg,rgba(142,58,127,.10),transparent);
+  background-size:250% 100%,100% 100%;animation:shimmer 5s linear infinite}
+@keyframes shimmer{from{background-position:120% 0,0 0}to{background-position:-120% 0,0 0}}
+@media (prefers-reduced-motion: reduce){body[data-fun="1"][data-scheme="angel"]::before,body[data-fun="1"][data-scheme="goddess"] .cutie-card{animation:none}}
+.scheme-row.locked{opacity:.5}
+.cutie-prog{margin-top:6px}
+.cutie-periods{margin-top:10px;font-size:13px;display:grid;gap:3px}
+.cutie-weeks{display:flex;align-items:flex-end;gap:4px;height:44px;margin-top:6px}
+.cutie-weeks .cw{flex:1;height:100%;display:flex;align-items:flex-end;background:rgba(224,85,156,.08);border-radius:4px;overflow:hidden}
+.cutie-weeks .cw>div{width:100%;background:var(--cutie);border-radius:4px 4px 0 0;min-height:2px}
+.cutie-title-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;border:1px solid rgba(224,85,156,.25)}
+.cutie-title-row.locked{opacity:.45}
+.cutie-title-row.cur{background:rgba(224,85,156,.10);border-color:var(--cutie)}
+.title-unlock{text-align:center;padding:4px 2px}
+.tu-kicker{font-weight:800;letter-spacing:.12em;text-transform:uppercase;font-size:12px;color:var(--cutie)}
+.tu-emoji{font-size:52px;margin-top:6px;animation:tupop .6s cubic-bezier(.2,1.6,.4,1) both}
+.tu-name{font-size:30px;margin:4px 0 0;color:var(--cutie)}
+.tu-scheme{display:flex;align-items:center;gap:10px;margin-top:14px;padding:10px;border-radius:12px;border:1px solid rgba(224,85,156,.3)}
+@keyframes tupop{from{transform:scale(.2);opacity:0}to{transform:scale(1);opacity:1}}
+.emoji-rain{position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden}
+.emoji-rain span{position:absolute;top:-60px;animation-name:emojifall;animation-timing-function:linear;animation-fill-mode:forwards}
+@keyframes emojifall{0%{transform:translateY(0) rotate(0)}50%{transform:translateY(55vh) translateX(18px) rotate(14deg)}100%{transform:translateY(115vh) translateX(-12px) rotate(-10deg)}}
 .volcard .spm-track{background:var(--line)}
 .welcome-back h3{font-size:17px;line-height:1.35}
 .update-card{border-color:var(--accent);background:var(--accent-soft)}
@@ -520,8 +626,14 @@ STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|
    stored data and moves independently. RELEASES[0] must match WHATS-NEW.md —
    the app is one offline file, so the notes are embedded, not fetched.
    TESTS_about.js fails if the two drift apart. */
-const APP_VERSION = "1.5.0";
+const APP_VERSION = "1.6.0";
 const RELEASES = [
+  {v:"1.6.0", date:"2026-11-17", notes:[
+    "Reach a new Cutie title and you get the full treatment: a shower of hearts and emojis, and your new title in lights.",
+    "Six new colour schemes to unlock as you level up: Mint Mojito, Angel Glow (with gold sparkle), Midnight Baddie, Bubblegum Pop, Rose Gold and Goddess. Locked ones show in Settings with the title that unlocks them, and you keep them for good once earned.",
+    "A progress bar under your title shows how many points to the next one. Tap your title to see every title, when you earned it, and what's still to come.",
+    "Stats now shows your points this week and this month, your best week and month, and a bar for each week of your plan.",
+  ]},
   {v:"1.5.0", date:"2026-11-17", notes:[
     "Cutie Points have had a glow-up: every workout now earns its own points (100 for finishing, 10 per working set, 3 per cardio minute, plus 50 for keeping your weekly streak). You see what you earned on the finish screen.",
     "Your points are now one lifetime total, the same everywhere, and your title follows it. Tap the total on Stats to see where your points came from.",
@@ -1024,6 +1136,7 @@ function cheerLine(){ return FUN_CHEERS[Math.floor(Math.random()*FUN_CHEERS.leng
 function celebrate(log){
   const tot=log.exercises.reduce((t,e)=>t+e.sets.reduce((a,x)=>a+x.kg*x.reps,0),0);
   const cb=cutieOn()? cutieBestCheck(log.id) : {w:null,best:null};
+  const fresh=cutieSyncTitles().filter(k=>k>0);
   const fact=funFact(tot);
   modal(`<div style="text-align:center;padding:6px 2px">
     <div style="font-size:44px">🎉</div>
@@ -1032,7 +1145,8 @@ function celebrate(log){
     ${fact?`<p style="margin:12px 0 0;font-size:16px">${fact}</p>`:""}
     <p class="muted" style="margin:10px 0 0">${cheerLine()}</p>
     <button class="btn btn-primary btn-block" style="margin-top:18px" data-ok>Yay</button>
-  </div>`, m=>{ m.onclick=e=>{ if(e.target.closest("[data-ok]")){ closeModal(); go("home"); } }; });
+  </div>`, m=>{ m.onclick=e=>{ if(e.target.closest("[data-ok]")){ closeModal();
+      if(cutieOn() && fresh.length) titleUnlockChain(fresh, ()=>go("home")); else go("home"); } }; });
   if(cb.best==="all") confetti();
 }
 function isCardioEx(id){ const e=exById(id); return !!(e && (e.cardio || e.muscle==="Cardio")); }
@@ -2965,7 +3079,7 @@ function renderWorkout(){
       <div class="fill" id="pfill" style="width:${total?Math.round(100*done/total):0}%"></div></div>
     <div class="row split" style="margin-bottom:12px">
       <span class="faint num" id="ptext">${done}/${total} sets${ro?"":` · ${mins} min`}</span>
-      <span class="faint num">${s.exercises.filter(e=>!e.skipped).length} exercises${(edit && s.logId && cutieOn() && cutieWorkout(s.logId))?` · <button class="linkbtn num" data-cutie="workout" data-id="${s.logId}" style="color:#E0559C">💖 ${cutieWorkout(s.logId).total.toLocaleString()} pts</button>`:""}</span></div>
+      <span class="faint num">${s.exercises.filter(e=>!e.skipped).length} exercises${(edit && s.logId && cutieOn() && cutieWorkout(s.logId))?` · <button class="cutie-link num" data-cutie="workout" data-id="${s.logId}" style="color:var(--cutie)">💖 ${cutieWorkout(s.logId).total.toLocaleString()} pts</button>`:""}</span></div>
     <div id="excards" class="${ro?"readonly":""}">${s.exercises.map((ses,xi)=>exCardHTML(ses,xi)).join("")}</div>
     ${ro? `<button class="btn btn-ghost btn-block" data-a="quit" style="margin-top:6px">Close</button>`
         : `<div class="row">
@@ -4264,7 +4378,7 @@ function dayModal(iso, logs, cardio){
       const canEdit=logEditable(l);
       return `<div class="row" style="gap:8px">
       <button class="btn btn-ghost" style="flex:1;justify-content:flex-start" data-open="${l.id}">
-        ${esc(l.dayName)} · ${l.exercises.reduce((t,e)=>t+e.sets.length,0)} sets · W${l.week}${cutieOn()?` · <span class="num" style="color:#E0559C">${(cutieWorkout(l.id)?.total||0).toLocaleString()} pts</span>`:""}
+        ${esc(l.dayName)} · ${l.exercises.reduce((t,e)=>t+e.sets.length,0)} sets · W${l.week}${cutieOn()?` · <span class="num" style="color:var(--cutie)">${(cutieWorkout(l.id)?.total||0).toLocaleString()} pts</span>`:""}
         <span class="pill" style="margin-left:auto">${canEdit?"Edit":"View"}</span></button>
       ${canEdit||l.bonus?`<button class="iconbtn" data-dellog="${l.id}" aria-label="Delete workout">✕</button>`:""}</div>`;}).join("")}
     ${cardio.map(c=>`<div class="row" style="gap:8px">
@@ -4572,7 +4686,7 @@ function cutieBreakdownModal(){
 function cutieTopHTML(top, mBest){
   if(!top.length) return "";
   const medal=["🥇","🥈","🥉"];
-  return `<div class="kicker" style="margin-top:12px;color:#E0559C">Cutest workouts ever</div>
+  return `<div class="kicker" style="margin-top:12px;color:var(--cutie)">Cutest workouts ever</div>
     <div class="stack" style="margin-top:6px;gap:6px">${top.map((w,i)=>`<button class="cutie-top" data-cutie="open" data-id="${w.id}">
       <span class="cutie-medal" aria-hidden="true">${medal[i]}</span>
       <span style="flex:1;text-align:left">${esc(w.name)} · ${fmtDate(w.date)}<br><span class="faint num" style="font-size:12px">${w.sets} sets${w.cardioMin?` · ${w.cardioMin} min cardio`:""}</span></span>
@@ -4583,10 +4697,145 @@ function cutieHomeHTML(){
   if(!cutieOn()) return "";
   const T=cutieTotals(); if(!T.count) return "";
   return `<div class="card cutie-card">
-    <div class="row split"><div class="kicker" style="color:#E0559C">${esc(cutieTitle(T.total))}</div>
+    <div class="row split"><button class="kicker cutie-link" data-cutie="titles" style="color:var(--cutie)">${esc(cutieTitle(T.total))} ›</button>
       <button class="pill num cutie-pill" data-cutie="breakdown">💖 ${T.total.toLocaleString()} pts</button></div>
+    ${cutieProgressHTML(T.total)}
     ${cutieTopHTML(cutieTop(3, T.ledger.workouts), null)}</div>`;
 }
+/* ---------- Cutie Points v2 part 2 (1.6.0): titles, unlocks, periods ----------
+   S().cutie = {init, titles:{<title index>: "YYYY-MM-DD"}} records when each
+   title was first reached. It is saved and backed up. Titles reached before
+   1.6.0 are recorded silently on first run, dated that day. A title (and its
+   colour scheme) stays unlocked even if points later drop below it. */
+const CUTIE_SCHEMES=[
+  {id:"mint",      name:"Mint Mojito",    hint:"Fresh mint and teal",           swatch:"#2BB5A0", at:2},
+  {id:"angel",     name:"Angel Glow",     hint:"Pearl white, gold and sparkle", swatch:"#D4AF37", at:4},
+  {id:"midnight",  name:"Midnight Baddie",hint:"Black with neon pink",          swatch:"#FF2E93", at:5},
+  {id:"bubblegum", name:"Bubblegum Pop",  hint:"Bubblegum pink and sky blue",   swatch:"#FF7AC0", at:7},
+  {id:"rosegold",  name:"Rose Gold",      hint:"Blush and rose gold",           swatch:"#D49A89", at:8},
+  {id:"goddess",   name:"Goddess",        hint:"Plum and gold, with shimmer",   swatch:"#8E3A7F", at:9},
+];
+function cutieState(){
+  const st=S();
+  st.cutie ??= {titles:{}};
+  st.cutie.titles ??= {};
+  if(!st.cutie.init){
+    const lv=cutieLevel(cutieTotals().real).i, d=todayISO();
+    for(let k=0;k<=lv;k++) st.cutie.titles[k] ??= d;
+    st.cutie.init=true; Store.save();
+  }
+  return st.cutie;
+}
+/** Record any titles newly reached on REAL points; returns their indices. */
+function cutieSyncTitles(){
+  const c=cutieState(), lv=cutieLevel(cutieTotals().real).i, d=todayISO(), fresh=[];
+  for(let k=0;k<=lv;k++) if(!c.titles[k]){ c.titles[k]=d; fresh.push(k); }
+  if(fresh.length) Store.save();
+  return fresh;
+}
+/** Highest title unlocked: the saved record, or the dev override's level. */
+function cutieUnlockedIdx(){
+  const real=Math.max(0, ...Object.keys(cutieState().titles).map(Number));
+  const dp=devPoints();
+  return dp!=null? Math.max(real, cutieLevel(dp).i) : real;
+}
+function cutieSchemeUnlocked(sc){ return cutieUnlockedIdx()>=sc.at; }
+/** May this scheme id be shown? Free schemes always; Cutie ones only when
+    Cutie is on and the scheme is unlocked. */
+function schemeAllowed(id){
+  const c=CUTIE_SCHEMES.find(x=>x.id===id);
+  return !c || (cutieOn() && cutieSchemeUnlocked(c));
+}
+function cutieProgressHTML(total){
+  const lv=cutieLevel(total);
+  if(!lv.next) return `<p class="faint" style="margin:6px 0 0">Top title reached 👑</p>`;
+  const from=CUTIE_THRESHOLDS[lv.i], pct=Math.max(0,Math.min(100,Math.round(100*(total-from)/(lv.nextAt-from))));
+  return `<div class="cutie-prog"><div class="row split num" style="font-size:12px"><span class="muted">${(lv.nextAt-total).toLocaleString()} points to <b>${esc(lv.next)}</b></span><span class="faint">${pct}%</span></div>
+    <div class="cutie-bar" role="progressbar" aria-valuenow="${pct}" aria-valuemax="100"><div style="width:${pct}%"></div></div></div>`;
+}
+/** Points by Mon-Sun week and by month, from the ledger. */
+function cutiePeriods(){
+  const L=cutieLedger(), wk={}, mo={};
+  [...L.workouts, ...L.extraCardio].forEach(x=>{
+    const w=isoWeekStart(x.date), m=x.date.slice(0,7);
+    wk[w]=(wk[w]||0)+x.total; mo[m]=(mo[m]||0)+x.total;
+  });
+  const today=todayISO(), tw=isoWeekStart(today), tm=today.slice(0,7);
+  const best=o=>Math.max(0,...Object.values(o));
+  // a bar per week of the active meso (from its first workout), else the last 8 weeks
+  const meso=activeMeso();
+  const first=meso && L.workouts.filter(w=>w.mesoId===meso.id).map(w=>w.date).sort()[0];
+  let start=first? isoWeekStart(first) : isoShift(tw,-49);
+  if(isoShift(tw,-7*11)>start) start=isoShift(tw,-7*11);          // cap at 12 bars
+  const bars=[]; for(let d=start; d<=tw; d=isoShift(d,7)) bars.push({wk:d, pts:wk[d]||0});
+  return {thisWeek:wk[tw]||0, bestWeek:best(wk), thisMonth:mo[tm]||0, bestMonth:best(mo), bars, fromMeso:!!first};
+}
+function cutiePeriodsHTML(){
+  const P=cutiePeriods(), max=Math.max(1,...P.bars.map(b=>b.pts));
+  return `<div class="cutie-periods num">
+    <div class="row split"><span>This week <b>${P.thisWeek.toLocaleString()}</b></span><span class="faint">Best week ${P.bestWeek.toLocaleString()}</span></div>
+    <div class="row split"><span>This month <b>${P.thisMonth.toLocaleString()}</b></span><span class="faint">Best month ${P.bestMonth.toLocaleString()}</span></div>
+    <div class="cutie-weeks" aria-label="Points per week">${P.bars.map(b=>`<div class="cw" title="${fmtDate(b.wk)}: ${b.pts}"><div style="height:${Math.round(100*b.pts/max)}%"></div></div>`).join("")}</div>
+    <div class="faint" style="font-size:11px">Points per week${P.fromMeso?` this ${term("meso")}`:", last weeks"}</div></div>`;
+}
+function cutieTitlesModal(){
+  const c=cutieState(), T=cutieTotals(), shown=cutieLevel(T.total).i, dp=devPoints();
+  modal(`<h2>My titles</h2>
+    <div class="stack" style="margin-top:10px;gap:6px">${CUTIE_TITLES.map((t,k)=>{
+      const date=c.titles[k], open=!!date || (dp!=null && k<=cutieLevel(dp).i);
+      const sc=CUTIE_SCHEMES.find(s=>s.at===k);
+      return `<div class="cutie-title-row ${open?"":"locked"} ${k===shown?"cur":""}">
+        <div style="flex:1"><b>${esc(t)}</b>${k===shown?` <span class="pill" style="font-size:11px">now</span>`:""}
+          <div class="faint num" style="font-size:12px">${open? (date?`Unlocked ${fmtDate(date)}`:"Dev preview") : `${(CUTIE_THRESHOLDS[k]-T.total).toLocaleString()} points to go`}${sc?` · unlocks ${esc(sc.name)}`:""}</div></div>
+        <span class="num faint" style="font-size:12px">${CUTIE_THRESHOLDS[k].toLocaleString()}</span></div>`;}).join("")}</div>
+    <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>Close</button>`,
+    m=>{ m.onclick=e=>{ if(e.target.closest("[data-ok]")) closeModal(); }; });
+}
+/* ---------- hearts and emoji shower: title unlocks only ---------- */
+const CUTIE_RAIN=["💖","💕","💗","💘","😍","🥳","😮‍💨","🤤","🥵","✨"];
+function emojiRain(){
+  try{
+    if(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const box=document.createElement("div"); box.className="emoji-rain"; box.setAttribute("aria-hidden","true");
+    for(let i=0;i<46;i++){
+      const s=document.createElement("span");
+      s.textContent=CUTIE_RAIN[Math.floor(Math.random()*CUTIE_RAIN.length)];
+      s.style.left=(Math.random()*96)+"%";
+      s.style.fontSize=(22+Math.random()*22)+"px";
+      s.style.animationDuration=(2.6+Math.random()*2)+"s";
+      s.style.animationDelay=(Math.random()*1.4)+"s";
+      box.appendChild(s);
+    }
+    document.body.appendChild(box);
+    setTimeout(()=>box.remove(), 6000);
+  }catch(_){}
+}
+/** The big moment. `then` runs when she taps through. Dev previews pass
+    dev:true so nothing is recorded. */
+function titleUnlockModal(k, then){
+  const sc=CUTIE_SCHEMES.find(s=>s.at===k);
+  emojiRain();
+  modal(`<div class="title-unlock">
+    <div class="tu-kicker">New title unlocked</div>
+    <div class="tu-emoji">👑</div>
+    <h2 class="tu-name">${esc(CUTIE_TITLES[k])}</h2>
+    <p class="muted" style="margin:6px 0 0">${CUTIE_THRESHOLDS[k].toLocaleString()} Cutie Points. Look at you go 💅</p>
+    ${sc?`<div class="tu-scheme"><span class="scheme-dot" style="background:${sc.swatch}"></span>
+      <div style="flex:1;text-align:left"><b>New colour unlocked</b><div class="faint" style="font-size:13px">${esc(sc.name)} · ${esc(sc.hint)}</div></div>
+      <button class="btn btn-ghost btn-sm" data-try="${sc.id}">Try it</button></div>`:""}
+    <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>Obsessed 😍</button></div>`, m=>{
+    m.onclick=e=>{
+      const t=e.target.closest("[data-try]");
+      if(t){ S().settings.funScheme=t.dataset.try; Store.save(); applyTheme(); toast(`${sc.name} on ✨`); return; }
+      if(e.target.closest("[data-ok]")){ closeModal(); if(then) then(); }
+    };
+  });
+}
+/** Show unlocks one after another (rare: several titles at once after an edit). */
+function titleUnlockChain(list, done){
+  if(!list.length){ if(done) done(); return; }
+  titleUnlockModal(list[0], ()=>titleUnlockChain(list.slice(1), done));
+}
 /* ---------- confetti (no library, offline) ---------- */
 function confetti(){
   try{
@@ -4624,7 +4873,12 @@ function devTap(){
   if(++_devTaps<7) return; _devTaps=0;
   if(DEV.on){ DEV={}; toast("Dev mode off, overrides cleared"); }
   else { DEV={on:true}; toast("Dev mode on"); }
-  devSave(); applyDevBadge(); go("settings");
+  devSave(); devSchemeCheck(); applyDevBadge(); go("settings");
+}
+/** A scheme picked during dev preview may not really be unlocked: fall back. */
+function devSchemeCheck(){
+  if(!schemeAllowed(S().settings.funScheme||"default")){ S().settings.funScheme="default"; Store.save(); }
+  applyTheme();
 }
 function applyDevBadge(){
   let b=document.getElementById("devbadge");
@@ -4644,7 +4898,7 @@ function devPanelHTML(){
       ${b("setpts","Set")}${b("add1000","+1,000")}${b("unlock","Unlock all")}${b("lock","Real points")}</div>
     <div class="kicker" style="margin-top:12px">Fire a celebration</div>
     <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">
-      ${b("confetti","Confetti")}${b("best","New best")}${b("week","Weekly best")}${b("finish","Finish screen")}</div>
+      ${b("title","Title unlock")}${b("confetti","Confetti")}${b("best","New best")}${b("week","Weekly best")}${b("finish","Finish screen")}</div>
     <button class="btn btn-danger btn-block" style="margin-top:12px" data-dev="reset">Reset all dev overrides</button></div>`;
 }
 function devFake(){ return {name:"Test workout", date:todayISO(), base:100, sets:9, setPts:90, cardioMin:10, cardioPts:30, streak:50, total:270}; }
@@ -4663,17 +4917,19 @@ document.addEventListener("click", e=>{
     if(k==="breakdown"){ cutieBreakdownModal(); return; }
     if(k==="open"){ startLogEdit(c.dataset.id, true); return; }
     if(k==="workout"){ cutieWorkoutModal(c.dataset.id); return; }
+    if(k==="titles"){ cutieTitlesModal(); return; }
   }
   const d=e.target.closest("[data-dev]"); if(!d || !DEV.on) return;
   const k=d.dataset.dev;
-  if(k==="preview"){ DEV.preview=d.checked; devSave(); toast(DEV.preview?"Cutie preview on":"Cutie preview off"); return; }
+  if(k==="preview"){ DEV.preview=d.checked; devSave(); devSchemeCheck(); toast(DEV.preview?"Cutie preview on":"Cutie preview off"); return; }
   if(k==="setpts"){ const v=parseInt($("#devpts")?.value,10); if(!Number.isFinite(v)||v<0){ toast("Enter a number"); return; } DEV.points=v; }
   if(k==="add1000") DEV.points=(devPoints()??cutieTotals().real)+1000;
   if(k==="unlock") DEV.points=CUTIE_THRESHOLDS[CUTIE_THRESHOLDS.length-1];
   if(k==="lock") delete DEV.points;
   if(k==="reset"){ DEV={on:true}; toast("Dev overrides cleared"); }
   if(["confetti","best","week","finish"].includes(k)){ devFire(k); return; }
-  devSave(); go("settings");
+  if(k==="title"){ const n=Math.min(CUTIE_TITLES.length-1, cutieLevel(cutieTotals().total).i+1); titleUnlockModal(n); return; }
+  devSave(); devSchemeCheck(); go("settings");
 });
 function cutieMsg(){ return CUTIE_MSGS[Math.floor(Math.random()*CUTIE_MSGS.length)]; }
 const CUTIE_FOOTERS=[
@@ -4783,13 +5039,15 @@ function cutieCardHTML(){
   const T=cutieTotals(), lv=cutieLevel(T.total), meso=activeMeso();
   const mBest=meso? cutieTop(1, T.ledger.workouts.filter(w=>w.mesoId===meso.id))[0] : null;
   return `<div class="card cutie-card" style="margin-bottom:14px">
-    <div class="row split"><div class="kicker" style="color:#E0559C">${esc(lv.title)} points</div>
-      <span class="pill" style="background:rgba(224,85,156,.15);color:#E0559C">💖${devPoints()!=null?" DEV":""}</span></div>
+    <div class="row split"><button class="kicker cutie-link" data-cutie="titles" style="color:var(--cutie)">${esc(lv.title)} points ›</button>
+      <span class="pill" style="background:rgba(224,85,156,.15);color:var(--cutie)">💖${devPoints()!=null?" DEV":""}</span></div>
     <button class="cutie-total num" data-cutie="breakdown" aria-label="Points breakdown">${T.total.toLocaleString()}</button>
+    ${cutieProgressHTML(T.total)}
     <div style="margin-top:4px;font-weight:600">${cutieMsg()}</div>
+    ${cutiePeriodsHTML()}
     ${cutieTopHTML(cutieTop(3, T.ledger.workouts), mBest)}
     <canvas class="chart" id="cutiechart" style="margin-top:10px"></canvas>
-    <p class="faint" style="margin:6px 0 0">${cutieFooter()} · tap your total for the breakdown</p></div>`;
+    <p class="faint" style="margin:6px 0 0">${cutieFooter()} · tap your total for the breakdown, your title for all titles</p></div>`;
 }
 function drawCutie(logs, meso){
   if(!cutieOn()) return;
@@ -5244,16 +5502,16 @@ VIEWS.settings=function(){
       <div class="kicker" style="margin-top:18px">Colour scheme</div>
       <p class="faint" style="margin:2px 0 10px">Fun mode only — Serious mode always uses the standard look.</p>
       <div class="stack">
-        ${FUN_SCHEMES.map(sc=>`
-          <label class="scheme-row ${(s.funScheme||"default")===sc.id?"on":""}">
-            <input type="checkbox" data-scheme-pick="${sc.id}" ${(s.funScheme||"default")===sc.id?"checked":""}
+        ${[...FUN_SCHEMES, ...(cutieOn()?CUTIE_SCHEMES:[])].map(sc=>{ const locked=sc.at!=null && !cutieSchemeUnlocked(sc); return `
+          <label class="scheme-row ${(s.funScheme||"default")===sc.id?"on":""} ${locked?"locked":""}">
+            <input type="checkbox" data-scheme-pick="${sc.id}" ${(s.funScheme||"default")===sc.id?"checked":""} ${locked?"disabled":""}
               style="width:22px;height:22px">
             <span class="scheme-dot" style="background:${sc.swatch}"></span>
             <span style="flex:1">
-              <span style="font-weight:800">${sc.name}</span>
-              <span class="faint" style="display:block;font-size:12px">${sc.hint}</span>
+              <span style="font-weight:800">${sc.name}${locked?" 🔒":""}</span>
+              <span class="faint" style="display:block;font-size:12px">${locked?`Unlocks at ${esc(CUTIE_TITLES[sc.at])}`:sc.hint}</span>
             </span>
-          </label>`).join("")}
+          </label>`;}).join("")}
       </div>`:""}
     </div>
     <div class="card"><h3>Progression rules</h3>
@@ -5398,7 +5656,7 @@ function applyTheme(){
   // Fun colour schemes only take effect in Fun mode; Serious stays neutral.
   b.dataset.fun=FUN()?"1":"0";
   applyDevBadge();
-  b.dataset.scheme=s.funScheme||"default";
+  b.dataset.scheme=schemeAllowed(s.funScheme||"default")? (s.funScheme||"default") : "default";
 }
 window.LiftDaddy=window.IronMeso={Store, ProgressionEngine, ChartManager, HistoryIndex, go, version:SCHEMA_VERSION};
 window.addEventListener("beforeunload", ()=>Store.flush());

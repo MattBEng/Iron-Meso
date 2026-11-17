@@ -83,19 +83,50 @@ off.
 - State lives in its own localStorage key, `liftdaddy_dev`, never in
   `ironmeso_v1`, exports or backups. Turning it off deletes the key.
 - Panel at the bottom of Settings: preview Cutie on any profile, set or add
-  points, unlock all (top threshold), back to real points, fire confetti / new
-  best / weekly best / finish screen, reset.
+  points, unlock all (top threshold, opens every scheme), back to real points,
+  fire title unlock / confetti / new best / weekly best / finish screen, reset.
+- Dev never writes title records. Turning dev off resets a scheme she hasn't
+  really earned back to the default.
 - A yellow DEV badge shows top right while it's on.
+
+## Titles and unlocks (1.6.0)
+
+- `S().cutie.titles` saves the date each title was first reached (title index
+  to date). It's part of the data, so backups carry it. On first run after
+  1.6.0, titles already reached are recorded silently, dated that day.
+- Checked at finish (`cutieSyncTitles`, real points only). A new title shows
+  after the finish screen's "Yay": hearts and emoji shower (`emojiRain`,
+  emojis in `CUTIE_RAIN`), the title in big text, and its colour scheme with a
+  Try it button. Several at once show one after another.
+- Titles and schemes never re-lock, even if points drop (deleting a workout).
+- Progress bar under the title on Home and Stats. Tap the title for the list
+  of all 10 with unlock dates, points to go, and which scheme each unlocks.
+- Stats shows this week / best week, this month / best month, and a bar per
+  week of the active meso (from its first workout, max 12; else last 8 weeks).
+
+## Colour schemes
+
+| Scheme | Unlocks at | Look |
+|---|---|---|
+| Mint Mojito | Fit Queen | Mint and teal |
+| Angel Glow | Iron Angel | Pearl white and gold, gold sparkle in the background |
+| Midnight Baddie | Barbell Baddie | Near-black and neon pink (best in dark mode) |
+| Bubblegum Pop | Certified Powerpuff | Bubblegum pink and sky blue |
+| Rose Gold | Dumbbell Darling | Blush and rose gold |
+| Goddess | Glute Goddess | Plum and gold, shimmer on the points card |
+
+- `CUTIE_SCHEMES` in `index.html`; each has light and dark CSS.
+- Shown in Settings only with Cutie on; locked ones greyed with the title
+  needed. `schemeAllowed()` stops a locked or Cutie-off scheme being applied
+  (falls back to the default look without changing the saved setting).
+- On these schemes the Cutie pink (`--cutie`) follows the scheme's accent.
+- Sparkle and shimmer stop when the phone asks for reduced motion.
 
 ## Still to build (from the spec)
 
-- 1.6.0: title progress bar, title unlock celebration and saved unlock dates,
-  title list, weekly and monthly totals, colour scheme unlocks (Mint Mojito at
-  Fit Queen, Angel Glow with gold sparkle at Iron Angel, Midnight Baddie,
-  Bubblegum Pop, Rose Gold, Goddess).
 - 1.7.0: bonus points (PR, full workout, beat last time, comeback), badges
   (50 points each, names in `MESSAGES.txt`), meso comparison in Stats.
 
 ## Tests
 
-`TESTS_cutie.js`.
+`TESTS_cutie.js` (1.5.0), `TESTS_cutie16.js` (1.6.0).

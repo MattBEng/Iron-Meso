@@ -8,9 +8,9 @@ live in `RELEASES[0]` in `index.html`, and `TESTS_about.js` fails if the two dri
 apart. Update both when you ship, and add the engineering detail to
 `CHANGELOG.md` rather than here.
 
-## 1.5.0 — 2026-11-17
+## 1.6.0 — 2026-11-17
 
-- Cutie Points have had a glow-up: every workout now earns its own points (100 for finishing, 10 per working set, 3 per cardio minute, plus 50 for keeping your weekly streak). You see what you earned on the finish screen.
-- Your points are now one lifetime total, the same everywhere, and your title follows it. Tap the total on Stats to see where your points came from.
-- Your three cutest workouts ever show on Home and Stats as gold, silver and bronze. Tap one to look back at it.
-- Beat your best ever workout and you get confetti. Beat everything from the last week and you get a little shout-out too.
+- Reach a new Cutie title and you get the full treatment: a shower of hearts and emojis, and your new title in lights.
+- Six new colour schemes to unlock as you level up: Mint Mojito, Angel Glow (with gold sparkle), Midnight Baddie, Bubblegum Pop, Rose Gold and Goddess. Locked ones show in Settings with the title that unlocks them, and you keep them for good once earned.
+- A progress bar under your title shows how many points to the next one. Tap your title to see every title, when you earned it, and what's still to come.
+- Stats now shows your points this week and this month, your best week and month, and a bar for each week of your plan.

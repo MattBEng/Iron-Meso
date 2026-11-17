@@ -9,6 +9,14 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.6.0 — 2026-11-17 (Cutie Points v2, part 2)
+- New saved state `S().cutie.titles` (title index -> date first reached); pre-1.6.0 titles recorded silently
+  on first run. `cutieSyncTitles()` at finish; unlock modal + `emojiRain()` (hearts/emoji shower) after Yay.
+- 6 unlockable schemes (`CUTIE_SCHEMES`, light+dark CSS, Angel Glow sparkle, Goddess shimmer); `schemeAllowed()`
+  gates them in `applyTheme` and the picker. Cutie colour now `--cutie`, follows the accent on unlocked schemes.
+- Progress bar, title list, week/month totals + weekly bars. Dev: Title unlock fire; leaving dev resets an
+  unearned scheme. Test: `TESTS_cutie16.js` (35).
+
 ### v1.5.0 — 2026-11-17 (Cutie Points v2, part 1)
 - Points now per workout from `cutieLedger()` (100 + 10/working set + 3/cardio min + 50 streak week),
   lifetime total via `cutieTotals()`, new `CUTIE_THRESHOLDS` (0 to 23,000). Replaces `cutieScore`, which was
