@@ -8,10 +8,9 @@ live in `RELEASES[0]` in `index.html`, and `TESTS_about.js` fails if the two dri
 apart. Update both when you ship, and add the engineering detail to
 `CHANGELOG.md` rather than here.
 
-## 1.7.5 — 2026-11-17
+## 1.8.0 — 2026-11-17
 
-- Assisted exercises now score the right way round: using less assistance earns the PR and beat-last-time points, not more.
-- Deleting an old plan no longer takes points off your total.
-- Forgot to set a holiday pause before you left? You can now add the dates after you're back, and recent past pauses show in Settings so you can remove them.
-- A newly revealed secret title now waits until the Cutie progress section is open, so you never miss the reveal.
-- Stats and Settings open faster as your history grows.
+- Share your wins: a new Share button on the finish screen and on title and badge unlocks makes a little picture card in your colours and opens your phone's share sheet, ready for Messages or any chat.
+- The workout card leads with what you lifted, like 12 corgis or 3 grand pianos, never the actual kilos. Tap Another one to swap it for a funnier one before you send.
+- You can also share a past workout: open it from your cutest workouts and tap its points.
+- The lifted total on the finish screen now shows in pounds if that's your unit.

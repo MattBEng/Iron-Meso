@@ -9,6 +9,14 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.8.0 — 2026-11-17 (share cards, Cutie only)
+- `shareZoneHTML(make)` adds a Share button + `#sharezone` to the finish screen, title/badge popups, the finale
+  and `cutieWorkoutModal`; returns "" unless `cutieOn()`. Cards are data (`shareWorkoutCard`, `shareTitleCard`,
+  `shareBadgeCard`), drawn by `shareDraw` on a 1200x800 canvas in the current scheme's colours, sent by
+  `shareSend` (Web Share with a PNG file, else download). Preview is inline in the popup, not a second modal.
+- `funFact` split into `funPick` + `funFact(total, pick)` so the card shows the same comparison as the screen;
+  the lifted total now follows the unit setting. Card never shows kilos. Test: `TESTS_share.js` (26, canvas stubbed).
+
 ### v1.7.5 — 2026-11-17 (review fixes: assisted points, meso delete, past pause, reveal, ledger cache)
 - `cutieLedger` is now a cache over `cutieLedgerBuild` (key: `_stateRev` bumped in `Store.save` + sizes + state object).
   Assisted lifts: PR = lowest assistance yet, beat = less assistance or same with more reps (was reversed).

@@ -409,6 +409,8 @@ body[data-fun="1"][data-scheme="goddess"] .cutie-card{background:linear-gradient
 .cutie-weeks .cw>div{width:100%;background:var(--cutie);border-radius:4px 4px 0 0;min-height:2px}
 .cutie-title-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;border:1px solid rgba(224,85,156,.25)}
 .cutie-title-row.locked{opacity:.45}
+.share-zone canvas{width:100%;height:auto;display:block;border-radius:14px;margin-top:12px}
+.share-zone .row{gap:8px;margin-top:10px}
 .cutie-compare{margin-top:10px;font-size:13px;display:grid;gap:2px;padding-top:8px;border-top:1px solid rgba(224,85,156,.18)}
 .badge-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;border:1px solid rgba(224,85,156,.25)}
 .badge-row.locked{opacity:.45}
@@ -714,8 +716,14 @@ STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|
    stored data and moves independently. RELEASES[0] must match WHATS-NEW.md —
    the app is one offline file, so the notes are embedded, not fetched.
    TESTS_about.js fails if the two drift apart. */
-const APP_VERSION = "1.7.5";
+const APP_VERSION = "1.8.0";
 const RELEASES = [
+  {v:"1.8.0", date:"2026-11-17", notes:[
+    "Share your wins: a new Share button on the finish screen and on title and badge unlocks makes a little picture card in your colours and opens your phone's share sheet, ready for Messages or any chat.",
+    "The workout card leads with what you lifted, like 12 corgis or 3 grand pianos, never the actual kilos. Tap Another one to swap it for a funnier one before you send.",
+    "You can also share a past workout: open it from your cutest workouts and tap its points.",
+    "The lifted total on the finish screen now shows in pounds if that's your unit.",
+  ]},
   {v:"1.7.5", date:"2026-11-17", notes:[
     "Assisted exercises now score the right way round: using less assistance earns the PR and beat-last-time points, not more.",
     "Deleting an old plan no longer takes points off your total.",
@@ -1243,13 +1251,20 @@ const FUN_CHEERS=[
   "Another brick in the wall 🧱","Your couch misses you. Too bad 😤","Team strong girl summer 🌞",
   "Deposit made to the gains account 🏦","Quietly becoming unstoppable 🔥","Nailed it 🎯",
 ];
-function funFact(totalKg){
-  if(!(totalKg>0)) return "";
-  const opts=FUN_WEIGHTS.map(([n,kg,em])=>({n,em,count:totalKg/kg}))
-    .filter(o=>o.count>=1.5 && o.count<=400);
-  if(!opts.length) return "";
-  const pick=opts[Math.floor(Math.random()*opts.length)];
-  return `You lifted <b class="num">${Math.round(totalKg).toLocaleString()} kg</b> today — that's like <b class="num">${Math.round(pick.count)}</b> ${pick.n} ${pick.em}`;
+/** A comical comparison for a lifted total: {n, em, count}, or null when
+    nothing sensible fits. `not` avoids repeating a name (share-card reroll). */
+function funPick(totalKg, not){
+  if(!(totalKg>0)) return null;
+  let opts=FUN_WEIGHTS.map(([n,kg,em])=>({n,em,count:Math.round(totalKg/kg)}))
+    .filter(o=>totalKg/FUN_WEIGHTS.find(f=>f[0]===o.n)[1]>=1.5 && o.count<=400);
+  if(!opts.length) return null;
+  if(not && opts.length>1) opts=opts.filter(o=>o.n!==not);
+  return opts[Math.floor(Math.random()*opts.length)];
+}
+function funFact(totalKg, pick){
+  pick=pick||funPick(totalKg);
+  if(!pick) return "";
+  return `You lifted <b class="num">${Math.round(dispW(totalKg)).toLocaleString()} ${unitLabel()}</b> today — that's like <b class="num">${pick.count}</b> ${pick.n} ${pick.em}`;
 }
 function cheerLine(){ return cutieLine(FUN_CHEERS[Math.floor(Math.random()*FUN_CHEERS.length)]); }
 /** Post-workout celebration (Fun mode): fact + cheer, then home. */
@@ -1258,13 +1273,14 @@ function celebrate(log){
   const cb=cutieOn()? cutieBestCheck(log.id) : {w:null,best:null};
   cutieState();
   const b1=cutieSyncBadges(), fresh=cutieSyncTitles().filter(k=>k>0), newBadges=[...b1, ...cutieSyncBadges()];
-  const fact=funFact(tot);
+  const pick=funPick(tot), fact=funFact(tot, pick);
   modal(`<div style="text-align:center;padding:6px 2px">
     <div style="font-size:44px">🎉</div>
     <h2 style="margin-top:6px">Workout done!</h2>
     ${cutieOn()? cutieEarnedHTML(cb.w, cb.best) : ""}
     ${fact?`<p style="margin:12px 0 0;font-size:16px">${fact}</p>`:""}
     <p class="muted" style="margin:10px 0 0">${cheerLine()}</p>
+    ${shareZoneHTML(()=>shareWorkoutCard(log, pick))}
     <button class="btn btn-primary btn-block" style="margin-top:18px" data-ok>Yay</button>
   </div>`, m=>{ m.onclick=e=>{ if(e.target.closest("[data-ok]")){ closeModal();
       const home=()=>go("home");
@@ -4887,7 +4903,9 @@ function cutieEarnedHTML(w, best){
 }
 function cutieWorkoutModal(id){
   const w=cutieWorkout(id); if(!w) return;
+  const lg=S().logs.find(l=>l.id===id);
   modal(`<h2>${esc(w.name)} · ${fmtDate(w.date)}</h2>${cutieEarnedHTML(w,null)}
+    ${lg? shareZoneHTML(()=>shareWorkoutCard(lg)) : ""}
     <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>Close</button>`,
     m=>{ m.onclick=e=>{ if(e.target.closest("[data-ok]")) closeModal(); }; });
 }
@@ -5066,6 +5084,7 @@ function titleUnlockModal(k, then){
       <div style="flex:1;text-align:left"><b>New colour unlocked</b><div class="faint" style="font-size:13px">${esc(sc.name)} · ${esc(sc.hint)}</div></div>
       <button class="btn btn-ghost btn-sm" data-try="${sc.id}">Try it</button></div>`:""}
     ${tease?`<p class="faint" style="margin:12px 0 0">A new secret title is waiting on Stats 👀</p>`:""}
+    ${shareZoneHTML(()=>shareTitleCard(k))}
     <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>Obsessed 😍</button></div>`, m=>{
     m.onclick=e=>{
       const t=e.target.closest("[data-try]");
@@ -5119,6 +5138,7 @@ function badgeModal(ids, then){
     <div class="stack" style="margin-top:12px;gap:8px">${ids.map(id=>{ const i=BADGE_DEFS.findIndex(b=>b.id===id);
       return `<div class="badge-row on"><span class="badge-ico">🏅</span><div style="flex:1;text-align:left"><b>${esc(badgeName(i))}</b>
         <div class="faint" style="font-size:12px">${esc(BADGE_DEFS[i].desc)}</div></div><b class="num" style="color:var(--cutie)">+${CUTIE_BONUS.badge}</b></div>`;}).join("")}</div>
+    ${shareZoneHTML(()=>shareBadgeCard(ids))}
     <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>Yay 💕</button></div>`,
     m=>{ m.onclick=e=>{ if(e.target.closest("[data-ok]")){ closeModal(); if(then) then(); } }; });
 }
@@ -5286,6 +5306,7 @@ function goddessFinale(then, dev){
     ${sc?`<div class="tu-scheme"><span class="scheme-dot" style="background:${sc.swatch}"></span>
       <div style="flex:1;text-align:left"><b>${esc(sc.name)} unlocked</b><div class="faint" style="font-size:13px">${esc(sc.hint)}</div></div>
       <button class="btn btn-ghost btn-sm" data-try="${sc.id}">Try it</button></div>`:""}
+    ${shareZoneHTML(()=>shareTitleCard(CUTIE_TITLES.length-1, true))}
     <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>I'm iconic 👑</button></div>`, m=>{
     m.onclick=e=>{
       const t=e.target.closest("[data-try]");
@@ -5294,6 +5315,125 @@ function goddessFinale(then, dev){
     };
   });
 }
+/* ---------- share cards (1.8.0), Cutie only ----------
+   A Share button on the finish screen and unlock popups. It draws a short wide
+   picture (3:2, sized for chat apps) on a canvas, in her current colours, and
+   hands it to the phone's share sheet (Web Share with a file). Where that isn't
+   supported the picture is saved to Downloads instead. Nothing is uploaded.
+   A card is plain data: {head, date, kicker, big, stats, left, right, frame, reroll}. */
+let _shareMake=null, _shareCard=null;
+function shareZoneHTML(make){
+  if(!cutieOn()) return "";
+  _shareMake=make; _shareCard=null;
+  return `<div class="share-zone" id="sharezone"></div>
+    <button class="btn btn-ghost btn-block" style="margin-top:10px" data-share="open">Share 💌</button>`;
+}
+function shareFooter(){
+  const lv=cutieLevel(cutieTotals().total), n=streakCount();
+  return {left:`👑 ${lv.title}`, frame:cutieFrame(lv.i), right:n>=2? `🔥 ${n}-workout streak` : ""};
+}
+/** Workout card. The headline is the comical comparison, never the kilos. */
+function shareWorkoutCard(log, pick){
+  const tot=log.exercises.reduce((t,e)=>t+e.sets.reduce((a,x)=>a+(x.kg||0)*(x.reps||0),0),0);
+  pick=pick||funPick(tot);
+  const w=cutieWorkout(log.id), pts=w? `+${w.total.toLocaleString()}` : "";
+  const sets=w? w.sets : log.exercises.reduce((t,e)=>t+e.sets.filter(x=>!isWarm(x)).length,0);
+  const stats=[sets?`${sets} set${sets>1?"s":""}`:"", log.durationMin?`${log.durationMin} min`:"",
+    (w&&w.prs)?`${w.prs} PR${w.prs>1?"s":""}`:"", (pick&&pts)?`${pts} pts`:""].filter(Boolean).join(" · ");
+  return Object.assign({head:`${log.dayName||"Workout"}, done`, date:fmtDate(log.date),
+    kicker:pick? "Today I lifted" : pts? "Today I earned" : "Today I",
+    big:pick? `${pick.count} ${pick.n} ${pick.em}` : pts? `${pts} Cutie Points 💖` : "showed up 💖",
+    stats, reroll:pick? ()=>shareWorkoutCard(log, funPick(tot, pick.n)) : null}, shareFooter());
+}
+function shareTitleCard(k, finale){
+  const n=cutieTotals().count;
+  return Object.assign({head:finale? "Top of the ladder" : "New title unlocked", date:fmtDate(todayISO()),
+    kicker:"I'm officially a", big:`${CUTIE_TITLES[k]} 👑`,
+    stats:`${CUTIE_THRESHOLDS[k].toLocaleString()} Cutie Points · ${n} workout${n===1?"":"s"}`, reroll:null},
+    shareFooter(), {left:""});
+}
+function shareBadgeCard(ids){
+  const i=BADGE_DEFS.findIndex(b=>b.id===ids[0]);
+  return Object.assign({head:ids.length>1? "Badges earned" : "Badge earned", date:fmtDate(todayISO()),
+    kicker:ids.length>1? `${ids.length} new badges, including` : "I just earned",
+    big:`${badgeName(i)} 🏅`, stats:BADGE_DEFS[i].desc, reroll:null}, shareFooter());
+}
+/** Draw a card. Returns the canvas, or null where canvas isn't available. */
+function shareDraw(card){
+  const c=document.createElement("canvas"), W=1200, H=800;
+  c.width=W; c.height=H;
+  let x=null; try{ x=c.getContext && c.getContext("2d"); }catch(_){}
+  if(!x) return null;
+  const cs=getComputedStyle(document.body), v=(n,d)=>(cs.getPropertyValue(n)||"").trim()||d;
+  const bg=v("--surface","#FFFFFF"), text=v("--text","#2B1228"), muted=v("--muted","#7A5674"), cutie=v("--cutie","#E0559C");
+  const F='system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
+  const rr=(X,Y,w,h,r)=>{ x.beginPath(); x.moveTo(X+r,Y); x.arcTo(X+w,Y,X+w,Y+h,r); x.arcTo(X+w,Y+h,X,Y+h,r); x.arcTo(X,Y+h,X,Y,r); x.arcTo(X,Y,X+w,Y,r); x.closePath(); };
+  x.fillStyle=bg; x.fillRect(0,0,W,H);
+  x.globalAlpha=.12; x.fillStyle=cutie; x.fillRect(0,0,W,H); x.globalAlpha=1;
+  x.lineWidth=8; x.strokeStyle=cutie; rr(20,20,W-40,H-40,44); x.stroke();
+  x.textBaseline="middle";
+  // top row
+  x.textAlign="left";  x.fillStyle=text;  x.font=`800 46px ${F}`; x.fillText(card.head||"", 70, 110, 760);
+  x.textAlign="right"; x.fillStyle=muted; x.font=`500 34px ${F}`; x.fillText(card.date||"", W-70, 110);
+  // headline: shrink to fit, then wrap onto two lines
+  x.textAlign="center"; x.fillStyle=cutie; x.font=`600 40px ${F}`; x.fillText(card.kicker||"", W/2, 285);
+  x.fillStyle=text;
+  const big=card.big||"", maxW=W-160;
+  let size=104; x.font=`900 ${size}px ${F}`;
+  while(size>64 && x.measureText(big).width>maxW){ size-=4; x.font=`900 ${size}px ${F}`; }
+  if(x.measureText(big).width>maxW){
+    const words=big.split(" "); let a=words.slice(), b=[];
+    while(a.length>1 && x.measureText(a.join(" ")).width>maxW) b.unshift(a.pop());
+    x.fillText(a.join(" "), W/2, 380, maxW); x.fillText(b.join(" "), W/2, 380+size*1.1, maxW);
+  } else x.fillText(big, W/2, 410, maxW);
+  // stats + footer
+  x.fillStyle=muted; x.font=`600 36px ${F}`; x.fillText(card.stats||"", W/2, 590, W-140);
+  x.font=`700 34px ${F}`;
+  if(card.left){
+    const tw=x.measureText(card.left).width;
+    if(card.frame){
+      x.lineWidth=4; x.strokeStyle={bronze:"#CD7F32", silver:"#B9BEC4", gold:"#D4AF37"}[card.frame]||cutie;
+      rr(62, 692, tw+44, 60, 30); x.stroke();
+    }
+    x.textAlign="left"; x.fillStyle=text; x.fillText(card.left, 84, 723);
+  }
+  if(card.right){ x.textAlign="right"; x.fillStyle=text; x.fillText(card.right, W-76, 723); }
+  return c;
+}
+function shareRender(){
+  const z=document.getElementById("sharezone"); if(!z || !_shareCard) return false;
+  const c=shareDraw(_shareCard);
+  if(!c){ toast("Can't make the picture on this phone"); return false; }
+  c.setAttribute("aria-label", `${_shareCard.kicker} ${_shareCard.big}`);
+  z.innerHTML=`<div class="row">${_shareCard.reroll?`<button class="btn btn-ghost" style="flex:1" data-share="again">Another one 🎲</button>`:""}
+    <button class="btn btn-primary" style="flex:1" data-share="send">Send it 💌</button></div>`;
+  z.insertBefore(c, z.firstChild);
+  return true;
+}
+function shareSend(){
+  const c=document.querySelector("#sharezone canvas"); if(!c) return;
+  const save=blob=>{ try{
+      const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="lift-daddy.png";
+      document.body.appendChild(a); a.click(); a.remove();
+      toast("Picture saved to your downloads 💾");
+    }catch(_){ toast("Couldn't save the picture"); } };
+  try{
+    c.toBlob(blob=>{
+      if(!blob){ toast("Couldn't make the picture"); return; }
+      let file=null; try{ file=new File([blob], "lift-daddy.png", {type:"image/png"}); }catch(_){}
+      if(file && navigator.canShare && navigator.share && navigator.canShare({files:[file]})){
+        navigator.share({files:[file]}).catch(err=>{ if(!err || err.name!=="AbortError") save(blob); });
+      } else save(blob);
+    }, "image/png");
+  }catch(_){ toast("Couldn't make the picture"); }
+}
+document.addEventListener("click", e=>{
+  const b=e.target.closest("[data-share]"); if(!b) return;
+  const k=b.dataset.share;
+  if(k==="open"){ if(!_shareMake) return; _shareCard=_shareMake(); if(shareRender()) b.remove(); return; }
+  if(k==="again"){ if(_shareCard && _shareCard.reroll){ _shareCard=_shareCard.reroll(); shareRender(); } return; }
+  if(k==="send") shareSend();
+});
 /* ---------- confetti (no library, offline) ---------- */
 function confetti(){
   try{

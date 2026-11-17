@@ -213,9 +213,22 @@ workouts (bonus workouts count toward the plan they were done in).
 - While a pause is on, Home shows an "On holiday" card and the streak pill says paused; the welcome-back
   card is hidden. The welcome-back bonus still applies on return (it's about motivation).
 
-## Next (1.8.0, from the spec)
+## Next (from the spec)
 
-- Monthly recap, share card, seasonal points (e.g. double points over Christmas: needs to ship before then).
+- Monthly recap, seasonal points (e.g. double points over Christmas: needs to ship before then).
+
+## Share cards (1.8.0)
+
+- Cutie only (`cutieOn()`): a Share button on the finish screen, title and badge popups, the Goddess finale, and
+  a past workout's points popup. Other profiles never see it.
+- Tapping Share shows the picture inside the same popup, with **Another one** (workout cards with a comparison)
+  and **Send it**. Send opens the phone's share sheet with a PNG; if the phone can't share files it is saved to
+  Downloads. Nothing is uploaded and no text is attached.
+- The picture is short and wide (3:2, 1200x800) for Messages and chat apps, drawn in her current colour scheme.
+- Workout card: day name, date, "Today I lifted N things" (the same comparison as the finish screen, from
+  `FUN_WEIGHTS`), then sets, minutes, PRs and points, her title (with its frame) and streak. **Kilos are never
+  on the card.** No weight lifted: the headline is the points earned.
+- Title card: "I'm officially a <title>", points and workout count. Badge card: the badge and what earned it.
 
 ## Tests
 
