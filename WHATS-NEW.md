@@ -8,6 +8,8 @@ live in `RELEASES[0]` in `index.html`, and `TESTS_about.js` fails if the two dri
 apart. Update both when you ship, and add the engineering detail to
 `CHANGELOG.md` rather than here.
 
-## 1.7.1 — 2026-11-17
+## 1.7.3 — 2026-11-17
 
-- With Cutie on, Stats is now all about you: your title journey with how long to the next one at your pace, every badge you've unlocked, and your Cutie stats. The PR, strength-across-plans, cardio and body sections are gone from this view.
+- Titles now come one step at a time: each one takes a little longer than the last, and only your next three are shown. The rest are secret until you get closer.
+- Every new title unlocks a colour. Three new ones join the set: Cherry Bomb, Lavender Haze and Ocean Babe.
+- Title progression no longer guesses how many weeks a title will take.

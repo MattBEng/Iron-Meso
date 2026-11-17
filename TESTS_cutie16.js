@@ -29,7 +29,9 @@ run("cutie titles + schemes", ()=>{
 
   // ---------- SCHEMES LOCKED BELOW THEIR TITLE ----------
   w.go("settings");
-  ok("10 schemes offered with Cutie on", $$("[data-scheme-pick]").length===10, $$("[data-scheme-pick]").length);
+  ok("free schemes + colours for the visible titles only (Hot Mumma +3)", $$("[data-scheme-pick]").length===8, $$("[data-scheme-pick]").length);
+  ok("the rest are counted as secret", /5 secret colours/.test($("#view").textContent));
+  ok("one colour per title from Hot Mumma up", ev("CUTIE_SCHEMES").map(s=>s.at).join(",")==="1,2,3,4,5,6,7,8,9");
   ok("Mint Mojito locked until Fit Queen", $("[data-scheme-pick='mint']").disabled &&
      /Unlocks at Fit Queen/.test($("[data-scheme-pick='mint']").closest("label").textContent));
   ok("a locked scheme can't be applied", ev("schemeAllowed('mint')")===false);
@@ -65,7 +67,8 @@ run("cutie titles + schemes", ()=>{
 
   // ---------- TITLE LIST ----------
   w.go("analytics"); click($("[data-cutie='titles']"));
-  ok("title list shows all 10", $$(".cutie-title-row").length===10);
+  ok("title list shows reached titles + the next 3 only", $$(".cutie-title-row").length===6, $$(".cutie-title-row").length);
+  ok("the rest are secret", /4 secret titles/.test($("#overlay").textContent));
   ok("unlocked ones show their date", $$(".cutie-title-row")[2].textContent.includes("Unlocked"));
   ok("locked ones are greyed with points to go", $$(".cutie-title-row")[5].classList.contains("locked") &&
      /points to go/.test($$(".cutie-title-row")[5].textContent));

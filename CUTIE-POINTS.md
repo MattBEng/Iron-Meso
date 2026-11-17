@@ -50,23 +50,26 @@ session, so hard and easy sessions scored the same. Sets reward effort evenly.
 
 ## Titles
 
-| Title | Points |
-|---|---|
-| Gym Cutie | 0 |
-| Hot Mumma | 2,000 |
-| Fit Queen | 5,000 |
-| Strong Sweetheart | 8,000 |
-| Iron Angel | 10,500 |
-| Barbell Baddie | 13,000 |
-| Snack with Muscles | 15,500 |
-| Certified Powerpuff | 18,000 |
-| Dumbbell Darling | 20,500 |
-| Glute Goddess | 23,000 |
+| Title | Points | Weeks after the one before (her pace) |
+|---|---|---|
+| Gym Cutie | 0 | |
+| Hot Mumma | 2,000 | |
+| Fit Queen | 5,000 | (she was here at 6,704 on 17 Nov) |
+| Strong Sweetheart | 7,800 | about 2 from 17 Nov |
+| Iron Angel | 9,500 | about 3 |
+| Barbell Baddie | 11,700 | about 4 |
+| Snack with Muscles | 14,400 | about 5 |
+| Certified Powerpuff | 17,700 | about 6 |
+| Dumbbell Darling | 21,600 | about 7 |
+| Glute Goddess | 26,000 | about 8 |
 
-`CUTIE_THRESHOLDS` in `index.html`; names come from `MESSAGES.txt`. Calibrated
-on her backup of 17 Nov 2026: 29 workouts since 3 Aug, about 1.8 a week, 6,704
-points, about 430 a week. She starts at Fit Queen; Glute Goddess is roughly 9
-months away at that pace.
+`CUTIE_THRESHOLDS` in `index.html`; names come from `MESSAGES.txt`. 1.7.3 (Matt's call): progression is
+incremental, each title about one week longer than the last at ~550 points a week (her 440 base plus
+bonuses), so Glute Goddess is ~35 weeks out. Don't let her finish in a month.
+
+- **Only reached titles plus the next 3 are shown** (`CUTIE_REVEAL`), everywhere: Stats title progression,
+  the titles list, and the colour picker. The rest show as a count of secret titles / colours.
+- **No time estimates** anywhere ("6 weeks to go" was upsetting). Points to go are fine.
 
 ## Where it shows
 
@@ -84,8 +87,8 @@ months away at that pace.
 Matt's call: for her, Stats drops PRs this plan, Strength progression across blocks, Cardio (incl. minutes
 by zone) and Body. It adds a "Cutie progress" section:
 
-- **Title progression**: all 10 titles, reached dates, points to go, and an estimate of weeks to the next
-  one from her pace (points in the last 8 weeks / 8, `cutiePace`).
+- **Title progression**: reached titles with dates, the next 3 with points to go, the rest as a secret count.
+  Her weekly pace is shown underneath (points in the last 8 weeks / 8, `cutiePace`); no week estimates.
 - **Badges unlocked**: a tile per badge, earned ones dated, locked ones with what earns them.
 - **Cutie stats**: points per workout, best week and month, streak weeks, PR bonuses, full workouts,
   lifts beaten, welcome backs, cardio minutes.
@@ -134,12 +137,18 @@ off.
 
 | Scheme | Unlocks at | Look |
 |---|---|---|
+| Cherry Bomb | Hot Mumma | Cherry red and hot pink (1.7.3) |
 | Mint Mojito | Fit Queen | Mint and teal |
+| Lavender Haze | Strong Sweetheart | Deep lavender and lilac (1.7.3) |
 | Angel Glow | Iron Angel | Pearl white and gold, gold sparkle in the background |
 | Midnight Baddie | Barbell Baddie | Near-black and neon pink (best in dark mode) |
+| Ocean Babe | Snack with Muscles | Aqua and ocean blue (1.7.3) |
 | Bubblegum Pop | Certified Powerpuff | Bubblegum pink and sky blue |
 | Rose Gold | Dumbbell Darling | Blush and rose gold |
 | Goddess | Glute Goddess | Plum and gold, shimmer on the points card |
+
+One colour per title from Hot Mumma up. She'd already passed Hot Mumma, so Cherry Bomb is simply unlocked
+when 1.7.3 arrives (no celebration).
 
 - `CUTIE_SCHEMES` in `index.html`; each has light and dark CSS.
 - Shown in Settings only with Cutie on; locked ones greyed with the title

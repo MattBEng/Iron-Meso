@@ -34,8 +34,10 @@ run("cutie stats page", ()=>{
   ok("strength across blocks gone", !kickers().some(k=>/Strength progression/.test(k)));
   ok("plan comparison kept", kickers().some(k=>/comparison/i.test(k)));
   ok("Cutie progress section added", secs().includes("cutie"));
-  ok("title progression card with all 10 titles", kickers().includes("Title progression") && $$(".cj-row").length===10);
-  ok("next title shows points to go and pace", /points to go · about \d+ weeks? at your pace/.test($("[data-sec='cutie']").textContent));
+  ok("title progression shows reached titles + the next 3", kickers().includes("Title progression") && $$(".cj-row").length===4, $$(".cj-row").length);
+  ok("the rest are hidden as secret", /6 secret titles still to discover/.test($("[data-sec='cutie']").textContent));
+  ok("next title shows points to go", /points to go/.test($("[data-sec='cutie']").textContent));
+  ok("no time estimates (Matt: upsetting)", !/weeks? at your pace|weeks? to go/.test($("[data-sec='cutie']").textContent));
   ok("badges card with a tile per badge", kickers().includes("Badges unlocked") && $$(".badge-tile").length===10);
   ok("Cutie stats card", kickers().includes("Cutie stats") && /points per workout/.test($("[data-sec='cutie']").textContent));
   let threw=false; try{ w.go("analytics"); w.go("home"); w.go("analytics"); }catch(e){ threw=true; }

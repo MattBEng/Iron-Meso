@@ -42,7 +42,9 @@ run("cutie points", ()=>{
   const lv=ev("cutieLevel");
   ok("0 is Gym Cutie", lv(0).title==="Gym Cutie");
   ok("5,000 is Fit Queen", lv(5000).title==="Fit Queen" && lv(4999).title==="Hot Mumma");
-  ok("23,000 is Glute Goddess", lv(23000).title==="Glute Goddess" && lv(99999).next===null);
+  ok("26,000 is Glute Goddess", lv(26000).title==="Glute Goddess" && lv(25999).title==="Dumbbell Darling" && lv(99999).next===null);
+  const th=ev("CUTIE_THRESHOLDS"), gaps=th.slice(4).map((t,i)=>t-th[i+3]);
+  ok("gaps from Iron Angel up grow each time (incremental)", gaps.every((g,i)=>i===0||g>gaps[i-1]), gaps.join(","));
   ok("10 thresholds for 10 titles", ev("CUTIE_THRESHOLDS").length===ev("CUTIE_TITLES").length);
 
   // ---------- TOP 3, TIES TO MOST RECENT ----------
@@ -118,7 +120,7 @@ run("cutie points", ()=>{
   ok("preview shows cutie features without changing gender", ev("cutieOn()")===true && st().profile.gender==="Male");
   inp($("#devpts"),"12345"); click($("[data-dev='setpts']"));
   ok("points override", ev("cutieTotals()").total===12345 && ev("cutieTotals()").real!==12345);
-  ok("override drives the title", ev("cutieTitle")(ev("cutieTotals()").total)==="Iron Angel");
+  ok("override drives the title", ev("cutieTitle")(ev("cutieTotals()").total)==="Barbell Baddie");
   click($("[data-dev='unlock']"));
   ok("unlock all = top title", ev("cutieTitle")(ev("cutieTotals()").total)==="Glute Goddess");
   ok("training data untouched by dev mode", !/liftdaddy_dev|12345|"preview"/.test(w.localStorage.getItem("ironmeso_v1")));

@@ -311,7 +311,7 @@ canvas.chart{width:100%; height:180px; display:block}
 .cutie-bar>div{height:100%;background:var(--cutie)}
 .cutie-link{background:none;border:0;padding:0;font:inherit;cursor:pointer;text-decoration:none}
 body{--cutie:#E0559C}
-body[data-fun="1"]:is([data-scheme="mint"],[data-scheme="angel"],[data-scheme="midnight"],[data-scheme="bubblegum"],[data-scheme="rosegold"],[data-scheme="goddess"]){--cutie:var(--accent)}
+body[data-fun="1"]:is([data-scheme="cherry"],[data-scheme="lavender"],[data-scheme="ocean"],[data-scheme="mint"],[data-scheme="angel"],[data-scheme="midnight"],[data-scheme="bubblegum"],[data-scheme="rosegold"],[data-scheme="goddess"]){--cutie:var(--accent)}
 .confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:9999}
 #devbadge{position:fixed;top:6px;right:6px;z-index:9998;background:#F5C542;color:#000;font:800 10px/1 system-ui;padding:4px 6px;border-radius:6px;pointer-events:none}
 .dev-card{border:1px dashed #F5C542}
@@ -419,6 +419,43 @@ body[data-fun="1"][data-scheme="goddess"] .cutie-card{background:linear-gradient
 .cj-row.cur{background:rgba(224,85,156,.10);border-radius:10px}
 .cj-dot{width:12px;height:12px;border-radius:50%;border:2px solid var(--cutie);flex:0 0 auto}
 .cj-row.on .cj-dot{background:var(--cutie)}
+body[data-fun="1"][data-scheme="cherry"][data-theme="light"]{
+  --bg:#FFF4F5; --surface:#FFFFFF; --raised:#FFF9FA; --line:#F9D6DC;
+  --accent:#E11D48; --accent-soft:rgba(225,29,72,.13);
+  --text:#3B0F18; --muted:#8C5560; --faint:#C899A2;
+  --cyan:#3FB6D3; --green:#3FBF86; --amber:#EFA53C; --red:#E11D48;
+}
+body[data-fun="1"][data-scheme="cherry"][data-theme="dark"]{
+  --bg:#1A0B0E; --surface:#26111A; --raised:#301621; --line:#44202D;
+  --accent:#FF4D6D; --accent-soft:rgba(255,77,109,.20);
+  --text:#FFEAEE; --muted:#C4909B; --faint:#86606A;
+  --cyan:#5FD4E6; --green:#5FD69C; --amber:#FFC061; --red:#FF6E86;
+}
+body[data-fun="1"][data-scheme="lavender"][data-theme="light"]{
+  --bg:#F7F4FE; --surface:#FFFFFF; --raised:#FBF9FF; --line:#E4DBFA;
+  --accent:#7C4DEB; --accent-soft:rgba(124,77,235,.13);
+  --text:#22163F; --muted:#6B5C92; --faint:#A79BC9;
+  --cyan:#4DB4D6; --green:#4CBF8E; --amber:#E9A64A; --red:#E0587A;
+}
+body[data-fun="1"][data-scheme="lavender"][data-theme="dark"]{
+  --bg:#15111F; --surface:#201A2E; --raised:#292139; --line:#3A2F4F;
+  --accent:#B79CFF; --accent-soft:rgba(183,156,255,.20);
+  --text:#F2EDFF; --muted:#A597C7; --faint:#6D628A;
+  --cyan:#6FD0E6; --green:#6FD5A6; --amber:#F0C06E; --red:#F2899F;
+}
+body[data-fun="1"][data-scheme="ocean"][data-theme="light"]{
+  --bg:#F0F8FC; --surface:#FFFFFF; --raised:#F7FBFE; --line:#D2E9F3;
+  --accent:#0E9FC0; --accent-soft:rgba(14,159,192,.13);
+  --text:#0E2A35; --muted:#4E7584; --faint:#93B5C2;
+  --cyan:#0E9FC0; --green:#3DBB86; --amber:#E9A63E; --red:#E55F78;
+}
+body[data-fun="1"][data-scheme="ocean"][data-theme="dark"]{
+  --bg:#0B161C; --surface:#12222B; --raised:#182B36; --line:#243C49;
+  --accent:#38D3F5; --accent-soft:rgba(56,211,245,.18);
+  --text:#E6F8FD; --muted:#8DB6C4; --faint:#5A7F8C;
+  --cyan:#38D3F5; --green:#5FD69C; --amber:#FFC061; --red:#FF7A90;
+}
+.cj-secret{display:flex;align-items:center;gap:10px;padding:8px 4px;opacity:.6;font-size:13px}
 .badge-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}
 .badge-tile{padding:10px;border-radius:12px;border:1px solid rgba(224,85,156,.25);text-align:center}
 .badge-tile.locked{opacity:.45}
@@ -640,8 +677,16 @@ STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|
    stored data and moves independently. RELEASES[0] must match WHATS-NEW.md —
    the app is one offline file, so the notes are embedded, not fetched.
    TESTS_about.js fails if the two drift apart. */
-const APP_VERSION = "1.7.1";
+const APP_VERSION = "1.7.3";
 const RELEASES = [
+  {v:"1.7.3", date:"2026-11-17", notes:[
+    "Titles now come one step at a time: each one takes a little longer than the last, and only your next three are shown. The rest are secret until you get closer.",
+    "Every new title unlocks a colour. Three new ones join the set: Cherry Bomb, Lavender Haze and Ocean Babe.",
+    "Title progression no longer guesses how many weeks a title will take.",
+  ]},
+  {v:"1.7.2", date:"2026-11-17", notes:[
+    "What's new now opens at the top, so the latest update is the first thing you see. Your titles list and points breakdown open at the top too.",
+  ]},
   {v:"1.7.1", date:"2026-11-17", notes:[
     "With Cutie on, Stats is now all about you: your title journey with how long to the next one at your pace, every badge you've unlocked, and your Cutie stats. The PR, strength-across-plans, cardio and body sections are gone from this view.",
   ]},
@@ -1542,9 +1587,13 @@ function modal(html, onMount){
   // navigating. If a modal was already open we reuse its entry — no new push.
   try{ if(!_modalHistory){ history.pushState({modal:true},""); _modalHistory=true; } }catch(_){}
   const m=bg.firstElementChild;
-  // focus first field, else first button
-  const first=m.querySelector("input, select, textarea") || m.querySelector("button");
-  if(first) first.focus();
+  // focus first field, else first button. A button is often at the BOTTOM of a
+  // long list (What's new, titles): focus it without scrolling, so the popup
+  // opens at the top (newest release first) instead of jumping to the end.
+  const field=m.querySelector("input, select, textarea");
+  const first=field || m.querySelector("button");
+  if(first) first.focus(field? undefined : {preventScroll:true});
+  if(!field) m.scrollTop=0;
   if(onMount) onMount(m);
   return m;
 }
@@ -4608,10 +4657,16 @@ const CUTIE_PTS={workout:100, set:10, cardioMin:3, streakWeek:50};
     workouts. Full = every planned lift logged with all its target sets.
     Beat = a lift's working volume beats the last time it was done. */
 const CUTIE_BONUS={pr:50, prMax:3, full:30, beat:10, beatMax:50, comeback:75, comebackDays:14, badge:50};
-/** Points needed for each title in CUTIE_TITLES (same order). Set from Matt's
-    partner's real pace in Nov 2026 (~430 pts/week): starts at title 3, last
-    title about 9 months out. */
-const CUTIE_THRESHOLDS=[0,2000,5000,8000,10500,13000,15500,18000,20500,23000];
+/** Points needed for each title in CUTIE_TITLES (same order). Incremental
+    (1.7.3, Matt's call): from her 6,704 points on 17 Nov 2026 at ~550 a week,
+    each title takes about one week longer than the last: 2, 3, 4 ... 8 weeks,
+    so Glute Goddess is ~35 weeks out. */
+const CUTIE_THRESHOLDS=[0,2000,5000,7800,9500,11700,14400,17700,21600,26000];
+/** Only the next few titles are shown; the rest stay secret until she's closer. */
+const CUTIE_REVEAL=3;
+function cutieVisibleMax(){
+  return Math.min(CUTIE_TITLES.length-1, Math.max(cutieUnlockedIdx(), cutieLevel(cutieTotals().total).i)+CUTIE_REVEAL);
+}
 function isoShift(iso, days){
   const d=new Date(iso+"T12:00"); d.setDate(d.getDate()+days);
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
@@ -4788,10 +4843,14 @@ function cutieHomeHTML(){
    title was first reached. It is saved and backed up. Titles reached before
    1.6.0 are recorded silently on first run, dated that day. A title (and its
    colour scheme) stays unlocked even if points later drop below it. */
+/* One unlockable per title from Hot Mumma up (1.7.3). */
 const CUTIE_SCHEMES=[
+  {id:"cherry",    name:"Cherry Bomb",    hint:"Cherry red and hot pink",       swatch:"#E11D48", at:1},
   {id:"mint",      name:"Mint Mojito",    hint:"Fresh mint and teal",           swatch:"#2BB5A0", at:2},
+  {id:"lavender",  name:"Lavender Haze",  hint:"Deep lavender and lilac",       swatch:"#8B5CF6", at:3},
   {id:"angel",     name:"Angel Glow",     hint:"Pearl white, gold and sparkle", swatch:"#D4AF37", at:4},
   {id:"midnight",  name:"Midnight Baddie",hint:"Black with neon pink",          swatch:"#FF2E93", at:5},
+  {id:"ocean",     name:"Ocean Babe",     hint:"Aqua and ocean blue",           swatch:"#0EA5C6", at:6},
   {id:"bubblegum", name:"Bubblegum Pop",  hint:"Bubblegum pink and sky blue",   swatch:"#FF7AC0", at:7},
   {id:"rosegold",  name:"Rose Gold",      hint:"Blush and rose gold",           swatch:"#D49A89", at:8},
   {id:"goddess",   name:"Goddess",        hint:"Plum and gold, with shimmer",   swatch:"#8E3A7F", at:9},
@@ -4865,15 +4924,18 @@ function cutiePeriodsHTML(){
     <div class="faint" style="font-size:11px">Points per week${P.fromMeso?` this ${term("meso")}`:", last weeks"}</div></div>`;
 }
 function cutieTitlesModal(){
-  const c=cutieState(), T=cutieTotals(), shown=cutieLevel(T.total).i, dp=devPoints();
+  const c=cutieState(), T=cutieTotals(), shown=cutieLevel(T.total).i, dp=devPoints(), vis=cutieVisibleMax();
+  const secret=CUTIE_TITLES.length-1-vis;
   modal(`<h2>My titles &amp; badges</h2>
     <div class="stack" style="margin-top:10px;gap:6px">${CUTIE_TITLES.map((t,k)=>{
+      if(k>vis) return "";
       const date=c.titles[k], open=!!date || (dp!=null && k<=cutieLevel(dp).i);
       const sc=CUTIE_SCHEMES.find(s=>s.at===k);
       return `<div class="cutie-title-row ${open?"":"locked"} ${k===shown?"cur":""}">
         <div style="flex:1"><b>${esc(t)}</b>${k===shown?` <span class="pill" style="font-size:11px">now</span>`:""}
           <div class="faint num" style="font-size:12px">${open? (date?`Unlocked ${fmtDate(date)}`:"Dev preview") : `${(CUTIE_THRESHOLDS[k]-T.total).toLocaleString()} points to go`}${sc?` · unlocks ${esc(sc.name)}`:""}</div></div>
-        <span class="num faint" style="font-size:12px">${CUTIE_THRESHOLDS[k].toLocaleString()}</span></div>`;}).join("")}</div>
+        <span class="num faint" style="font-size:12px">${CUTIE_THRESHOLDS[k].toLocaleString()}</span></div>`;}).join("")}
+      ${secret>0?`<div class="cj-secret"><span>🔒</span><span>${secret} secret title${secret>1?"s":""}, each with a new colour</span></div>`:""}</div>
     ${badgesHTML()}
     <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>Close</button>`,
     m=>{ m.onclick=e=>{ if(e.target.closest("[data-ok]")) closeModal(); }; });
@@ -5021,17 +5083,19 @@ function cutiePace(){
   return Math.round(pts/8);
 }
 function cutieJourneyHTML(){
-  const T=cutieTotals(), c=cutieState(), lv=cutieLevel(T.total), pace=cutiePace();
+  const T=cutieTotals(), c=cutieState(), lv=cutieLevel(T.total), pace=cutiePace(), vis=cutieVisibleMax();
+  const secret=CUTIE_TITLES.length-1-vis;
   return `<div class="card cutie-card"><div class="kicker" style="color:var(--cutie)">Title progression</div>
     <div class="cutie-journey">${CUTIE_TITLES.map((t,k)=>{
       const date=c.titles[k], cur=k===lv.i, next=k===lv.i+1;
       const reached=!!date || k<=lv.i;
       const left=CUTIE_THRESHOLDS[k]-T.total;
-      const eta=(next && pace>0)? ` · about ${Math.max(1,Math.round(left/pace))} week${Math.round(left/pace)>1?"s":""} at your pace`:"";
+      if(k>vis) return "";
       return `<div class="cj-row ${reached?"on":""} ${cur?"cur":""}"><span class="cj-dot"></span>
         <div style="flex:1"><b>${esc(t)}</b>${cur?` <span class="pill" style="font-size:11px">now</span>`:""}
-          <div class="faint num" style="font-size:12px">${reached? (date?`Reached ${fmtDate(date)}`:"Reached") : `${left.toLocaleString()} points to go${eta}`}</div></div>
-        <span class="faint num" style="font-size:12px">${CUTIE_THRESHOLDS[k].toLocaleString()}</span></div>`; }).join("")}</div>
+          <div class="faint num" style="font-size:12px">${reached? (date?`Reached ${fmtDate(date)}`:"Reached") : `${left.toLocaleString()} points to go`}</div></div>
+        <span class="faint num" style="font-size:12px">${CUTIE_THRESHOLDS[k].toLocaleString()}</span></div>`; }).join("")}
+      ${secret>0?`<div class="cj-secret"><span>🔒</span><span>${secret} secret title${secret>1?"s":""} still to discover. Keep going to reveal ${secret>1?"them":"it"} 💕</span></div>`:""}</div>
     ${pace? `<p class="faint num" style="margin:8px 0 0;font-size:12px">Your pace: about ${pace.toLocaleString()} points a week (last 8 weeks)</p>`:""}</div>`;
 }
 function cutieBadgesCardHTML(){
@@ -5742,7 +5806,7 @@ VIEWS.settings=function(){
       <div class="kicker" style="margin-top:18px">Colour scheme</div>
       <p class="faint" style="margin:2px 0 10px">Fun mode only — Serious mode always uses the standard look.</p>
       <div class="stack">
-        ${[...FUN_SCHEMES, ...(cutieOn()?CUTIE_SCHEMES:[])].map(sc=>{ const locked=sc.at!=null && !cutieSchemeUnlocked(sc); return `
+        ${[...FUN_SCHEMES, ...(cutieOn()?CUTIE_SCHEMES.filter(x=>x.at<=cutieVisibleMax()):[])].map(sc=>{ const locked=sc.at!=null && !cutieSchemeUnlocked(sc); return `
           <label class="scheme-row ${(s.funScheme||"default")===sc.id?"on":""} ${locked?"locked":""}">
             <input type="checkbox" data-scheme-pick="${sc.id}" ${(s.funScheme||"default")===sc.id?"checked":""} ${locked?"disabled":""}
               style="width:22px;height:22px">
@@ -5752,6 +5816,8 @@ VIEWS.settings=function(){
               <span class="faint" style="display:block;font-size:12px">${locked?`Unlocks at ${esc(CUTIE_TITLES[sc.at])}`:sc.hint}</span>
             </span>
           </label>`;}).join("")}
+        ${(()=>{ if(!cutieOn()) return ""; const n=CUTIE_SCHEMES.filter(x=>x.at>cutieVisibleMax()).length;
+          return n? `<div class="faint" style="font-size:13px;padding:4px 2px">🔒 ${n} secret colour${n>1?"s":""} to unlock with new titles</div>` : ""; })()}
       </div>`:""}
     </div>
     <div class="card"><h3>Progression rules</h3>

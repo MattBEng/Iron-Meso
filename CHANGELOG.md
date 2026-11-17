@@ -9,6 +9,17 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.7.3 — 2026-11-17 (incremental titles, secrets, a colour per title)
+- `CUTIE_THRESHOLDS` now 0/2,000/5,000/7,800/9,500/11,700/14,400/17,700/21,600/26,000: from her 6,704 at
+  ~550/week each title takes ~1 week longer (2..8 weeks, ~35 total). Only reached + next 3 titles show
+  (`CUTIE_REVEAL`, `cutieVisibleMax`) in Stats, the titles list and the scheme picker; the rest are counted
+  as secret. No week estimates. 3 new schemes (Cherry Bomb, Lavender Haze, Ocean Babe): one per title 1-9.
+
+### v1.7.2 — 2026-11-17 (popups open at the top)
+- `modal()` focused the first button, which on long lists (What's new, titles, breakdown) is at the bottom,
+  so the popup scrolled to the end. Buttons now get `focus({preventScroll:true})` and `scrollTop=0`; popups
+  with a field still focus it normally. Test: `TESTS_modalscroll.js`.
+
 ### v1.7.1 — 2026-11-17 (Cutie Stats page)
 - With `cutieOn()`, Stats hides PRs this plan, strength across blocks, Cardio and Body sections and adds
   a "Cutie progress" section: `cutieJourneyHTML` (titles, dates, ETA from `cutiePace`), `cutieBadgesCardHTML`,
