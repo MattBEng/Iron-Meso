@@ -21,9 +21,9 @@ import brings them all back.
 | Working set | 10 each | Warm-up sets don't count |
 | Cardio | 3 per minute | In-workout and standalone cardio both count |
 | Streak week | 50 | First scheduled workout of a Mon-Sun week when the week before also had one (holiday-paused weeks are skipped over) |
-| PR | 50 each, max 3 | A working set's e1RM beats that lift's best from earlier workouts (warm-ups never count; first time on a lift isn't a PR) |
-| Full workout | 30 | Every lift in the plan's day logged with all its target sets (not bonus workouts) |
-| Beat last time | 10 per lift, max 50 | A lift's working volume beats the last time it was done (kg x reps; reps or seconds for bodyweight and holds) |
+| PR | 50 each, max 3 | A working set's e1RM beats that lift's best from earlier workouts (warm-ups never count; first time on a lift isn't a PR). Assisted lifts: the lowest assistance yet |
+| Full workout | 30 | Every lift in the plan's day logged with all its target sets (not bonus workouts). The planned lift count is stamped on the log (`log.planned`) at finish and when its meso is deleted |
+| Beat last time | 10 per lift, max 50 | A lift's working volume beats the last time it was done (kg x reps; reps or seconds for bodyweight and holds). Assisted lifts: less assistance, or the same with more reps |
 | Welcome back | 75 | First workout after 14 or more days off |
 | Badge | 50 each | See Badges |
 
@@ -206,7 +206,7 @@ workouts (bonus workouts count toward the plan they were done in).
 
 ## Holiday pause (1.7.0)
 
-- Settings > Holiday pause: from and to dates (up to 90 days, must not be over already). Stored in
+- Settings > Holiday pause: from and to dates (up to 90 days; past dates are allowed, and the last 90 days of pauses are listed). Stored in
   `S().pauses` [{id, from, to}], backed up, for everyone (not just Cutie).
 - Paused days don't count as a gap in the workout streak (`streakCount`), and paused weeks are skipped
   when checking the Cutie streak week, so the streak carries on after the holiday.

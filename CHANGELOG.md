@@ -9,6 +9,14 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.7.5 — 2026-11-17 (review fixes: assisted points, meso delete, past pause, reveal, ledger cache)
+- `cutieLedger` is now a cache over `cutieLedgerBuild` (key: `_stateRev` bumped in `Store.save` + sizes + state object).
+  Assisted lifts: PR = lowest assistance yet, beat = less assistance or same with more reps (was reversed).
+- Full-workout bonus reads `log.planned` (lift count, stamped at finish and on meso delete via `plannedLifts`),
+  so deleting a meso no longer drops 30 pts per full workout. Older logs still read the live meso day.
+- Holiday pause: past dates accepted; Settings lists pauses from the last 90 days. Secret reveal is only spent
+  while the Stats "cutie" section is open (toggle handler swaps `#cjourney`). Test: `TESTS_cutie175.js` (20).
+
 ### v1.7.4 — 2026-11-17 (special unlocks)
 - Scheme effects via `CUTIE_FX` layer + CSS (lavender hearts, bubblegum bubbles, ocean wave, midnight neon,
   angel halo, rose-gold sheen, goddess crown); `CUTIE_RAIN_BY_TITLE` showers; `cutieFrame` bronze/silver/gold.

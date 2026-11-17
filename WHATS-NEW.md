@@ -8,9 +8,10 @@ live in `RELEASES[0]` in `index.html`, and `TESTS_about.js` fails if the two dri
 apart. Update both when you ship, and add the engineering detail to
 `CHANGELOG.md` rather than here.
 
-## 1.7.4 — 2026-11-17
+## 1.7.5 — 2026-11-17
 
-- Each new title is a little more special now: its colour comes with its own effect, like floating hearts, a neon glow, a rolling wave, bubbles or a rose-gold shine, and its unlock rains its own emojis.
-- Your title on Home and Stats now has a frame that upgrades from bronze to silver to gold as you climb.
-- When a secret title comes into view, it's revealed on Stats with a little shake. Each title also brings its own new lines to the rest timer and finish screen.
-- And there's a surprise waiting at the very top. 👑
+- Assisted exercises now score the right way round: using less assistance earns the PR and beat-last-time points, not more.
+- Deleting an old plan no longer takes points off your total.
+- Forgot to set a holiday pause before you left? You can now add the dates after you're back, and recent past pauses show in Settings so you can remove them.
+- A newly revealed secret title now waits until the Cutie progress section is open, so you never miss the reveal.
+- Stats and Settings open faster as your history grows.

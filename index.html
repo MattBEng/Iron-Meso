@@ -714,8 +714,15 @@ STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|
    stored data and moves independently. RELEASES[0] must match WHATS-NEW.md —
    the app is one offline file, so the notes are embedded, not fetched.
    TESTS_about.js fails if the two drift apart. */
-const APP_VERSION = "1.7.4";
+const APP_VERSION = "1.7.5";
 const RELEASES = [
+  {v:"1.7.5", date:"2026-11-17", notes:[
+    "Assisted exercises now score the right way round: using less assistance earns the PR and beat-last-time points, not more.",
+    "Deleting an old plan no longer takes points off your total.",
+    "Forgot to set a holiday pause before you left? You can now add the dates after you're back, and recent past pauses show in Settings so you can remove them.",
+    "A newly revealed secret title now waits until the Cutie progress section is open, so you never miss the reveal.",
+    "Stats and Settings open faster as your history grows.",
+  ]},
   {v:"1.7.4", date:"2026-11-17", notes:[
     "Each new title is a little more special now: its colour comes with its own effect, like floating hearts, a neon glow, a rolling wave, bubbles or a rose-gold shine, and its unlock rains its own emojis.",
     "Your title on Home and Stats now has a frame that upgrades from bronze to silver to gold as you climb.",
@@ -939,7 +946,7 @@ class StorageManager{
   }
   /** Debounced autosave (default). Critical moments call flush() directly. */
   save(){
-    HistoryIndex.invalidate();
+    HistoryIndex.invalidate(); _stateRev++;
     this._dirty=true;
     clearTimeout(this._t);
     this._t=setTimeout(()=>this.flush(), 400);
@@ -1005,6 +1012,8 @@ class StorageManager{
 /* ---------------- exercise history index ----------------
    Built lazily on first query after any mutation; avoids
    re-scanning every log for every exercise on every render. */
+/* Bumped by every Store.save(): lets derived data (the Cutie ledger) be cached. */
+let _stateRev=0;
 const HistoryIndex={
   _map:null,
   invalidate(){ this._map=null; },
@@ -2133,6 +2142,8 @@ function mesoMenu(id){
       }
       if(a==="del"){
         if(confirm(`Delete this ${term("meso")}? Logged workouts are kept.`)){
+          // keep each log's planned lift count so Cutie full-workout bonuses survive the delete
+          S().logs.forEach(l=>{ if(l.mesoId===id && !l.skipped && l.planned==null){ const pl=plannedLifts(id, l.dayId); if(pl) l.planned=pl; } });
           S().mesocycles=S().mesocycles.filter(x=>x.id!==id);
           if(S().activeMesoId===id) S().activeMesoId=null;
           if(S().parkedSession?.mesoId===id) S().parkedSession=null;
@@ -4345,6 +4356,7 @@ function finishWorkout(){
         sets:e.sets.filter(x=>x.done)}))
     };
     if(s.bonus){ log.bonus=true; log.bonusOf=s.bonusOf; }
+    else { const pl=plannedLifts(s.mesoId, s.dayId); if(pl) log.planned=pl; }   // for the Cutie full-workout bonus
     if(logged.length) S().logs.push(log);
     if(s.bonus){
       endBonus(); Store.save(); Store.flush();
@@ -4723,7 +4735,24 @@ function isoShift(iso, days){
     (or bonusOf); each cardio entry counts once. Streak: +50 on the first
     scheduled (non-bonus) workout of a Mon-Sun week when the week before also
     had one. Bonus workouts earn base, sets and cardio, not streak. */
+function plannedLifts(mesoId, dayId){
+  const day=mesoById(mesoId)?.days.find(d=>d.id===dayId);
+  return day? day.exercises.filter(x=>!x.cardio && !isCardioEx(x.exerciseId)).length : 0;
+}
+/* The ledger is rebuilt only when the saved state changes (1.7.5): one screen
+   asks for it many times. Keyed on the save counter plus cheap size checks, and
+   on the state object itself so an import or takeover never reuses it. */
+let _cutieCache=null;
 function cutieLedger(){
+  const st=S();
+  const key=[_stateRev, st.logs.length, st.cardio.length, st.mesocycles.length, st.exercises.length,
+    (st.pauses||[]).length, st.cutie?.bonusFrom??""].join("|");
+  if(_cutieCache && _cutieCache.st===st && _cutieCache.key===key) return _cutieCache.val;
+  const val=cutieLedgerBuild();
+  _cutieCache={st, key, val};
+  return val;
+}
+function cutieLedgerBuild(){
   const st=S(), used=new Set();
   const logs=st.logs.filter(l=>!l.skipped).slice()
     .sort((a,b)=>a.date.localeCompare(b.date) || (a.loggedAt||0)-(b.loggedAt||0));
@@ -4758,6 +4787,18 @@ function cutieLedger(){
     const lifts=l.exercises.filter(e=>!isCardioEx(e.exerciseId));
     let prs=0, beats=0;
     lifts.forEach(e=>{
+      if(exById(e.exerciseId)?.assisted){
+        // Assisted lifts run backwards: LESS assistance is the progress. PR = the
+        // lowest assistance yet; beat = less than last time, or the same with more reps.
+        const ws=working(e); if(!ws.length) return;
+        const a=Math.min(...ws.map(x=>x.kg||0)), r=ws.reduce((t,x)=>t+(x.reps||0),0);
+        const b=best[e.exerciseId], lv=lastVol[e.exerciseId];
+        if(b!=null && a<b-1e-9) prs++;
+        best[e.exerciseId]= b==null? a : Math.min(b,a);
+        if(lv!=null && (a<lv.a-1e-9 || (Math.abs(a-lv.a)<1e-9 && r>lv.r))) beats++;
+        lastVol[e.exerciseId]={a, r};
+        return;
+      }
       const top=Math.max(0,...working(e).filter(x=>x.kg>0).map(x=>epley(x.kg,x.reps)));
       if(top>0 && best[e.exerciseId]!=null && top>best[e.exerciseId]+1e-9) prs++;
       if(top>0) best[e.exerciseId]=Math.max(best[e.exerciseId]||0, top);
@@ -4767,9 +4808,11 @@ function cutieLedger(){
     });
     let full=0;
     if(!l.bonus){
-      const day=mesoById(l.mesoId)?.days.find(d=>d.id===l.dayId);
-      const slots=day? day.exercises.filter(x=>!x.cardio && !isCardioEx(x.exerciseId)) : [];
-      if(slots.length && lifts.length>=slots.length && lifts.every(e=>working(e).length>=(e.target?.sets||0)))
+      // planned lift count: stamped on the log at finish (and when its meso is
+      // deleted), else read from the meso day. Without the stamp, deleting an old
+      // meso took this bonus away from every workout in it.
+      const planned=l.planned ?? plannedLifts(l.mesoId, l.dayId);
+      if(planned && lifts.length>=planned && lifts.every(e=>working(e).length>=(e.target?.sets||0)))
         full=CUTIE_BONUS.full;
     }
     const gap=prevDate? Math.round((new Date(l.date+"T12:00")-new Date(prevDate+"T12:00"))/864e5) : 0;
@@ -5118,10 +5161,11 @@ function unpausedGap(a, b){
   return n;
 }
 function pauseCardHTML(){
-  const t=todayISO(), list=(S().pauses||[]).filter(p=>p.to>=t).sort((a,b)=>a.from.localeCompare(b.from));
+  // upcoming, current, and the last 90 days of past ones (a pause can be added after the trip)
+  const t=todayISO(), list=(S().pauses||[]).filter(p=>p.to>=isoShift(t,-90)).sort((a,b)=>a.from.localeCompare(b.from));
   return `<div class="card"><h3>Holiday pause</h3>
-    <p class="faint" style="margin:4px 0 10px">Going away? Pause these dates so the break doesn't reset your streak.</p>
-    ${list.map(p=>`<div class="row split" style="margin-bottom:6px"><span class="num">🏝️ ${fmtDate(p.from)} – ${fmtDate(p.to)}${t>=p.from?" · on now":""}</span>
+    <p class="faint" style="margin:4px 0 10px">Going away? Pause these dates so the break doesn't reset your streak. Forgot to set it? Add the dates after you're back.</p>
+    ${list.map(p=>`<div class="row split" style="margin-bottom:6px"><span class="num">🏝️ ${fmtDate(p.from)} – ${fmtDate(p.to)}${t>p.to?" · past":t>=p.from?" · on now":""}</span>
       <button class="iconbtn" data-a="delpause" data-id="${p.id}" aria-label="Remove pause">✕</button></div>`).join("")}
     <div class="row" style="gap:8px"><div style="flex:1;min-width:0"><label>From</label><input type="date" id="pfrom" value="${t}" style="width:100%;min-width:0"></div>
       <div style="flex:1;min-width:0"><label>To</label><input type="date" id="pto" style="width:100%;min-width:0"></div></div>
@@ -5135,11 +5179,12 @@ function cutiePace(){
   const pts=[...L.workouts, ...L.extraCardio].filter(x=>x.date>=from).reduce((t,x)=>t+x.total,0);
   return Math.round(pts/8);
 }
-function cutieJourneyHTML(){
+function cutieJourneyHTML(freshList){
   const T=cutieTotals(), c=cutieState(), lv=cutieLevel(T.total), pace=cutiePace(), vis=cutieVisibleMax();
-  const fresh=new Set(cutieRevealCheck());
+  // a reveal is only spent while the section is open, so she actually sees it
+  const fresh=new Set(freshList || (statsClosed().includes("cutie")? [] : cutieRevealCheck()));
   const secret=CUTIE_TITLES.length-1-vis;
-  return `<div class="card cutie-card"><div class="kicker" style="color:var(--cutie)">Title progression</div>
+  return `<div class="card cutie-card" id="cjourney"><div class="kicker" style="color:var(--cutie)">Title progression</div>
     <div class="cutie-journey">${CUTIE_TITLES.map((t,k)=>{
       const date=c.titles[k], cur=k===lv.i, next=k===lv.i+1;
       const reached=!!date || k<=lv.i;
@@ -5956,6 +6001,10 @@ VIEWS.analytics=function(){
     if(d.open && i>=0) list.splice(i,1);
     if(!d.open && i<0) list.push(id);
     Store.save();
+    if(d.open && id==="cutie"){                       // reveal held back while it was closed
+      const f=cutieRevealCheck(), el=$("#cjourney");
+      if(f.length && el) el.outerHTML=cutieJourneyHTML(f);
+    }
     if(d.open) drawOpen();
   }));
   // Scope dropdown — re-render Stats for the selected slice of history.
@@ -6097,7 +6146,6 @@ VIEWS.settings=function(){
       const f=$("#pfrom").value, t=$("#pto").value;
       if(!f || !t){ toast("Pick both dates"); return; }
       if(t<f){ toast("The end date is before the start"); return; }
-      if(t<todayISO()){ toast("That pause is already over"); return; }
       if(Math.round((new Date(t+"T12:00")-new Date(f+"T12:00"))/864e5)>90){ toast("A pause can be up to 90 days"); return; }
       (S().pauses ??= []).push({id:uid(), from:f, to:t}); Store.save();
       toast(FUN()?"Holiday pause set 🏝️":"Pause set"); go("settings"); return;
