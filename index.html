@@ -419,6 +419,43 @@ body[data-fun="1"][data-scheme="goddess"] .cutie-card{background:linear-gradient
 .cj-row.cur{background:rgba(224,85,156,.10);border-radius:10px}
 .cj-dot{width:12px;height:12px;border-radius:50%;border:2px solid var(--cutie);flex:0 0 auto}
 .cj-row.on .cj-dot{background:var(--cutie)}
+.cutie-card{position:relative;overflow:hidden}
+.cutie-card>*:not(.cfx){position:relative;z-index:1}
+.cfx{position:absolute;inset:0;pointer-events:none;z-index:0;display:none}
+.cfx span{position:absolute;bottom:-24px;font-size:16px;animation:cfxup 6s linear infinite;opacity:0}
+.cfx span:nth-child(1){left:8%;animation-delay:0s}.cfx span:nth-child(2){left:30%;animation-delay:1.3s;font-size:12px}
+.cfx span:nth-child(3){left:52%;animation-delay:2.6s}.cfx span:nth-child(4){left:74%;animation-delay:3.7s;font-size:13px}
+.cfx span:nth-child(5){left:90%;animation-delay:4.8s}
+@keyframes cfxup{0%{transform:translateY(0);opacity:0}10%{opacity:.8}100%{transform:translateY(-320px);opacity:0}}
+body[data-fun="1"]:is([data-scheme="lavender"],[data-scheme="bubblegum"]) .cfx{display:block}
+body[data-fun="1"][data-scheme="lavender"] .cfx span::before{content:"💜"}
+body[data-fun="1"][data-scheme="bubblegum"] .cfx span{width:14px;height:14px;border-radius:50%;border:2px solid #7AD7FF;background:rgba(122,215,255,.12)}
+body[data-fun="1"][data-scheme="bubblegum"] .cfx span:nth-child(odd){border-color:#FF85C2;width:20px;height:20px}
+body[data-fun="1"][data-scheme="ocean"] .cfx{display:block}
+body[data-fun="1"][data-scheme="ocean"] .cfx::after{content:"";position:absolute;left:0;right:0;bottom:0;height:22px;opacity:.35;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='22'%3E%3Cpath d='M0 12 Q25 2 50 12 T100 12 V22 H0Z' fill='%2338D3F5'/%3E%3C/svg%3E") repeat-x;
+  background-size:100px 22px;animation:cfxwave 6s linear infinite}
+@keyframes cfxwave{from{background-position:0 0}to{background-position:-100px 0}}
+body[data-fun="1"][data-scheme="midnight"] .cutie-card{animation:cfxneon 2.4s ease-in-out infinite}
+@keyframes cfxneon{0%,100%{box-shadow:0 0 0 1px rgba(255,46,147,.5)}50%{box-shadow:0 0 0 2px #FF2E93,0 0 18px rgba(255,46,147,.55)}}
+body[data-fun="1"][data-scheme="angel"] .cutie-title::before{content:"";display:inline-block;width:16px;height:6px;margin-right:6px;border:2px solid #E8C35A;border-radius:50%;vertical-align:4px;animation:cfxbob 2.4s ease-in-out infinite}
+@keyframes cfxbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+body[data-fun="1"][data-scheme="rosegold"] :is(.cutie-total,.cutie-pill){background-image:linear-gradient(100deg,var(--cutie) 30%,#fff 50%,var(--cutie) 70%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent !important;animation:cfxsheen 3.2s linear infinite}
+body[data-fun="1"][data-scheme="rosegold"] .cutie-pill{background-color:rgba(232,174,158,.15)}
+@keyframes cfxsheen{from{background-position:150% 0}to{background-position:-50% 0}}
+body[data-fun="1"][data-scheme="goddess"] .cutie-title::after{content:" 👑"}
+.cutie-title{display:inline-block}
+.cutie-title.frame-bronze,.cutie-title.frame-silver,.cutie-title.frame-gold{padding:3px 10px;border-radius:999px;border:1.5px solid}
+.cutie-title.frame-bronze{border-color:#CD7F32;background:rgba(205,127,50,.12)}
+.cutie-title.frame-silver{border-color:#C9CDD2;background:rgba(201,205,210,.14)}
+.cutie-title.frame-gold{border-color:#D4AF37;background:linear-gradient(100deg,rgba(212,175,55,.10) 30%,rgba(255,236,170,.35) 50%,rgba(212,175,55,.10) 70%);background-size:200% 100%;animation:cfxsheen 4s linear infinite}
+.goddess-pts{color:#D9AE3F !important}
+.goddess-crown{display:inline-block;font-size:.8em;animation:cfxbob 2.6s ease-in-out infinite}
+.cj-reveal{animation:cjrev 1.6s ease both}
+.cj-reveal .cj-dot{animation:cfxshake .9s ease-in-out 2}
+@keyframes cjrev{0%{opacity:0;filter:blur(6px);transform:scale(.92)}50%{opacity:1;filter:blur(0);transform:scale(1.03)}100%{transform:scale(1)}}
+@keyframes cfxshake{0%,100%{transform:rotate(0)}25%{transform:rotate(-14deg)}50%{transform:rotate(12deg)}75%{transform:rotate(-6deg)}}
+@media (prefers-reduced-motion: reduce){.cfx,.cutie-card,.cutie-title,.cutie-total,.cutie-pill,.goddess-crown,.cj-reveal,.cj-reveal .cj-dot{animation:none !important}.cfx{display:none !important}}
 body[data-fun="1"][data-scheme="cherry"][data-theme="light"]{
   --bg:#FFF4F5; --surface:#FFFFFF; --raised:#FFF9FA; --line:#F9D6DC;
   --accent:#E11D48; --accent-soft:rgba(225,29,72,.13);
@@ -677,8 +714,14 @@ STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|
    stored data and moves independently. RELEASES[0] must match WHATS-NEW.md —
    the app is one offline file, so the notes are embedded, not fetched.
    TESTS_about.js fails if the two drift apart. */
-const APP_VERSION = "1.7.3";
+const APP_VERSION = "1.7.4";
 const RELEASES = [
+  {v:"1.7.4", date:"2026-11-17", notes:[
+    "Each new title is a little more special now: its colour comes with its own effect, like floating hearts, a neon glow, a rolling wave, bubbles or a rose-gold shine, and its unlock rains its own emojis.",
+    "Your title on Home and Stats now has a frame that upgrades from bronze to silver to gold as you climb.",
+    "When a secret title comes into view, it's revealed on Stats with a little shake. Each title also brings its own new lines to the rest timer and finish screen.",
+    "And there's a surprise waiting at the very top. 👑",
+  ]},
   {v:"1.7.3", date:"2026-11-17", notes:[
     "Titles now come one step at a time: each one takes a little longer than the last, and only your next three are shown. The rest are secret until you get closer.",
     "Every new title unlocks a colour. Three new ones join the set: Cherry Bomb, Lavender Haze and Ocean Babe.",
@@ -1199,7 +1242,7 @@ function funFact(totalKg){
   const pick=opts[Math.floor(Math.random()*opts.length)];
   return `You lifted <b class="num">${Math.round(totalKg).toLocaleString()} kg</b> today — that's like <b class="num">${Math.round(pick.count)}</b> ${pick.n} ${pick.em}`;
 }
-function cheerLine(){ return FUN_CHEERS[Math.floor(Math.random()*FUN_CHEERS.length)]; }
+function cheerLine(){ return cutieLine(FUN_CHEERS[Math.floor(Math.random()*FUN_CHEERS.length)]); }
 /** Post-workout celebration (Fun mode): fact + cheer, then home. */
 function celebrate(log){
   const tot=log.exercises.reduce((t,e)=>t+e.sets.reduce((a,x)=>a+x.kg*x.reps,0),0);
@@ -1849,7 +1892,7 @@ VIEWS.home=function(){
       ${lastLog.notes? `<p class="muted" style="margin:8px 0 0">“${esc(lastLog.notes)}”</p>`:""}
     </div>`:"";
   $("#view").innerHTML=`
-    <div class="topbar"><div><div class="brand">LIFT <em>DADDY</em></div>
+    <div class="topbar"><div><div class="brand">LIFT <em>DADDY</em>${cutieCrownHTML()}</div>
       <div class="top-sub num">${new Date().toLocaleDateString(undefined,{weekday:"long", day:"numeric", month:"long"})}</div></div>
       <span class="pill acc num">${activePause()?"🏝️ ":(FUN()?"🔥 ":"")}${streakCount()}-workout streak${activePause()?" · paused":""}</span></div>
     ${(!st.profile?.setupDismissed && !st.profile?.age)? `<div class="card" style="border-color:var(--accent)">
@@ -4109,7 +4152,7 @@ const REST_OVER_MSGS=[
  "Rest over — your muscles called, they want more 📞",
  "Up you get — cute is temporary, strong is forever 💪",
  "Rest's up — go be the moment, babe ✨"];
-function restOverMsg(){ return REST_OVER_MSGS[Math.floor(Math.random()*REST_OVER_MSGS.length)]; }
+function restOverMsg(){ return cutieLine(REST_OVER_MSGS[Math.floor(Math.random()*REST_OVER_MSGS.length)]); }
 function restAlert(){
   // Vibration only — no audio, ever. (Works in foreground on Android.)
   if(!S().settings.restBuzz) return;
@@ -4664,7 +4707,11 @@ const CUTIE_BONUS={pr:50, prMax:3, full:30, beat:10, beatMax:50, comeback:75, co
 const CUTIE_THRESHOLDS=[0,2000,5000,7800,9500,11700,14400,17700,21600,26000];
 /** Only the next few titles are shown; the rest stay secret until she's closer. */
 const CUTIE_REVEAL=3;
-function cutieVisibleMax(){
+function cutieVisibleMax(realOnly){
+  if(realOnly){
+    const rec=Math.max(0, ...Object.keys(cutieState().titles).map(Number));
+    return Math.min(CUTIE_TITLES.length-1, Math.max(rec, cutieLevel(cutieTotals().real).i)+CUTIE_REVEAL);
+  }
   return Math.min(CUTIE_TITLES.length-1, Math.max(cutieUnlockedIdx(), cutieLevel(cutieTotals().total).i)+CUTIE_REVEAL);
 }
 function isoShift(iso, days){
@@ -4832,9 +4879,10 @@ function cutieTopHTML(top, mBest){
 function cutieHomeHTML(){
   if(!cutieOn()) return "";
   const T=cutieTotals(); if(!T.count) return "";
-  return `<div class="card cutie-card">
-    <div class="row split"><button class="kicker cutie-link" data-cutie="titles" style="color:var(--cutie)">${esc(cutieTitle(T.total))} ›</button>
-      <button class="pill num cutie-pill" data-cutie="breakdown">💖 ${T.total.toLocaleString()} pts</button></div>
+  const lvH=cutieLevel(T.total);
+  return `<div class="card cutie-card">${CUTIE_FX}
+    <div class="row split"><button class="kicker cutie-link cutie-title frame-${cutieFrame(lvH.i)}" data-cutie="titles" style="color:var(--cutie)">${esc(lvH.title)} ›</button>
+      <button class="pill num cutie-pill ${goddessReached()?"goddess-pts":""}" data-cutie="breakdown">💖 ${T.total.toLocaleString()} pts</button></div>
     ${cutieProgressHTML(T.total)}
     ${cutieTopHTML(cutieTop(3, T.ledger.workouts), null)}</div>`;
 }
@@ -4942,13 +4990,14 @@ function cutieTitlesModal(){
 }
 /* ---------- hearts and emoji shower: title unlocks only ---------- */
 const CUTIE_RAIN=["💖","💕","💗","💘","😍","🥳","😮‍💨","🤤","🥵","✨"];
-function emojiRain(){
+function emojiRain(set){
+  const pool=(set&&set.length)? set : CUTIE_RAIN;
   try{
     if(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const box=document.createElement("div"); box.className="emoji-rain"; box.setAttribute("aria-hidden","true");
     for(let i=0;i<46;i++){
       const s=document.createElement("span");
-      s.textContent=CUTIE_RAIN[Math.floor(Math.random()*CUTIE_RAIN.length)];
+      s.textContent=pool[Math.floor(Math.random()*pool.length)];
       s.style.left=(Math.random()*96)+"%";
       s.style.fontSize=(22+Math.random()*22)+"px";
       s.style.animationDuration=(2.6+Math.random()*2)+"s";
@@ -4963,7 +5012,8 @@ function emojiRain(){
     dev:true so nothing is recorded. */
 function titleUnlockModal(k, then){
   const sc=CUTIE_SCHEMES.find(s=>s.at===k);
-  emojiRain();
+  emojiRain(CUTIE_RAIN_BY_TITLE[k]);
+  const tease=k+CUTIE_REVEAL<=CUTIE_TITLES.length-1;
   modal(`<div class="title-unlock">
     <div class="tu-kicker">New title unlocked</div>
     <div class="tu-emoji">👑</div>
@@ -4972,6 +5022,7 @@ function titleUnlockModal(k, then){
     ${sc?`<div class="tu-scheme"><span class="scheme-dot" style="background:${sc.swatch}"></span>
       <div style="flex:1;text-align:left"><b>New colour unlocked</b><div class="faint" style="font-size:13px">${esc(sc.name)} · ${esc(sc.hint)}</div></div>
       <button class="btn btn-ghost btn-sm" data-try="${sc.id}">Try it</button></div>`:""}
+    ${tease?`<p class="faint" style="margin:12px 0 0">A new secret title is waiting on Stats 👀</p>`:""}
     <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>Obsessed 😍</button></div>`, m=>{
     m.onclick=e=>{
       const t=e.target.closest("[data-try]");
@@ -4983,7 +5034,9 @@ function titleUnlockModal(k, then){
 /** Show unlocks one after another (rare: several titles at once after an edit). */
 function titleUnlockChain(list, done){
   if(!list.length){ if(done) done(); return; }
-  titleUnlockModal(list[0], ()=>titleUnlockChain(list.slice(1), done));
+  const k=list[0], next=()=>titleUnlockChain(list.slice(1), done);
+  if(k===CUTIE_TITLES.length-1 && !cutieState().finaleShown) goddessFinale(next);   // the once-only finale
+  else titleUnlockModal(k, next);
 }
 /* ---------- badges (1.7.0) ----------
    One-off achievements, 50 points each. Earned dates are saved in
@@ -5084,6 +5137,7 @@ function cutiePace(){
 }
 function cutieJourneyHTML(){
   const T=cutieTotals(), c=cutieState(), lv=cutieLevel(T.total), pace=cutiePace(), vis=cutieVisibleMax();
+  const fresh=new Set(cutieRevealCheck());
   const secret=CUTIE_TITLES.length-1-vis;
   return `<div class="card cutie-card"><div class="kicker" style="color:var(--cutie)">Title progression</div>
     <div class="cutie-journey">${CUTIE_TITLES.map((t,k)=>{
@@ -5091,8 +5145,8 @@ function cutieJourneyHTML(){
       const reached=!!date || k<=lv.i;
       const left=CUTIE_THRESHOLDS[k]-T.total;
       if(k>vis) return "";
-      return `<div class="cj-row ${reached?"on":""} ${cur?"cur":""}"><span class="cj-dot"></span>
-        <div style="flex:1"><b>${esc(t)}</b>${cur?` <span class="pill" style="font-size:11px">now</span>`:""}
+      return `<div class="cj-row ${reached?"on":""} ${cur?"cur":""} ${fresh.has(k)?"cj-reveal":""}"><span class="cj-dot"></span>
+        <div style="flex:1"><b>${esc(t)}</b>${cur?` <span class="pill" style="font-size:11px">now</span>`:""}${fresh.has(k)?` <span class="pill" style="font-size:11px;color:var(--cutie)">new 👀</span>`:""}
           <div class="faint num" style="font-size:12px">${reached? (date?`Reached ${fmtDate(date)}`:"Reached") : `${left.toLocaleString()} points to go`}</div></div>
         <span class="faint num" style="font-size:12px">${CUTIE_THRESHOLDS[k].toLocaleString()}</span></div>`; }).join("")}
       ${secret>0?`<div class="cj-secret"><span>🔒</span><span>${secret} secret title${secret>1?"s":""} still to discover. Keep going to reveal ${secret>1?"them":"it"} 💕</span></div>`:""}</div>
@@ -5124,6 +5178,76 @@ function cutieMetricsHTML(){
       ${tile(sum("cardioMin")+T.ledger.extraCardio.reduce((t,c)=>t+c.cardioMin,0),"cardio minutes")}
     </div>
     <p class="faint" style="margin:8px 0 0;font-size:12px">Bonus counts start from 1.7.0. Tap your total above for where every point came from.</p></div>`;
+}
+/* ---------- special unlocks (1.7.4) ---------- */
+/** Each title's own unlock shower (default CUTIE_RAIN otherwise). */
+const CUTIE_RAIN_BY_TITLE={
+  3:["💜","💗","💕","💜","✨"],
+  4:["⭐","✨","😇","🌟","💛"],
+  5:["💋","🖤","💅","🔥","😈"],
+  6:["🌊","🐚","🐬","💙","✨"],
+  7:["🩷","🩵","🍬","💥","💗"],
+  8:["🌹","💐","💖","✨","🥀"],
+  9:["👑","✨","💛","🏆","👑"],
+};
+/** Frame on her title: bronze from Hot Mumma, silver from Iron Angel, gold from Certified Powerpuff. */
+function cutieFrame(i){ return i>=7? "gold" : i>=4? "silver" : i>=1? "bronze" : ""; }
+function goddessReached(){ return cutieUnlockedIdx()>=CUTIE_TITLES.length-1; }
+function cutieCrownHTML(){ return (cutieOn() && goddessReached())? ` <span class="goddess-crown" aria-label="Glute Goddess">👑</span>` : ""; }
+/** Animated effect layer for the points cards (shown by the unlocked scheme's CSS). */
+const CUTIE_FX=`<div class="cfx" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>`;
+/** Lines tied to titles (MESSAGES.txt [TITLE LINES], "Title | line"). Unlocked
+    titles' lines are mixed into rest-over and finish-screen messages. */
+function titleLinesUnlocked(){
+  const top=cutieUnlockedIdx(), names=new Set(CUTIE_TITLES.slice(0, top+1));
+  return (TITLE_LINES||[]).map(l=>{ const i=l.indexOf("|"); return i<0? null : {t:l.slice(0,i).trim(), m:l.slice(i+1).trim()}; })
+    .filter(x=>x && x.m && names.has(x.t)).map(x=>x.m);
+}
+function cutieLine(base){
+  if(!cutieOn()) return base;
+  const L=titleLinesUnlocked();
+  return (L.length && Math.random()<0.4)? L[Math.floor(Math.random()*L.length)] : base;
+}
+/** Secret reveal: titles that came into view (next 3) since she last looked.
+    Uses REAL progress only, so dev mode never spends a reveal. */
+let _devReveal=false;
+function cutieRevealCheck(){
+  const c=cutieState(), vis=cutieVisibleMax(true);
+  if(c.revealed==null){ c.revealed=vis; Store.save(); return []; }
+  if(_devReveal){ _devReveal=false; return [cutieVisibleMax()]; }
+  if(vis<=c.revealed) return [];
+  const fresh=[]; for(let k=c.revealed+1;k<=vis;k++) fresh.push(k);
+  c.revealed=vis; Store.save();
+  setTimeout(()=>toast(`New title revealed 👀 ${CUTIE_TITLES[fresh[fresh.length-1]]}`), 600);
+  return fresh;
+}
+/** The finale: once, the first time Glute Goddess is reached. */
+function goddessFinale(then, dev){
+  const c=cutieState(), T=cutieTotals(), W=T.ledger.workouts;
+  const first=W.length? W[0].date : todayISO();
+  const days=Math.max(1, Math.round((new Date(todayISO()+"T12:00")-new Date(first+"T12:00"))/864e5));
+  if(!dev){ c.finaleShown=todayISO(); Store.save(); }
+  emojiRain(CUTIE_RAIN_BY_TITLE[9]); confetti();
+  const sc=CUTIE_SCHEMES.find(s=>s.at===CUTIE_TITLES.length-1);
+  const tile=(v,l)=>`<div><div class="tot-n num" style="color:#D9AE3F">${v}</div><div class="faint">${l}</div></div>`;
+  modal(`<div class="title-unlock goddess-finale">
+    <div class="tu-kicker" style="color:#D9AE3F">The top of the ladder</div>
+    <div class="tu-emoji" style="font-size:64px">👑</div>
+    <h2 class="tu-name" style="color:#D9AE3F;font-size:34px">Glute Goddess</h2>
+    <p style="margin:8px 0 0">You made it. Every set, every early start, every PR got you here.</p>
+    <div class="tot-grid" style="margin-top:14px">${tile(W.length.toLocaleString(),"workouts")}${tile(days.toLocaleString(),"days")}${
+      tile(Object.keys(c.badges||{}).length+"/"+BADGE_DEFS.length,"badges")}</div>
+    <p class="muted" style="margin:12px 0 0">The crown stays on your Home screen for good, and your points turn gold.</p>
+    ${sc?`<div class="tu-scheme"><span class="scheme-dot" style="background:${sc.swatch}"></span>
+      <div style="flex:1;text-align:left"><b>${esc(sc.name)} unlocked</b><div class="faint" style="font-size:13px">${esc(sc.hint)}</div></div>
+      <button class="btn btn-ghost btn-sm" data-try="${sc.id}">Try it</button></div>`:""}
+    <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>I'm iconic 👑</button></div>`, m=>{
+    m.onclick=e=>{
+      const t=e.target.closest("[data-try]");
+      if(t){ S().settings.funScheme=t.dataset.try; Store.save(); applyTheme(); toast(`${sc.name} on ✨`); return; }
+      if(e.target.closest("[data-ok]")){ closeModal(); if(then) then(); }
+    };
+  });
 }
 /* ---------- confetti (no library, offline) ---------- */
 function confetti(){
@@ -5187,7 +5311,7 @@ function devPanelHTML(){
       ${b("setpts","Set")}${b("add1000","+1,000")}${b("unlock","Unlock all")}${b("lock","Real points")}</div>
     <div class="kicker" style="margin-top:12px">Fire a celebration</div>
     <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">
-      ${b("title","Title unlock")}${b("badge","Badge")}${b("confetti","Confetti")}${b("best","New best")}${b("week","Weekly best")}${b("finish","Finish screen")}</div>
+      ${b("title","Title unlock")}${b("finale","Goddess finale")}${b("reveal","Secret reveal")}${b("badge","Badge")}${b("confetti","Confetti")}${b("best","New best")}${b("week","Weekly best")}${b("finish","Finish screen")}</div>
     <button class="btn btn-danger btn-block" style="margin-top:12px" data-dev="reset">Reset all dev overrides</button></div>`;
 }
 function devFake(){ return {name:"Test workout", date:todayISO(), base:100, sets:9, setPts:90, cardioMin:10, cardioPts:30, streak:50,
@@ -5219,10 +5343,58 @@ document.addEventListener("click", e=>{
   if(k==="reset"){ DEV={on:true}; toast("Dev overrides cleared"); }
   if(["confetti","best","week","finish"].includes(k)){ devFire(k); return; }
   if(k==="badge"){ badgeModal(["ton","early"]); return; }
+  if(k==="finale"){ goddessFinale(null, true); return; }
+  if(k==="reveal"){ _devReveal=true; go("analytics"); setTimeout(()=>toast("Scroll to Title progression to see the reveal"),300); return; }
   if(k==="title"){ const n=Math.min(CUTIE_TITLES.length-1, cutieLevel(cutieTotals().total).i+1); titleUnlockModal(n); return; }
   devSave(); devSchemeCheck(); go("settings");
 });
 function cutieMsg(){ return CUTIE_MSGS[Math.floor(Math.random()*CUTIE_MSGS.length)]; }
+const TITLE_LINES=[
+ "Hot Mumma | Hot Mumma energy only 🔥",
+ "Hot Mumma | Mums who lift hit different 💪",
+ "Hot Mumma | School run done, squats done. Hot Mumma 😮‍💨",
+ "Hot Mumma | That's a Hot Mumma rep if I've ever seen one",
+ "Hot Mumma | Coffee in one hand, PRs in the other ☕",
+ "Fit Queen | The Fit Queen has entered the building 👑",
+ "Fit Queen | Queens don't skip, they slay 💅",
+ "Fit Queen | Crown on, reps in 👑",
+ "Fit Queen | Fit Queen behaviour, as usual",
+ "Fit Queen | Bow down, the queen is lifting",
+ "Strong Sweetheart | Sweet as pie, strong as steel 💜",
+ "Strong Sweetheart | Strong Sweetheart reporting for reps",
+ "Strong Sweetheart | Soft heart, hard sets 💗",
+ "Strong Sweetheart | Cute AND strong? Should be illegal 🚨",
+ "Strong Sweetheart | Sweetheart by name, savage by sets",
+ "Iron Angel | Heaven sent, iron bent 😇",
+ "Iron Angel | Even angels need leg day ✨",
+ "Iron Angel | Halo on, weights up",
+ "Iron Angel | Angelic form, devilish reps 😈",
+ "Iron Angel | An Iron Angel never rests for long",
+ "Barbell Baddie | Baddie on the bar 💋",
+ "Barbell Baddie | Barbell Baddie doesn't do easy",
+ "Barbell Baddie | Too hot for the cardio section 🔥",
+ "Barbell Baddie | Main character, main lifts 🖤",
+ "Barbell Baddie | Rack it like a baddie 💅",
+ "Snack with Muscles | Snack? You're a full meal 😮‍💨",
+ "Snack with Muscles | Snack with muscles, serving gains",
+ "Snack with Muscles | Protein in, snack out 🥤",
+ "Snack with Muscles | Someone call the gym, a snack's on the loose 🚨",
+ "Snack with Muscles | Muscles: check. Snack: double check 😏",
+ "Certified Powerpuff | Small but mighty, mighty, mighty 💥",
+ "Certified Powerpuff | Powerpuff mode: on",
+ "Certified Powerpuff | Saving the day one set at a time 🦸‍♀️",
+ "Certified Powerpuff | Certified. Powerful. Unstoppable. 💪",
+ "Certified Powerpuff | Powerpuff punch, every single set 👊",
+ "Dumbbell Darling | Darling, those dumbbells don't stand a chance 💖",
+ "Dumbbell Darling | Dumbbell Darling, dangerously good",
+ "Dumbbell Darling | Pick them up, put them down, look fabulous",
+ "Dumbbell Darling | Darling, you're glowing (it's the sweat) ✨",
+ "Dumbbell Darling | Every darling needs her dumbbells",
+ "Glute Goddess | All hail the Glute Goddess 👑",
+ "Glute Goddess | Goddess status: permanent",
+ "Glute Goddess | Mere mortals could never 🍑",
+ "Glute Goddess | The glutes have spoken",
+ "Glute Goddess | Worship the grind, Goddess"];
 const BADGE_NAMES=[
  "First Step",
  "Ten Down",
@@ -5340,10 +5512,10 @@ function cutieCardHTML(){
   if(!cutieOn()) return "";
   const T=cutieTotals(), lv=cutieLevel(T.total), meso=activeMeso();
   const mBest=meso? cutieTop(1, T.ledger.workouts.filter(w=>w.mesoId===meso.id))[0] : null;
-  return `<div class="card cutie-card" style="margin-bottom:14px">
-    <div class="row split"><button class="kicker cutie-link" data-cutie="titles" style="color:var(--cutie)">${esc(lv.title)} points ›</button>
+  return `<div class="card cutie-card" style="margin-bottom:14px">${CUTIE_FX}
+    <div class="row split"><button class="kicker cutie-link cutie-title frame-${cutieFrame(lv.i)}" data-cutie="titles" style="color:var(--cutie)">${esc(lv.title)} points ›</button>
       <span class="pill" style="background:rgba(224,85,156,.15);color:var(--cutie)">💖${devPoints()!=null?" DEV":""}</span></div>
-    <button class="cutie-total num" data-cutie="breakdown" aria-label="Points breakdown">${T.total.toLocaleString()}</button>
+    <button class="cutie-total num ${goddessReached()?"goddess-pts":""}" data-cutie="breakdown" aria-label="Points breakdown">${T.total.toLocaleString()}</button>
     ${cutieProgressHTML(T.total)}
     <div style="margin-top:4px;font-weight:600">${cutieMsg()}</div>
     ${cutiePeriodsHTML()}

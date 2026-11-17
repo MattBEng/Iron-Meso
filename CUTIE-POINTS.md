@@ -95,6 +95,26 @@ by zone) and Body. It adds a "Cutie progress" section:
 
 Everyone else sees the original Stats page.
 
+## Special unlocks (1.7.4)
+
+- **Scheme effects** (only while that colour is on, Cutie on, motion allowed): Lavender Haze hearts float up
+  the points cards; Angel Glow halo over her title (plus the gold sparkle); Midnight Baddie neon pulse round
+  the card; Ocean Babe wave along the bottom; Bubblegum Pop bubbles; Rose Gold metallic sheen on her points;
+  Goddess crown after her title (plus the shimmer). Cherry Bomb and Mint Mojito are plain colours.
+- **Unlock showers** per title (`CUTIE_RAIN_BY_TITLE`): lavender hearts, gold stars, kisses and fire, ocean,
+  sweets, roses, crowns. Titles 1 and 2 use the original mix. The unlock popup also says a new secret title
+  is waiting on Stats when one comes into view.
+- **Frame** on her title (Home and Stats): bronze Hot Mumma to Strong Sweetheart, silver Iron Angel to Snack
+  with Muscles, gold from Certified Powerpuff.
+- **Secret reveal**: `S().cutie.revealed` keeps how far she has seen. A title entering the next-3 window
+  animates once on Stats with "new 👀" and a toast. First look after 1.7.4 records silently. Real progress
+  only; dev mode has its own Secret reveal button that spends nothing.
+- **Title lines**: `MESSAGES.txt` `[TITLE LINES]`, `Title | line`, 5 per title. Once she has a title, its
+  lines join the rest-over and finish-screen messages (about 2 in 5).
+- **Glute Goddess finale**: the first time she reaches it, a one-off screen with a crown shower, confetti,
+  her workouts, days and badges, and the Goddess colour (`S().cutie.finaleShown`). After that: a crown next
+  to LIFT DADDY on Home for good, and her points turn gold. Dev mode has a Goddess finale button.
+
 ## Celebrations
 
 - **New all-time best**: banner plus confetti. Never on the first ever workout.
@@ -199,4 +219,4 @@ workouts (bonus workouts count toward the plan they were done in).
 
 ## Tests
 
-`TESTS_cutie.js` (1.5.0), `TESTS_cutie16.js` (1.6.0), `TESTS_cutie17.js` (1.7.0), `TESTS_cutiestats.js` (1.7.1).
+`TESTS_cutie.js` (1.5.0), `TESTS_cutie16.js` (1.6.0), `TESTS_cutie17.js` (1.7.0), `TESTS_cutiestats.js` (1.7.1), `TESTS_cutie174.js` (1.7.4).

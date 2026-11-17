@@ -22,6 +22,7 @@ const SECTIONS={
   "CUTIE STATS MESSAGES":           "CUTIE_MSGS",
   "CUTIE FOOTERS":                  "CUTIE_FOOTERS",
   "BADGE NAMES":                    "BADGE_NAMES",
+  "TITLE LINES":                    "TITLE_LINES",
 };
 
 function parse(){

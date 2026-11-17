@@ -361,3 +361,62 @@ Cardio Cutie
 Early Bird
 Bonus Babe
 Glow Up
+
+[TITLE LINES]
+# Extra rest-over and finish-screen lines for the Cutie layer. Format:  Title | line
+# The title must match a name in [CUTIE LEVEL TITLES]. A title's lines join the mix
+# once she has reached that title (about 2 in 5 messages come from these).
+
+Hot Mumma | Hot Mumma energy only 🔥
+Hot Mumma | Mums who lift hit different 💪
+Hot Mumma | School run done, squats done. Hot Mumma 😮‍💨
+Hot Mumma | That's a Hot Mumma rep if I've ever seen one
+Hot Mumma | Coffee in one hand, PRs in the other ☕
+
+Fit Queen | The Fit Queen has entered the building 👑
+Fit Queen | Queens don't skip, they slay 💅
+Fit Queen | Crown on, reps in 👑
+Fit Queen | Fit Queen behaviour, as usual
+Fit Queen | Bow down, the queen is lifting
+
+Strong Sweetheart | Sweet as pie, strong as steel 💜
+Strong Sweetheart | Strong Sweetheart reporting for reps
+Strong Sweetheart | Soft heart, hard sets 💗
+Strong Sweetheart | Cute AND strong? Should be illegal 🚨
+Strong Sweetheart | Sweetheart by name, savage by sets
+
+Iron Angel | Heaven sent, iron bent 😇
+Iron Angel | Even angels need leg day ✨
+Iron Angel | Halo on, weights up
+Iron Angel | Angelic form, devilish reps 😈
+Iron Angel | An Iron Angel never rests for long
+
+Barbell Baddie | Baddie on the bar 💋
+Barbell Baddie | Barbell Baddie doesn't do easy
+Barbell Baddie | Too hot for the cardio section 🔥
+Barbell Baddie | Main character, main lifts 🖤
+Barbell Baddie | Rack it like a baddie 💅
+
+Snack with Muscles | Snack? You're a full meal 😮‍💨
+Snack with Muscles | Snack with muscles, serving gains
+Snack with Muscles | Protein in, snack out 🥤
+Snack with Muscles | Someone call the gym, a snack's on the loose 🚨
+Snack with Muscles | Muscles: check. Snack: double check 😏
+
+Certified Powerpuff | Small but mighty, mighty, mighty 💥
+Certified Powerpuff | Powerpuff mode: on
+Certified Powerpuff | Saving the day one set at a time 🦸‍♀️
+Certified Powerpuff | Certified. Powerful. Unstoppable. 💪
+Certified Powerpuff | Powerpuff punch, every single set 👊
+
+Dumbbell Darling | Darling, those dumbbells don't stand a chance 💖
+Dumbbell Darling | Dumbbell Darling, dangerously good
+Dumbbell Darling | Pick them up, put them down, look fabulous
+Dumbbell Darling | Darling, you're glowing (it's the sweat) ✨
+Dumbbell Darling | Every darling needs her dumbbells
+
+Glute Goddess | All hail the Glute Goddess 👑
+Glute Goddess | Goddess status: permanent
+Glute Goddess | Mere mortals could never 🍑
+Glute Goddess | The glutes have spoken
+Glute Goddess | Worship the grind, Goddess

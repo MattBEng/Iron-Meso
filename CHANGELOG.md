@@ -9,6 +9,13 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.7.4 — 2026-11-17 (special unlocks)
+- Scheme effects via `CUTIE_FX` layer + CSS (lavender hearts, bubblegum bubbles, ocean wave, midnight neon,
+  angel halo, rose-gold sheen, goddess crown); `CUTIE_RAIN_BY_TITLE` showers; `cutieFrame` bronze/silver/gold.
+- Secret reveal: `S().cutie.revealed` + `cutieRevealCheck()` (real progress only). `[TITLE LINES]` in MESSAGES.txt
+  (9th section) mixed into `restOverMsg`/`cheerLine` via `cutieLine`. Goddess finale once (`S().cutie.finaleShown`),
+  then crown on Home brand + gold points. Dev: Goddess finale, Secret reveal. Test: `TESTS_cutie174.js`.
+
 ### v1.7.3 — 2026-11-17 (incremental titles, secrets, a colour per title)
 - `CUTIE_THRESHOLDS` now 0/2,000/5,000/7,800/9,500/11,700/14,400/17,700/21,600/26,000: from her 6,704 at
   ~550/week each title takes ~1 week longer (2..8 weeks, ~35 total). Only reached + next 3 titles show

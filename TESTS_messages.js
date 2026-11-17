@@ -21,7 +21,7 @@ run("message banks", ()=>{
   // ---------- THE FILE PARSES ----------
   const txt=fs.readFileSync(path.join(dir,"MESSAGES.txt"),"utf8");
   const sections=[...txt.matchAll(/^\[(.+)\]$/gm)].map(m=>m[1]);
-  ok("all eight sections present", sections.length===8, sections.length);
+  ok("all nine sections present", sections.length===9, sections.length);
   ok("every message sits under a heading",
      txt.split(/\r?\n/).findIndex(l=>l.trim() && !l.startsWith("#") && !/^\[/.test(l))
        > txt.split(/\r?\n/).findIndex(l=>/^\[/.test(l)));
@@ -36,6 +36,7 @@ run("message banks", ()=>{
     CUTIE_MSGS: ev("CUTIE_MSGS"),
     CUTIE_FOOTERS: ev("CUTIE_FOOTERS"),
     BADGE_NAMES: ev("BADGE_NAMES"),
+    TITLE_LINES: ev("TITLE_LINES"),
   };
   Object.entries(banks).forEach(([name,arr])=>{
     ok(`${name} is a non-empty array`, Array.isArray(arr) && arr.length>0, arr&&arr.length);
@@ -53,6 +54,10 @@ run("message banks", ()=>{
      banks.RETURN_MSGS_LONG.includes(ev("returnMessage")(40)));
   ok("cutie titles are ordered easiest-first (10 levels)",
      banks.CUTIE_TITLES.length===10, banks.CUTIE_TITLES.length);
+  const titles=new Set(banks.CUTIE_TITLES);
+  const bad=banks.TITLE_LINES.filter(l=>{ const i=l.indexOf("|"); return i<0 || !titles.has(l.slice(0,i).trim()) || !l.slice(i+1).trim(); });
+  ok("every title line is 'Title | line' with a real title", bad.length===0, bad.slice(0,2).join(" / "));
+  ok("lines for every title from Hot Mumma up", banks.CUTIE_TITLES.slice(1).every(t=>banks.TITLE_LINES.some(l=>l.startsWith(t+" |"))));
   ok("one badge name per badge, in order", banks.BADGE_NAMES.length===ev("BADGE_DEFS").length,
      banks.BADGE_NAMES.length+" vs "+ev("BADGE_DEFS").length);
 });
