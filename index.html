@@ -504,8 +504,15 @@ STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|
    stored data and moves independently. RELEASES[0] must match WHATS-NEW.md —
    the app is one offline file, so the notes are embedded, not fetched.
    TESTS_about.js fails if the two drift apart. */
-const APP_VERSION = "1.4.1";
+const APP_VERSION = "1.4.2";
 const RELEASES = [
+  {v:"1.4.2", date:"2026-11-17", notes:[
+    "Bonus workouts now count in the Stats tab for your current meso, and you can delete one from the calendar.",
+    "Ending, deleting or repeating a meso while a bonus workout is open no longer brings the old meso's workout back afterwards.",
+    "Deload weeks no longer make assisted exercises harder. They keep last week's assistance and halve the sets.",
+    "An old recovery survey no longer holds back your progression. Only a survey from your latest workout or the last 10 days counts, on Home and Stats too.",
+    "Adding an exercise mid-workout now uses the reps and RIR your meso sets for that lift, instead of 10 reps at RIR 2.",
+  ]},
   {v:"1.4.1", date:"2026-11-17", notes:[
     "Editing a past workout no longer wipes your warm-up, AMRAP and myorep markings or your hold times when you tap Save changes. Bodyweight and timed exercises also show properly when you open an old workout.",
   ]},
@@ -1005,6 +1012,18 @@ function celebrate(log){
 }
 function isCardioEx(id){ const e=exById(id); return !!(e && (e.cardio || e.muscle==="Cardio")); }
 function mesoById(id){ return S().mesocycles.find(m=>m.id===id); }
+/** Surveys still relevant now: the one for the most recent workout, or any
+    under FEEDBACK_FRESH_DAYS old. A bad survey from months ago must not keep
+    holding progression back (skips, bonus workouts and deletes leave no new one). */
+const FEEDBACK_FRESH_DAYS=10;
+function freshFeedback(){
+  const st=S();
+  const last=[...st.logs].reverse().find(l=>!l.skipped);
+  const now=new Date(todayISO()+"T12:00");
+  return (st.feedback||[]).filter(f=>(last && f.logId && f.logId===last.id) ||
+    (f.date && (now-new Date(f.date+"T12:00"))/864e5 <= FEEDBACK_FRESH_DAYS));
+}
+function latestFeedback(){ const f=freshFeedback(); return f[f.length-1]||null; }
 function activeMeso(){ return mesoById(S().activeMesoId); }
 
 /** All logged set entries for an exercise, newest first (index-backed). */
@@ -1087,7 +1106,7 @@ class ProgressionEngine{
     const avgRIR   = work.reduce((t,s)=>t+s.rir,0)/work.length;
     const minRIR   = Math.min(...work.map(s=>s.rir));
     // Recovery modifier from the latest post-workout survey
-    const fb=S().feedback[S().feedback.length-1];
+    const fb=latestFeedback();
     let recovMod=1;
     if(fb){
       const strain=(fb.fatigue+fb.jointPain+(5-fb.recovery)+(5-fb.sleep))/4;
@@ -1573,7 +1592,7 @@ function mesoVolumeCardHTML(meso, pos){
 VIEWS.home=function(){
   const st=S(), meso=activeMeso(), pos=mesoPosition(meso);
   const lastLog=[...st.logs].reverse().find(l=>!l.skipped)||null;   // skips are not workouts
-  const lastFb=st.feedback[st.feedback.length-1];
+  const lastFb=latestFeedback();
   const bw=st.bodyweight.slice(-14);
   let mesoCard;
   if(!meso){
@@ -1829,6 +1848,7 @@ function mesoMenu(id){
             m.archived=true;
             S().activeMesoId=null;
             if(S().activeSession?.mesoId===id) S().activeSession=null;
+            if(S().parkedSession?.mesoId===id) S().parkedSession=null;
             if(S().editSession?.mesoId===id) S().editSession=null;
             Store.save(); Store.flush();
             closeModal(); toast(`${term("Meso")} ended — workouts kept`); go("mesos");
@@ -1853,6 +1873,7 @@ function mesoMenu(id){
         if(confirm(`Delete this ${term("meso")}? Logged workouts are kept.`)){
           S().mesocycles=S().mesocycles.filter(x=>x.id!==id);
           if(S().activeMesoId===id) S().activeMesoId=null;
+          if(S().parkedSession?.mesoId===id) S().parkedSession=null;
           Store.save();
         }
       }
@@ -2396,6 +2417,12 @@ function retargetSessionExercise(ses, newId, edit){
                 : buildGhostRows(newId, n, sug? sug.kg : 0, reps, rir, sug, false);
   return ses;
 }
+/** Deload load for one exercise: ~60% of last time. Assisted lifts keep last
+    time's assistance (60% of the assistance would make the lift HARDER). */
+function deloadKg(sug, ex){
+  if(ex && ex.assisted) return sug.lastKg;
+  return snapLoad(sug.lastKg*0.6, sug.lastKg, ex);
+}
 function upgradeSession(s){
   s.exercises.forEach(e=>{
     // backfill bodyweight flag from the library (handles exercises added/edited
@@ -2461,11 +2488,11 @@ VIEWS.workout=function(){
         const repTarget = (sug && sug.bodyweight)? sug.reps : slot.reps;
         // volume ramp (per-exercise, per-muscle ceiling, lands in final real week)
         let nSets=rampedSets(meso, slot, pos.week, deload);
-        if(deload && sug && !isBW){ kg=snapLoad(sug.lastKg*0.6, sug.lastKg, exRef); }
+        if(deload && sug && !isBW){ kg=deloadKg(sug, exRef); }
         return {slotId:slot.id, exerciseId:slot.exerciseId, bodyweight:isBW, timed:isTimed,
           target:{sets:nSets, reps:repTarget, rir:slot.rir, rest:slot.rest, notes:slot.notes,
             secs: isTimed? (slot.secs||30) : undefined},
-          suggestion: isTimed? null : (deload&&sug&&!isBW? {...sug, kg, diff:kg-sug.lastKg, reason:FUN()?"Recovery week — lighter and shorter on purpose.":"Deload — ~60% load, half the sets."} : sug),
+          suggestion: isTimed? null : (deload&&sug&&!isBW? {...sug, kg, diff:kg-sug.lastKg, reason:FUN()?"Recovery week — lighter and shorter on purpose.":(exRef&&exRef.assisted?"Deload — same assistance as last time, half the sets.":"Deload — ~60% load, half the sets.")} : sug),
           notes:"", skipped:false, rowsReady:true,
           sets: isTimed? buildTimedRows(nSets, slot.secs||30, slot.rir)
                 : isBW? buildSetRows(nSets, 0, repTarget, slot.rir)
@@ -2744,6 +2771,7 @@ function repeatMeso(id){
   S().mesocycles.push(c);
   S().activeMesoId=c.id;
   S().activeSession=null;
+  S().parkedSession=null;
   Store.save(); Store.flush();
   toast(FUN()?"Round two — starting at week-2 volume 💪":"Repeating — starts at week-2 volume");
   go("workout");
@@ -3026,7 +3054,7 @@ function startFuturePreview(week, dayIdx){
       const sug=ProgressionEngine.suggest(slot.exerciseId, slot.reps, slot.rir);
       let kg=sug?sug.kg:0;
       let nSets=rampedSets(meso, slot, week, deload);
-      if(deload && sug){ kg=snapLoad(sug.lastKg*0.6, sug.lastKg, exById(slot.exerciseId)); }
+      if(deload && sug){ kg=deloadKg(sug, exById(slot.exerciseId)); }
       return {slotId:slot.id, exerciseId:slot.exerciseId,
         target:{sets:nSets, reps:slot.reps, rir:slot.rir, rest:slot.rest, notes:slot.notes},
         suggestion:sug, notes:"", skipped:false, rowsReady:true, _edit:false,
@@ -3382,14 +3410,18 @@ function bindWorkout(){
         } else {
           const exRef=exById(exId);
           const isBW=!!(exRef && exRef.equipment==="Bodyweight");
-          const sug=edit? null : ProgressionEngine.suggest(exId, 10, 2);
+          // judge it against how the meso programs this lift, if it does (else 10 @ RIR 2)
+          const pm=mesoById(s.mesoId||s.bonusOf)||activeMeso();
+          const ps=pm && pm.days.flatMap(d=>d.exercises).find(x=>x.exerciseId===exId && !x.cardio && x.reps>0);
+          const pReps=ps? ps.reps : 10, pRIR=ps && ps.rir!=null? ps.rir : 2;
+          const sug=edit? null : ProgressionEngine.suggest(exId, pReps, pRIR);
           const nSets=edit?1:3;
-          const repTarget=(sug && sug.bodyweight)? sug.reps : 10;
+          const repTarget=(sug && sug.bodyweight)? sug.reps : pReps;
           inst={slotId:null, exerciseId:exId, bodyweight:isBW,
-            target:{sets:nSets, reps:repTarget, rir:2, rest:S().settings.restDefault, notes:""},
+            target:{sets:nSets, reps:repTarget, rir:pRIR, rest:S().settings.restDefault, notes:""},
             suggestion:sug, notes:"", skipped:false, rowsReady:true, _edit:edit,
-            sets:buildSetRows(nSets, (isBW?0:(sug?sug.kg:0)), repTarget, 2)};
-          mkSlot=()=>({id:uid(), exerciseId:exId, sets:3, reps:10, rir:2, rest:S().settings.restDefault, notes:""});
+            sets:buildSetRows(nSets, (isBW?0:(sug?sug.kg:0)), repTarget, pRIR)};
+          mkSlot=()=>({id:uid(), exerciseId:exId, sets:3, reps:pReps, rir:pRIR, rest:S().settings.restDefault, notes:""});
         }
         const finish=()=>{ save(); renderWorkout(); toast("Exercise added"); };
         const day=sessionTemplateDay(s);
@@ -4184,7 +4216,7 @@ function previewDay(meso, dayIdx, week){
           const sug=ProgressionEngine.suggest(x.exerciseId, x.reps, x.rir);
           if(sug){
             let kg=sug.kg;
-            if(deload){ kg=snapLoad(sug.lastKg*0.6, sug.lastKg, exById(x.exerciseId)); nSets=Math.max(1,Math.ceil(x.sets/2)); }
+            if(deload){ kg=deloadKg(sug, exById(x.exerciseId)); nSets=Math.max(1,Math.ceil(x.sets/2)); }
             proj=` · ~${dispW(kg)}${unitLabel()}`;
           }
         }catch(_){}
@@ -4206,7 +4238,7 @@ function dayModal(iso, logs, cardio){
       <button class="btn btn-ghost" style="flex:1;justify-content:flex-start" data-open="${l.id}">
         ${esc(l.dayName)} · ${l.exercises.reduce((t,e)=>t+e.sets.length,0)} sets · W${l.week}
         <span class="pill" style="margin-left:auto">${canEdit?"Edit":"View"}</span></button>
-      ${canEdit?`<button class="iconbtn" data-dellog="${l.id}" aria-label="Delete workout">✕</button>`:""}</div>`;}).join("")}
+      ${canEdit||l.bonus?`<button class="iconbtn" data-dellog="${l.id}" aria-label="Delete workout">✕</button>`:""}</div>`;}).join("")}
     ${cardio.map(c=>`<div class="row" style="gap:8px">
       <div class="setline num" style="flex:1">${esc(c.type)} · ${c.minutes} min${c.zone?` · Z${c.zone}`:""}</div>
       <button class="iconbtn" data-delc="${c.id}" aria-label="Delete cardio">✕</button></div>`).join("")}
@@ -4591,7 +4623,7 @@ VIEWS.analytics=function(){
   const U=unitLabel();
   const inScope=x=>{
     if(!scope) return true;
-    if(scope.kind==="meso") return x.mesoId===scope.id.slice(5);
+    if(scope.kind==="meso") return x.mesoId===scope.id.slice(5) || x.bonusOf===scope.id.slice(5);
     if(scope.id==="month") return x.date.slice(0,7)===nowISO.slice(0,7);
     if(scope.id==="year")  return x.date.slice(0,4)===nowISO.slice(0,4);
     return true;                                    // all time
@@ -4750,7 +4782,7 @@ VIEWS.analytics=function(){
   }).slice(-30);
 
   // fatigue indicator: recent feedback strain avg
-  const recentFb=st.feedback.slice(-3);
+  const recentFb=freshFeedback().slice(-3);
   const strain=recentFb.length? recentFb.reduce((t,f)=>t+(f.fatigue+f.jointPain+(6-f.recovery)+(6-f.sleep))/4,0)/recentFb.length : null;
   const fatigueLabel=strain==null?null: strain>=4?["High — consider easing off","red"]: strain>=3?["Moderate","amb"]:["Low — good to push","grn"];
 

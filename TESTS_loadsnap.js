@@ -21,7 +21,7 @@ run("loadable weights", ()=>{
   const sug=(id,reps)=>ev(`ProgressionEngine.suggest(${JSON.stringify(id)},${reps??10},2)`);
   const clear=()=>{ st().logs=[]; st().feedback=[]; save(); };
   const LUNGE="b_walking_lunge", HT="b_machine_hip_thrust", PULL="b_assisted_pull_up";
-  const poorRecovery=()=>{ st().feedback.push({fatigue:5,jointPain:4,recovery:1,sleep:1,date:"2026-09-17"}); save(); };
+  const poorRecovery=()=>{ st().feedback.push({fatigue:5,jointPain:4,recovery:1,sleep:1,date:"2026-09-17",logId:st().logs.at(-1).id}); save(); };
 
   // ---------- THE REPORTED BUG: A HOLD CHANGED THE WEIGHT ----------
   clear();

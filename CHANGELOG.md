@@ -9,6 +9,15 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.4.2 — 2026-11-17 (review items A2 to A7)
+- A2 Stats `inScope` meso scope also matches `bonusOf`. A3 `dayModal` shows delete for bonus logs.
+- A4 end/delete/repeat meso clear `parkedSession` (end/delete only if it belongs to that meso).
+- A5 new `deloadKg()` used by all three deload sites: assisted lifts keep last assistance.
+- A6 new `freshFeedback()`/`latestFeedback()`: survey counts only if for the latest log or <=10 days
+  old. Used by `suggest`, Home pills, Stats fatigue. A7 `+ Add exercise` takes reps/RIR from the
+  meso slot for that lift (session's meso or `bonusOf`, else active), fallback 10 @ 2.
+- Test: `TESTS_review142.js` (25 checks).
+
 ### v1.4.1 — 2026-11-17 (edit-workout data loss)
 - `startLogEdit` copied only kg/reps/RIR per set, so Save changes on a past workout
   stripped `type` (warmup/amrap/my/mm) and `secs`, and the edit view had no
