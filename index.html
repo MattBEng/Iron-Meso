@@ -362,6 +362,13 @@ body[data-fun="1"]:is([data-scheme="cherry"],[data-scheme="lavender"],[data-sche
 .pet-opt.on{border-color:var(--accent);background:var(--accent-soft)}
 .pet-opt.locked{opacity:.45;cursor:default}
 .pet-opt.locked svg{filter:grayscale(1)}
+.pet-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-md);margin-top:8px;cursor:pointer;
+  text-transform:none;letter-spacing:0;font-size:15px;font-weight:400;color:var(--text)}
+.pet-row b{font-weight:800}
+.pet-row .faint{font-weight:400}
+.pet-row.locked{opacity:.55;cursor:default}
+.pet-ico{width:36px;height:36px;display:grid;place-items:center;font-size:22px;flex:0 0 auto}
+.pet-ico-svg svg{width:36px;height:36px;overflow:visible}
 .pet-none{width:46px;height:46px;display:grid;place-items:center;font-size:20px;color:var(--muted)}
 .tu-pet{width:40px;height:40px;flex:0 0 auto}
 .tu-pet svg{width:100%;height:100%;overflow:visible}
@@ -802,8 +809,14 @@ STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|
    stored data and moves independently. RELEASES[0] must match WHATS-NEW.md —
    the app is one offline file, so the notes are embedded, not fetched.
    TESTS_about.js fails if the two drift apart. */
-const APP_VERSION = "1.8.1";
+const APP_VERSION = "1.9.0";
 const RELEASES = [
+  {v:"1.9.0", date:"2026-11-17", notes:[
+    "Meet Daisy 🦆 Your new little duck keeps you company around the app. Tap her and see what happens.",
+    "She cheers you on while you train: finish an exercise and watch her.",
+    "She picks up new things as you earn titles. The first one arrives at Strong Sweetheart.",
+    "Not a duck person? Turn her off in More, under Your duck.",
+  ]},
   {v:"1.8.1", date:"2026-11-17", notes:[
     "The Cutie points card now matches whichever colour theme you pick, instead of always being magenta.",
     "The Feel button on each set no longer cuts off: it now reads Easy, OK, Hard or Max.",
@@ -5178,7 +5191,9 @@ function titleUnlockModal(k, then){
     ${sc?`<div class="tu-scheme"><span class="scheme-dot" style="background:${sc.swatch}"></span>
       <div style="flex:1;text-align:left"><b>New colour unlocked</b><div class="faint" style="font-size:13px">${esc(sc.name)} · ${esc(sc.hint)}</div></div>
       <button class="btn btn-ghost btn-sm" data-try="${sc.id}">Try it</button></div>`:""}
-    ${(()=>{ const pet=(DEV.on && DEV.duck)? petsLive().find(p=>p.at===k) : null; return pet?`<div class="tu-scheme"><span class="tu-pet">${petSVG("sit", pet)}</span>
+    ${(()=>{ const ad=petPick()? PET_ADDONS.find(a=>a.at===k) : null; return ad?`<div class="tu-scheme"><span class="tu-pet">${petSVG(ad.id, petPick())}</span>
+      <div style="flex:1;text-align:left"><b>${esc(petPick().name)} got a ${esc(ad.name.toLowerCase())} ${ad.emoji}</b><div class="faint" style="font-size:13px">${esc(ad.blurb)}</div></div></div>`:""; })()}
+    ${(()=>{ const pet=k>0? petsLive().find(p=>p.at===k) : null; return pet?`<div class="tu-scheme"><span class="tu-pet">${petSVG("sit", pet)}</span>
       <div style="flex:1;text-align:left"><b>New pet unlocked</b><div class="faint" style="font-size:13px">${esc(pet.name)} the ${esc(pet.kind)}</div></div>
       <button class="btn btn-ghost btn-sm" data-pet="${pet.id}">Bring along</button></div>`:""; })()}
     ${tease?`<p class="faint" style="margin:12px 0 0">A new secret title is waiting on Stats 👀</p>`:""}
@@ -5556,14 +5571,14 @@ function confetti(){
     requestAnimationFrame(tick);
   }catch(_){}
 }
-/* ---------- duck (1.8.x, DEV ONLY for now) ----------
+/* ---------- the duck (1.9.0) ----------
    Pets: a small bird that keeps her company. One unlocks with each title (the
    same ladder as the colour schemes), she picks one or none in Settings, and
    only one is ever out. It turns up on a page in one of a few poses, gently
    animated; tap it and it does something cute. Tap it five times and it lays an
    egg or its friends rain down the screen; ten quick taps and it has had enough.
    Drawn in code (inline SVG), so it works offline and adds no files. Original artwork.
-   Gated on dev mode + the "Duck" switch in the dev panel: nobody else sees it.
+   Live since 1.9.0 for Cutie profiles only (Fun mode + Female); see duckOn().
    It sits in fixed safe spots just above the bottom nav (the app can't reliably
    find empty space on a page) and never appears on the Train tab, where a
    tappable creature near the set buttons would get hit by accident. */
@@ -5669,20 +5684,31 @@ function petPick(){
 }
 function duckSVG(pose){ return petSVG(pose, petPick()||PETS[0]); }
 function petsCardHTML(){
-  if(!(DEV.on && DEV.duck)) return "";
-  const cur=petPick(), vis=cutieVisibleMax(), live=petsLive(), hidden=live.filter(p=>p.at>vis).length;
-  return `<div class="card"><h3>${live.length>1?"Pets":"Pet"}</h3>
-    <p class="faint" style="margin:4px 0 10px">${live.length>1?"A new pet joins you with every title. Pick one to keep you company, or none.":"A little duck to keep you company. Turn her off any time."}</p>
-    <div class="pet-grid">
+  if(!cutieOn()) return "";                       // Cutie only: never in Serious mode
+  const cur=petPick(), vis=cutieVisibleMax(), live=petsLive(), many=live.length>1;
+  const hidden=live.filter(p=>p.at>vis).length, sw='style="width:24px;height:24px;flex:0 0 auto"';
+  const addons=PET_ADDONS.filter(a=>a.at<=vis).map(a=>{ const ok=addonUnlocked(a); return `
+    <label class="pet-row ${ok?"":"locked"}"><span class="pet-ico">${a.emoji}</span>
+      <span style="flex:1"><b>${esc(a.name)}</b><span class="faint" style="display:block;font-size:13px">${ok? esc(a.blurb) : "🔒 Unlocks at "+esc(CUTIE_TITLES[a.at])}</span></span>
+      <input type="checkbox" data-addon="${a.id}" ${ok && addonOn(a.id)?"checked":""} ${ok && cur?"":"disabled"} ${sw}></label>`; }).join("");
+  const more=PET_ADDONS.filter(a=>a.at>vis).length;
+  return `<div class="card" id="petcard"><h3>${many?"Pets":"Your duck"}</h3>
+    <p class="faint" style="margin:4px 0 10px">${many?"A new pet joins you with every title. Pick one to keep you company, or none.":"Daisy keeps you company around the app. Tap her and see what happens."}</p>
+    ${many?`<div class="pet-grid">
       <button class="pet-opt ${cur?"":"on"}" data-pet=""><div class="pet-none">✕</div><b>No pet</b></button>
       ${live.filter(p=>p.at<=vis).map(p=>{ const ok=petUnlocked(p); return `
       <button class="pet-opt ${cur&&cur.id===p.id?"on":""} ${ok?"":"locked"}" data-pet="${p.id}" ${ok?"":"disabled"}>
         ${petSVG("sit", p)}<b>${esc(p.name)}</b><span class="faint">${ok? esc(p.kind) : "🔒 "+esc(CUTIE_TITLES[p.at])}</span></button>`; }).join("")}
-    </div>
-    ${hidden?`<p class="faint" style="margin:10px 0 0">${hidden} more secret pet${hidden>1?"s":""} to find 👀</p>`:""}</div>`;
+    </div>${hidden?`<p class="faint" style="margin:10px 0 0">${hidden} more secret pet${hidden>1?"s":""} to find 👀</p>`:""}`
+    :`<label class="pet-row"><span class="pet-ico pet-ico-svg">${petSVG("sit", live[0])}</span>
+      <span style="flex:1"><b>Show ${esc(live[0].name)}</b><span class="faint" style="display:block;font-size:13px">On every page except Plans</span></span>
+      <input type="checkbox" data-petshow ${cur?"checked":""} ${sw}></label>`}
+    ${addons?`<div class="kicker" style="margin-top:14px">Her things</div>${addons}`:""}
+    ${more?`<p class="faint" style="margin:10px 0 0">She picks up more as you earn titles 👀</p>`:""}</div>`;
 }
 const DUCK_POSES=["sit","stand","sleep","peek","waddle","skate"];
-const DUCK_VIEWS=["home","mesos","exercises","calendar","analytics","settings","workout"];
+/* Every page except Plans: a duck wandering about while a meso is being set up gets in the way. */
+const DUCK_VIEWS=["home","exercises","calendar","analytics","settings","workout"];
 /* On the Train tab it keeps to the bottom-left corner in a still pose and can't be
    tapped (taps pass straight through), so it never steals a tap meant for a set.
    There it reacts on its own when an exercise is finished: see duckCheer(). */
@@ -5697,16 +5723,28 @@ const DUCK_SAYS=["Quack!","Quack quack 💕","*happy wiggle*","Proud of you 🥹
 const DUCK_STAB_SAYS=["Tap me again. I dare you. 🔪","Enough. 🔪","We don't do that here. 🔪","I said stop. 🔪","Choose your next tap wisely. 🔪"];
 const DUCK_EGG_SAYS=["Oh! 🥚","…that wasn't me 🥚","Surprise 🥚","Breakfast? 🥚"];
 let _duckPose=null;
-function duckOn(){ return !!(DEV.on && DEV.duck && petPick()); }
+/* Live for Cutie profiles (Fun mode + Female) since 1.9.0. Off in Serious mode, off
+   for everyone else, and off when she picks "no pet" in Settings. */
+function duckOn(){ return !!(cutieOn() && petPick()); }
+/* Add-ons: things the duck picks up as titles are earned. Each can be switched
+   off in Settings (settings.petAddons[id]===false). More to come. */
+const PET_ADDONS=[
+  {id:"skate", name:"Skateboard", emoji:"🛹", at:3, blurb:"Now and then she skates across the page"},
+];
+function addonUnlocked(a){ return cutieUnlockedIdx()>=a.at; }
+function addonOn(id){
+  const a=PET_ADDONS.find(x=>x.id===id);
+  return !!a && addonUnlocked(a) && (S().settings.petAddons||{})[id]!==false;
+}
 function duckRemove(){ const d=document.getElementById("duck"); if(d) d.remove(); }
 /** Put the duck on this page (or take it away). Called by go() after every render. */
-function duckPlace(view){
+function duckPlace(view, force){
   duckRemove(); clearTimeout(_duckCheerT);
   document.querySelectorAll(".pet-rain").forEach(x=>x.remove());
   if(!duckOn() || !DUCK_VIEWS.includes(view)) return;
   const train=view==="workout";
-  const poses=(train? DUCK_TRAIN_POSES : DUCK_POSES).filter(p=>p!==_duckPose);
-  const pose=_duckPose=poses[Math.floor(Math.random()*poses.length)];
+  const poses=(train? DUCK_TRAIN_POSES : DUCK_POSES).filter(p=>p!==_duckPose && (p!=="skate" || addonOn("skate")));
+  const pose=_duckPose=force||poses[Math.floor(Math.random()*poses.length)];
   const d=document.createElement("div");
   d.id="duck"; d.dataset.pose=pose; d.setAttribute("role","button"); d.setAttribute("aria-label",(petPick()||PETS[0]).name);
   if(pose==="waddle" || pose==="skate") d.dataset.spot="walk";
@@ -5843,7 +5881,6 @@ function devPanelHTML(){
   return `<div class="card dev-card"><h3>Dev mode</h3>
     <p class="faint" style="margin:4px 0 10px">Testing only. Nothing here touches workouts or backups. Tap the version 7 times to turn off and clear.</p>
     <label class="row" style="gap:10px"><input type="checkbox" data-dev="preview" ${DEV.preview?"checked":""} style="width:22px;height:22px"> Preview Cutie features</label>
-    <label class="row" style="gap:10px;margin-top:8px"><input type="checkbox" data-dev="duck" ${DEV.duck?"checked":""} style="width:22px;height:22px"> Duck (testing): shows on every page</label>
     <label class="row" style="gap:10px;margin-top:8px"><input type="checkbox" data-dev="allpets" ${DEV.allPets?"checked":""} style="width:22px;height:22px"> Show unfinished pets (the other birds)</label>
     <p class="num" style="margin:10px 0 6px">Points: real ${T.real.toLocaleString()} · showing <b>${T.total.toLocaleString()}</b> (${esc(cutieTitle(T.total))})</p>
     <div class="row" style="gap:6px;flex-wrap:wrap">
@@ -5852,6 +5889,9 @@ function devPanelHTML(){
     <div class="kicker" style="margin-top:12px">Fire a celebration</div>
     <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">
       ${b("title","Title unlock")}${b("finale","Goddess finale")}${b("reveal","Secret reveal")}${b("badge","Badge")}${b("confetti","Confetti")}${b("best","New best")}${b("week","Weekly best")}${b("finish","Finish screen")}</div>
+    <div class="kicker" style="margin-top:12px">Duck (needs Cutie preview on)</div>
+    <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">
+      ${b("dkskate","Skate")}${b("dkegg","Egg")}${b("dkflock","Flock")}${b("dkknife","Knife")}</div>
     <button class="btn btn-danger btn-block" style="margin-top:12px" data-dev="reset">Reset all dev overrides</button></div>`;
 }
 function devFake(){ return {name:"Test workout", date:todayISO(), base:100, sets:9, setPts:90, cardioMin:10, cardioPts:30, streak:50,
@@ -5873,19 +5913,25 @@ document.addEventListener("click", e=>{
     if(k==="workout"){ cutieWorkoutModal(c.dataset.id); return; }
     if(k==="titles"){ cutieTitlesModal(); return; }
   }
-  const pb=e.target.closest("[data-pet]");
-  if(pb && DEV.on && DEV.duck){
-    const id=pb.dataset.pet, p=PETS.find(x=>x.id===id);
+  const pb=e.target.closest("[data-pet],[data-petshow]");
+  if(pb && cutieOn()){
+    const id=pb.hasAttribute("data-petshow")? (pb.checked? petsLive()[0].id : "") : pb.dataset.pet, p=PETS.find(x=>x.id===id);
     if(id!=="" && !(p && petUnlocked(p))) return;
     S().settings.pet=id; Store.save();
     toast(p? `${p.name} is with you now 💕` : "No pet for now");
     if(currentView==="settings") go("settings"); else duckPlace(currentView);
     return;
   }
+  const ab=e.target.closest("[data-addon]");
+  if(ab && cutieOn()){
+    const a=PET_ADDONS.find(x=>x.id===ab.dataset.addon); if(!a || !addonUnlocked(a)) return;
+    (S().settings.petAddons ??= {})[a.id]=ab.checked; Store.save();
+    toast(`${a.name} ${ab.checked?"on":"off"}`);
+    return;
+  }
   const d=e.target.closest("[data-dev]"); if(!d || !DEV.on) return;
   const k=d.dataset.dev;
   if(k==="allpets"){ DEV.allPets=d.checked; devSave(); toast(DEV.allPets?"Unfinished pets shown":"Unfinished pets hidden"); go("settings"); return; }
-  if(k==="duck"){ DEV.duck=d.checked; devSave(); duckPlace(currentView); toast(DEV.duck?"Duck on 🦆":"Duck off"); return; }
   if(k==="preview"){ DEV.preview=d.checked; devSave(); devSchemeCheck(); toast(DEV.preview?"Cutie preview on":"Cutie preview off"); return; }
   if(k==="setpts"){ const v=parseInt($("#devpts")?.value,10); if(!Number.isFinite(v)||v<0){ toast("Enter a number"); return; } DEV.points=v; }
   if(k==="add1000") DEV.points=(devPoints()??cutieTotals().real)+1000;
@@ -5893,6 +5939,13 @@ document.addEventListener("click", e=>{
   if(k==="lock") delete DEV.points;
   if(k==="reset"){ DEV={on:true}; toast("Dev overrides cleared"); }
   if(["confetti","best","week","finish"].includes(k)){ devFire(k); return; }
+  if(k.startsWith("dk")){
+    if(!duckOn()){ toast("Turn on Cutie preview and the duck first"); return; }
+    if(k==="dkskate"){ duckPlace("settings", "skate"); return; }
+    let dd=document.getElementById("duck"); if(!dd){ duckPlace("settings"); dd=document.getElementById("duck"); }
+    if(dd){ if(k==="dkegg") duckEgg(dd); if(k==="dkflock") duckFlock(dd); if(k==="dkknife") duckStab(dd); }
+    return;
+  }
   if(k==="badge"){ badgeModal(["ton","early"]); return; }
   if(k==="finale"){ goddessFinale(null, true); return; }
   if(k==="reveal"){ _devReveal=true; go("analytics"); setTimeout(()=>toast("Scroll to Title progression to see the reveal"),300); return; }
@@ -6566,6 +6619,7 @@ VIEWS.settings=function(){
         ? "Full training jargon: RIR, mesocycles, deloads. No fluff."
         : "Plain language, a feel scale instead of RIR, and a little encouragement. Your progression maths is identical in both."}</p>
     </div>
+    ${petsCardHTML()}
     <div class="card"><h3>Your profile</h3>
       <p class="faint" style="margin:-4px 0 6px">Optional. Age and body metrics only feed cardio heart-rate zones — never your lifting progression.</p>
       <div class="grid2">
@@ -6604,7 +6658,6 @@ VIEWS.settings=function(){
       <div class="row split" style="margin-top:6px"><span class="muted">Released</span><span class="faint num">${fmtDate(RELEASES[0].date)}</span></div>
       <button class="btn btn-ghost btn-block" style="margin-top:12px" data-a="whatsnew">What's new in ${APP_VERSION}</button>
     </div>
-    ${petsCardHTML()}
     ${devPanelHTML()}
     <p class="faint" style="text-align:center">Lift Daddy · your pocket training buddy</p>`;
   const persist=()=>{

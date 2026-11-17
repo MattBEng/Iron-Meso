@@ -236,6 +236,19 @@ workouts (bonus workouts count toward the plan they were done in).
   on the card.** No weight lifted: the headline is the points earned.
 - Title card: "I'm officially a <title>", points and workout count. Badge card: the badge and what earned it.
 
+## The duck (1.9.0)
+
+- Cutie only (`cutieOn()`): Daisy, a small white duck, is there from the start. Never in Serious mode.
+- She shows on every page except Plans, in a different pose each visit, just above the bottom bar.
+- Tapping her does something small. Every fifth tap she lays an egg or ducks rain down the screen. Ten quick
+  taps and she gets cross and pulls out a tiny knife for a few seconds.
+- On the Train tab she sits bottom-left and can't be tapped. When an exercise is finished she reacts: strong,
+  tired or cool. Hard exercises mostly get the tired one.
+- **Add-ons unlock with titles.** So far: the skateboard at Strong Sweetheart (she sometimes skates across the
+  page). The rest of the ladder is still to be decided.
+- More > Your duck: switch her off, or switch individual add-ons off.
+- Nine other birds are drawn but unfinished and hidden (dev panel: "Show unfinished pets").
+
 ## Tests
 
 `TESTS_cutie.js` (1.5.0), `TESTS_cutie16.js` (1.6.0), `TESTS_cutie17.js` (1.7.0), `TESTS_cutiestats.js` (1.7.1), `TESTS_cutie174.js` (1.7.4).

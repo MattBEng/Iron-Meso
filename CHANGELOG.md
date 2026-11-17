@@ -9,21 +9,28 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
-### v1.8.1 (no version bump) — 2026-11-17 (duck / pets, dev only)
+### v1.9.0 — 2026-11-17 (the duck goes live, Cutie only)
+- **Live:** `duckOn()` is now `cutieOn() && petPick()` (was dev mode + a dev switch, now removed). Daisy is there
+  from the start for Fun mode + Female; never in Serious mode or for other profiles.
+- **Pages:** every page except Plans (`DUCK_VIEWS` drops `mesos`), every visit.
+- **Add-ons:** `PET_ADDONS` (first: `skate`, `at:3` = Strong Sweetheart). `addonOn(id)` = title earned and not
+  switched off. The skate pose only enters the rotation when it is on; that title's unlock popup announces it.
+- **Settings:** "Your duck" card (`petsCardHTML`, `#petcard`) between App personality and Your profile: show/hide
+  Daisy (`settings.pet`: undefined/"daisy" = on, "" = off) and a switch per add-on (`settings.petAddons[id]===false`
+  = off). Locked add-ons show their title; ones past the visible titles stay hidden.
+- Dev panel: Skate / Egg / Flock / Knife buttons; "Show unfinished pets" still reveals the nine wip birds.
+- Built earlier today as dev-only (tap tricks, Train reactions, skateboard art): see the entry below. Test: `TESTS_duck.js` (76).
+
+### v1.8.1 (dev-only groundwork, no version bump) — 2026-11-17 (duck / pets)
 - **Pet duck** ("Daisy"): `petSVG(pose, skin)` is one bird rig drawn as inline SVG (original art); `duckSVG(pose)`
   draws the active pet. `duckPlace(view)` runs from `go()`: fixed safe spots above the nav. Poses: sit, stand,
-  sleep, peek, waddle, and **skate** (skateboard add-on, wobbles across the page). All motion respects reduce-motion.
+  sleep, peek, waddle, skate. All motion respects reduce-motion.
 - **Taps** (`duckTap`): a random say / hop / spin / heart / wiggle; every 5th tap `duckEgg` (lays an egg, max 3) or
   `duckFlock` (18 ducks rain down, `.pet-rain`); 10 taps each under 1s apart `duckStab` (cross, little knife, ~3.5s).
 - **Train tab:** bottom-left, still poses, not tappable (`dk-notap`). `duckCheer(ses)` fires where "Exercise done"
   is toasted: `flex` / `tired` / `cool` for ~3s, hard exercises (avg 1 RIR or less) mostly `tired`.
-- **Pets framework, mostly hidden:** `PETS` has 10 birds, one per title (`at`), but only Daisy is live; the rest
-  are `wip:1` and ignored by `petsLive()` unless the dev panel's "Show unfinished pets" (`DEV.allPets`) is on.
-  `settings.pet`: undefined = newest unlocked, "" = none, else an id; one active at most (`petPick`). Settings
-  gets a Pet card (`petsCardHTML`); title unlocks announce a live pet at that title.
-- **Dev only:** everything needs dev mode AND the "Duck" switch (`DEV.duck`). No version bump, no What's new,
-  no update card. Before release: decide the unlock, how often it shows, and swap the `DEV` gate for `cutieOn()`.
-  Test: `TESTS_duck.js` (77).
+- **Pets framework, hidden:** `PETS` has 10 birds, one per title (`at`), but only Daisy is live; the rest are
+  `wip:1` and ignored by `petsLive()` unless the dev panel's "Show unfinished pets" (`DEV.allPets`) is on.
 
 ### v1.8.1 — 2026-11-17 (theme colours, Feel label)
 - `--cutie` = `--accent` on every Fun scheme; the 17 fixed rgba(224,85,156) tints now `color-mix` of `--cutie`.

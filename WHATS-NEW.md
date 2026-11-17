@@ -8,7 +8,9 @@ live in `RELEASES[0]` in `index.html`, and `TESTS_about.js` fails if the two dri
 apart. Update both when you ship, and add the engineering detail to
 `CHANGELOG.md` rather than here.
 
-## 1.8.1 — 2026-11-17
+## 1.9.0 — 2026-11-17
 
-- The Cutie points card now matches whichever colour theme you pick, instead of always being magenta.
-- The Feel button on each set no longer cuts off: it now reads Easy, OK, Hard or Max.
+- Meet Daisy 🦆 Your new little duck keeps you company around the app. Tap her and see what happens.
+- She cheers you on while you train: finish an exercise and watch her.
+- She picks up new things as you earn titles. The first one arrives at Strong Sweetheart.
+- Not a duck person? Turn her off in More, under Your duck.
