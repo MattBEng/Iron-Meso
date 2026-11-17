@@ -9,6 +9,11 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.7.1 — 2026-11-17 (Cutie Stats page)
+- With `cutieOn()`, Stats hides PRs this plan, strength across blocks, Cardio and Body sections and adds
+  a "Cutie progress" section: `cutieJourneyHTML` (titles, dates, ETA from `cutiePace`), `cutieBadgesCardHTML`,
+  `cutieMetricsHTML`. Other profiles unchanged. Test: `TESTS_cutiestats.js`.
+
 ### v1.7.0 — 2026-11-17 (Cutie bonuses, badges, holiday pause)
 - `cutieLedger` adds `CUTIE_BONUS`: PR (e1RM beats earlier best, 50, max 3), full workout (30, not bonus
   workouts), beat last time (10/lift, max 50), welcome back (75 after 14+ days). Going forward only:

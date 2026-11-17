@@ -413,6 +413,16 @@ body[data-fun="1"][data-scheme="goddess"] .cutie-card{background:linear-gradient
 .badge-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;border:1px solid rgba(224,85,156,.25)}
 .badge-row.locked{opacity:.45}
 .badge-ico{font-size:22px}
+.cutie-journey{display:grid;gap:2px;margin-top:6px}
+.cj-row{display:flex;align-items:center;gap:10px;padding:6px 4px;opacity:.5}
+.cj-row.on{opacity:1}
+.cj-row.cur{background:rgba(224,85,156,.10);border-radius:10px}
+.cj-dot{width:12px;height:12px;border-radius:50%;border:2px solid var(--cutie);flex:0 0 auto}
+.cj-row.on .cj-dot{background:var(--cutie)}
+.badge-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}
+.badge-tile{padding:10px;border-radius:12px;border:1px solid rgba(224,85,156,.25);text-align:center}
+.badge-tile.locked{opacity:.45}
+.bt-name{font-weight:800;font-size:13px;margin-top:2px}
 .cutie-title-row.cur{background:rgba(224,85,156,.10);border-color:var(--cutie)}
 .title-unlock{text-align:center;padding:4px 2px}
 .tu-kicker{font-weight:800;letter-spacing:.12em;text-transform:uppercase;font-size:12px;color:var(--cutie)}
@@ -630,8 +640,11 @@ STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|
    stored data and moves independently. RELEASES[0] must match WHATS-NEW.md —
    the app is one offline file, so the notes are embedded, not fetched.
    TESTS_about.js fails if the two drift apart. */
-const APP_VERSION = "1.7.0";
+const APP_VERSION = "1.7.1";
 const RELEASES = [
+  {v:"1.7.1", date:"2026-11-17", notes:[
+    "With Cutie on, Stats is now all about you: your title journey with how long to the next one at your pace, every badge you've unlocked, and your Cutie stats. The PR, strength-across-plans, cardio and body sections are gone from this view.",
+  ]},
   {v:"1.7.0", date:"2026-11-17", notes:[
     "Bonus Cutie Points from today: +50 for each PR (up to 3 a workout), +30 for finishing every planned set, +10 for each lift where you beat last time, and +75 welcome-back points after two weeks or more off.",
     "Ten badges to collect, from First Step to Ton Up and Early Bird. Each new one is worth 50 points and comes with confetti. Any you've already earned are there too. Tap your title to see your badges next to your titles.",
@@ -4999,6 +5012,55 @@ function pauseCardHTML(){
       <div style="flex:1;min-width:0"><label>To</label><input type="date" id="pto" style="width:100%;min-width:0"></div></div>
     <button class="btn btn-ghost btn-block" style="margin-top:10px" data-a="addpause">Add pause</button></div>`;
 }
+/* ---------- Stats page, Cutie version (1.7.1) ----------
+   With Cutie on, Stats swaps the PR, strength-across-blocks, cardio and body
+   sections for title progression, badges and Cutie metrics. */
+function cutiePace(){
+  const L=cutieLedger(), from=isoShift(todayISO(),-56);
+  const pts=[...L.workouts, ...L.extraCardio].filter(x=>x.date>=from).reduce((t,x)=>t+x.total,0);
+  return Math.round(pts/8);
+}
+function cutieJourneyHTML(){
+  const T=cutieTotals(), c=cutieState(), lv=cutieLevel(T.total), pace=cutiePace();
+  return `<div class="card cutie-card"><div class="kicker" style="color:var(--cutie)">Title progression</div>
+    <div class="cutie-journey">${CUTIE_TITLES.map((t,k)=>{
+      const date=c.titles[k], cur=k===lv.i, next=k===lv.i+1;
+      const reached=!!date || k<=lv.i;
+      const left=CUTIE_THRESHOLDS[k]-T.total;
+      const eta=(next && pace>0)? ` · about ${Math.max(1,Math.round(left/pace))} week${Math.round(left/pace)>1?"s":""} at your pace`:"";
+      return `<div class="cj-row ${reached?"on":""} ${cur?"cur":""}"><span class="cj-dot"></span>
+        <div style="flex:1"><b>${esc(t)}</b>${cur?` <span class="pill" style="font-size:11px">now</span>`:""}
+          <div class="faint num" style="font-size:12px">${reached? (date?`Reached ${fmtDate(date)}`:"Reached") : `${left.toLocaleString()} points to go${eta}`}</div></div>
+        <span class="faint num" style="font-size:12px">${CUTIE_THRESHOLDS[k].toLocaleString()}</span></div>`; }).join("")}</div>
+    ${pace? `<p class="faint num" style="margin:8px 0 0;font-size:12px">Your pace: about ${pace.toLocaleString()} points a week (last 8 weeks)</p>`:""}</div>`;
+}
+function cutieBadgesCardHTML(){
+  const got=S().cutie?.badges||{}, n=Object.keys(got).length;
+  return `<div class="card cutie-card"><div class="row split"><div class="kicker" style="color:var(--cutie)">Badges unlocked</div>
+      <span class="pill num">${n}/${BADGE_DEFS.length}</span></div>
+    <div class="badge-grid">${BADGE_DEFS.map((b,i)=>{ const on=!!got[b.id];
+      return `<div class="badge-tile ${on?"on":"locked"}" title="${esc(b.desc)}"><div class="badge-ico">${on?"🏅":"🔒"}</div>
+        <div class="bt-name">${esc(badgeName(i))}</div><div class="faint" style="font-size:11px">${on?fmtDate(got[b.id]):esc(b.desc)}</div></div>`; }).join("")}</div></div>`;
+}
+function cutieMetricsHTML(){
+  const T=cutieTotals(), W=T.ledger.workouts, P=cutiePeriods();
+  const n=W.length, avg=n? Math.round(W.reduce((t,w)=>t+w.total,0)/n) : 0;
+  const tile=(v,l)=>`<div><div class="tot-n num">${v}</div><div class="faint">${l}</div></div>`;
+  const sum=k=>W.reduce((t,w)=>t+(w[k]||0),0);
+  return `<div class="card cutie-card"><div class="kicker" style="color:var(--cutie)">Cutie stats</div>
+    <div class="tot-grid">
+      ${tile(avg.toLocaleString(),"points per workout")}
+      ${tile(P.bestWeek.toLocaleString(),"best week")}
+      ${tile(P.bestMonth.toLocaleString(),"best month")}
+      ${tile(W.filter(w=>w.streak).length,"streak weeks")}
+      ${tile(sum("prs"),"PRs (bonus)")}
+      ${tile(W.filter(w=>w.full).length,"full workouts")}
+      ${tile(sum("beats"),"lifts beaten")}
+      ${tile(W.filter(w=>w.comeback).length,"welcome backs")}
+      ${tile(sum("cardioMin")+T.ledger.extraCardio.reduce((t,c)=>t+c.cardioMin,0),"cardio minutes")}
+    </div>
+    <p class="faint" style="margin:8px 0 0;font-size:12px">Bonus counts start from 1.7.0. Tap your total above for where every point came from.</p></div>`;
+}
 /* ---------- confetti (no library, offline) ---------- */
 function confetti(){
   try{
@@ -5498,7 +5560,7 @@ VIEWS.analytics=function(){
       <p class="faint" style="margin:8px 0 0">Average per week. Tick = weekly target. Green = target met.${
         partialWeek?` Week ${partialWeek} is in progress and not counted yet.`:""}${
         totals.cardioMin?" Cardio is minutes per week, not sets.":""}</p></div>
-    ${prList.length? `<div class="card"><div class="kicker">PRs this ${term("meso")}</div>
+    ${!cutieOn() && prList.length? `<div class="card"><div class="kicker">PRs this ${term("meso")}</div>
       <div class="stack" style="margin-top:8px">${prList.slice(0,6).map(p=>
         `<div class="row split num"><span>${esc(p.name)}</span>
          <span class="pill grn">e1RM ${dispW(p.from)} → ${dispW(p.to)}${U}</span></div>`).join("")}</div></div>`:""}` : "";
@@ -5527,7 +5589,7 @@ VIEWS.analytics=function(){
         `<div class="row split num"><span>${esc(m.name)}${m.archived?' <span class="faint">· archived</span>':""}</span>
          <span class="muted">${m.workouts} workouts · ${tonnes(m.vol)}</span></div>`).join("")}</div>
       <p class="faint" style="margin:8px 0 0">Average volume per workout, oldest to newest.</p></div>
-    ${liftProg.length? `<div class="card"><div class="kicker">Strength progression across blocks</div>
+    ${!cutieOn() && liftProg.length? `<div class="card"><div class="kicker">Strength progression across blocks</div>
       <div class="stack" style="margin-top:8px">${liftProg.slice(0,6).map(p=>
         `<div class="row split num"><span>${esc(p.name)}</span>
          <span class="pill grn">+${p.pct}% · ${dispW(p.from)}→${dispW(p.to)}${U}</span></div>`).join("")}</div>
@@ -5586,8 +5648,9 @@ VIEWS.analytics=function(){
     ${section("block", `This ${term("meso")}`, blockBody)}
     ${section("trends", "Training", trendsBody)}
     ${section("blocks", `${term("Meso")}s compared`, blocksBody)}
-    ${section("cardio", "Cardio", cardioBody)}
-    ${section("body", "Body", bodyBody)}`;
+    ${cutieOn()? section("cutie", "Cutie progress", cutieJourneyHTML()+cutieBadgesCardHTML()+cutieMetricsHTML()) : ""}
+    ${cutieOn()? "" : section("cardio", "Cardio", cardioBody)}
+    ${cutieOn()? "" : section("body", "Body", bodyBody)}`;
 
   // ---- Charts: only drawn while their section is open (a closed <details>
   //      has no width), and redrawn when a section is opened ----

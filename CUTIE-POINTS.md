@@ -79,6 +79,19 @@ months away at that pace.
 - **Calendar day popup** and **opening a past workout**: that workout's points
   (tap in the workout header for its breakdown).
 
+## Stats page with Cutie on (1.7.1)
+
+Matt's call: for her, Stats drops PRs this plan, Strength progression across blocks, Cardio (incl. minutes
+by zone) and Body. It adds a "Cutie progress" section:
+
+- **Title progression**: all 10 titles, reached dates, points to go, and an estimate of weeks to the next
+  one from her pace (points in the last 8 weeks / 8, `cutiePace`).
+- **Badges unlocked**: a tile per badge, earned ones dated, locked ones with what earns them.
+- **Cutie stats**: points per workout, best week and month, streak weeks, PR bonuses, full workouts,
+  lifts beaten, welcome backs, cardio minutes.
+
+Everyone else sees the original Stats page.
+
 ## Celebrations
 
 - **New all-time best**: banner plus confetti. Never on the first ever workout.
@@ -177,4 +190,4 @@ workouts (bonus workouts count toward the plan they were done in).
 
 ## Tests
 
-`TESTS_cutie.js` (1.5.0), `TESTS_cutie16.js` (1.6.0), `TESTS_cutie17.js` (1.7.0).
+`TESTS_cutie.js` (1.5.0), `TESTS_cutie16.js` (1.6.0), `TESTS_cutie17.js` (1.7.0), `TESTS_cutiestats.js` (1.7.1).
