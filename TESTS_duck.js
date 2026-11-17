@@ -1,5 +1,6 @@
 /* The duck (dev-only for now): a small creature that turns up on a page.
-   Only shows with dev mode on AND the Duck switch on. Never on the Train tab. */
+   Only shows with dev mode on AND the Duck switch on. On the Train tab it can't be
+   tapped, and it reacts when an exercise is finished. */
 const {boot, ok, run}=require("./TESTS_lib");
 const A=boot();
 
@@ -34,10 +35,41 @@ run("duck", ()=>{
   ok("all poses turn up", poses.every(p=>seen.has(p)), [...seen].join(","));
   ok("only ever one duck", $$("#duck").length===1);
   ["home","mesos","exercises","calendar","analytics","settings"].forEach(v=>{ w.go(v); ok(`duck on ${v}`, !!duck()); });
+
+  // ---------- Train tab: there, still, and out of the way ----------
   w.go("workout");
-  ok("never on the Train tab", !duck());
+  ok("duck is on the Train tab", !!duck());
+  ok("…in the bottom-left corner", duck().dataset.spot==="bl");
+  ok("…and can't be tapped, so it never steals a set tap", duck().classList.contains("dk-notap"));
+  const trainPoses=new Set(); for(let i=0;i<20;i++){ w.go("workout"); trainPoses.add(duck().dataset.pose); }
+  ok("only still poses on Train (no walking or peeking)", [...trainPoses].every(p=>["sit","stand","sleep"].includes(p)), [...trainPoses].join(","));
+
+  // ---------- reacts when an exercise is finished ----------
+  const s0=st().activeSession, n=s0.exercises[0].sets.length;
+  const tick=i=>click($(`[data-chk="0:${i}"]`));
+  s0.exercises[0].sets.forEach(x=>{ x.kg=100; x.reps=5; x.rir=3; }); save(); w.go("workout");
+  for(let i=0;i<n-1;i++) tick(i);
+  ok("no reaction while sets remain", !duck().dataset.gesture);
+  tick(n-1);
+  ok("finishing the exercise makes the duck react", ["flex","tired","cool"].includes(duck().dataset.gesture), duck().dataset.gesture);
+  ok("…with an encouraging line", !!duck().querySelector(".dk-say") && duck().querySelector(".dk-say").textContent.length>2);
+  ok("…drawn as that gesture", !!duck().querySelector(".dk-"+duck().dataset.gesture));
+  ev("duckCheerEnd")();
+  ok("then it goes back to a resting pose", !duck().dataset.gesture && ["sit","stand"].includes(duck().dataset.pose) && !duck().querySelector(".dk-say"));
+  // a hard exercise usually gets the tired one
+  const rnd=w.Math.random; w.Math.random=()=>0.1;
+  ev("duckCheer")({sets:[{done:true,rir:0,kg:100,reps:5},{done:true,rir:1,kg:100,reps:5}]});
+  ok("a hard exercise gets the tired gesture", duck().dataset.gesture==="tired");
+  ev("duckCheerEnd")();
+  ev("duckCheer")({sets:[{done:true,rir:3,kg:100,reps:5}]});
+  ok("an easier one gets the strong gesture", duck().dataset.gesture==="flex");
+  w.Math.random=rnd; ev("duckCheerEnd")();
+  ok("every gesture draws", ["flex","tired","cool"].every(p=>/^<svg/.test(ev("duckSVG")(p).trim())));
+  tick(n-1); tick(n-1);
+  ok("un-ticking and re-ticking reacts again", !!duck().dataset.gesture);
+  ev("duckCheerEnd")();
   w.go("home");
-  ok("back again after leaving Train", !!duck());
+  ok("leaving Train puts it back to normal and tappable", !!duck() && !duck().classList.contains("dk-notap"));
 
   // ---------- tap ----------
   const force=p=>{ w.eval(`_duckPose=null; var __p=DUCK_POSES.splice(0); DUCK_POSES.push(${JSON.stringify(p)});`); w.go("home"); w.eval("DUCK_POSES.splice(0); __p.forEach(x=>DUCK_POSES.push(x));"); };
