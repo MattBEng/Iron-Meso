@@ -9,6 +9,14 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.5.0 — 2026-11-17 (Cutie Points v2, part 1)
+- Points now per workout from `cutieLedger()` (100 + 10/working set + 3/cardio min + 50 streak week),
+  lifetime total via `cutieTotals()`, new `CUTIE_THRESHOLDS` (0 to 23,000). Replaces `cutieScore`, which was
+  scoped to the Stats dropdown and counted warm-ups. Full rules: new `CUTIE-POINTS.md`.
+- Top 3 on Stats + Home, breakdown modal, points on finish/calendar/workout header, all-time and 7-day best
+  celebrations (`cutieBestCheck`), `confetti()`. Bonus workouts get the finish screen when Cutie is on.
+- Dev mode: 7 taps on Settings version; state in `liftdaddy_dev` key only. Test: `TESTS_cutie.js` (43).
+
 ### v1.4.2 — 2026-11-17 (review items A2 to A7)
 - A2 Stats `inScope` meso scope also matches `bonusOf`. A3 `dayModal` shows delete for bonus logs.
 - A4 end/delete/repeat meso clear `parkedSession` (end/delete only if it belongs to that meso).

@@ -8,10 +8,9 @@ live in `RELEASES[0]` in `index.html`, and `TESTS_about.js` fails if the two dri
 apart. Update both when you ship, and add the engineering detail to
 `CHANGELOG.md` rather than here.
 
-## 1.4.2 — 2026-11-17
+## 1.5.0 — 2026-11-17
 
-- Bonus workouts now count in the Stats tab for your current meso, and you can delete one from the calendar.
-- Ending, deleting or repeating a meso while a bonus workout is open no longer brings the old meso's workout back afterwards.
-- Deload weeks no longer make assisted exercises harder. They keep last week's assistance and halve the sets.
-- An old recovery survey no longer holds back your progression. Only a survey from your latest workout or the last 10 days counts, on Home and Stats too.
-- Adding an exercise mid-workout now uses the reps and RIR your meso sets for that lift, instead of 10 reps at RIR 2.
+- Cutie Points have had a glow-up: every workout now earns its own points (100 for finishing, 10 per working set, 3 per cardio minute, plus 50 for keeping your weekly streak). You see what you earned on the finish screen.
+- Your points are now one lifetime total, the same everywhere, and your title follows it. Tap the total on Stats to see where your points came from.
+- Your three cutest workouts ever show on Home and Stats as gold, silver and bronze. Tap one to look back at it.
+- Beat your best ever workout and you get confetti. Beat everything from the last week and you get a little shout-out too.

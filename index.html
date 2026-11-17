@@ -297,6 +297,22 @@ canvas.chart{width:100%; height:180px; display:block}
 .mgfilter .typechip{white-space:nowrap;flex:0 0 auto}
 .linkdate{color:var(--accent);font-weight:700;background:none;border:0;padding:0;font:inherit}
 .cutie-card{border-color:rgba(224,85,156,.35);background:linear-gradient(180deg,rgba(224,85,156,.06),transparent)}
+.cutie-total{display:block;background:none;border:0;padding:0;font:inherit;font-size:30px;font-weight:900;color:#E0559C;cursor:pointer;text-align:left}
+.cutie-pill{border:0;cursor:pointer;background:rgba(224,85,156,.15);color:#E0559C;font-weight:700}
+.cutie-top{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border:1px solid rgba(224,85,156,.25);border-radius:12px;background:rgba(224,85,156,.05);color:var(--text);font:inherit;cursor:pointer}
+.cutie-medal{font-size:22px}
+.cutie-earned{margin:12px 0 4px;padding:12px;border-radius:14px;background:rgba(224,85,156,.08);border:1px solid rgba(224,85,156,.3)}
+.cutie-plus{font-size:34px;font-weight:900;color:#E0559C}
+.cutie-best{font-weight:800;color:#E0559C;margin-bottom:4px}
+.cutie-best.wk{font-weight:700}
+.cutie-lines{margin-top:8px;text-align:left}
+.cutie-line{font-size:13px;padding:2px 0}
+.cutie-bar{height:6px;border-radius:3px;background:rgba(224,85,156,.15);margin:4px 0 2px;overflow:hidden}
+.cutie-bar>div{height:100%;background:#E0559C}
+.linkbtn{background:none;border:0;padding:0;font:inherit;cursor:pointer}
+.confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:9999}
+#devbadge{position:fixed;top:6px;right:6px;z-index:9998;background:#F5C542;color:#000;font:800 10px/1 system-ui;padding:4px 6px;border-radius:6px;pointer-events:none}
+.dev-card{border:1px dashed #F5C542}
 .volcard .spm-track{background:var(--line)}
 .welcome-back h3{font-size:17px;line-height:1.35}
 .update-card{border-color:var(--accent);background:var(--accent-soft)}
@@ -504,8 +520,14 @@ STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|
    stored data and moves independently. RELEASES[0] must match WHATS-NEW.md —
    the app is one offline file, so the notes are embedded, not fetched.
    TESTS_about.js fails if the two drift apart. */
-const APP_VERSION = "1.4.2";
+const APP_VERSION = "1.5.0";
 const RELEASES = [
+  {v:"1.5.0", date:"2026-11-17", notes:[
+    "Cutie Points have had a glow-up: every workout now earns its own points (100 for finishing, 10 per working set, 3 per cardio minute, plus 50 for keeping your weekly streak). You see what you earned on the finish screen.",
+    "Your points are now one lifetime total, the same everywhere, and your title follows it. Tap the total on Stats to see where your points came from.",
+    "Your three cutest workouts ever show on Home and Stats as gold, silver and bronze. Tap one to look back at it.",
+    "Beat your best ever workout and you get confetti. Beat everything from the last week and you get a little shout-out too.",
+  ]},
   {v:"1.4.2", date:"2026-11-17", notes:[
     "Bonus workouts now count in the Stats tab for your current meso, and you can delete one from the calendar.",
     "Ending, deleting or repeating a meso while a bonus workout is open no longer brings the old meso's workout back afterwards.",
@@ -1001,14 +1023,17 @@ function cheerLine(){ return FUN_CHEERS[Math.floor(Math.random()*FUN_CHEERS.leng
 /** Post-workout celebration (Fun mode): fact + cheer, then home. */
 function celebrate(log){
   const tot=log.exercises.reduce((t,e)=>t+e.sets.reduce((a,x)=>a+x.kg*x.reps,0),0);
+  const cb=cutieOn()? cutieBestCheck(log.id) : {w:null,best:null};
   const fact=funFact(tot);
   modal(`<div style="text-align:center;padding:6px 2px">
     <div style="font-size:44px">🎉</div>
     <h2 style="margin-top:6px">Workout done!</h2>
+    ${cutieOn()? cutieEarnedHTML(cb.w, cb.best) : ""}
     ${fact?`<p style="margin:12px 0 0;font-size:16px">${fact}</p>`:""}
     <p class="muted" style="margin:10px 0 0">${cheerLine()}</p>
     <button class="btn btn-primary btn-block" style="margin-top:18px" data-ok>Yay</button>
   </div>`, m=>{ m.onclick=e=>{ if(e.target.closest("[data-ok]")){ closeModal(); go("home"); } }; });
+  if(cb.best==="all") confetti();
 }
 function isCardioEx(id){ const e=exById(id); return !!(e && (e.cardio || e.muscle==="Cardio")); }
 function mesoById(id){ return S().mesocycles.find(m=>m.id===id); }
@@ -1661,6 +1686,7 @@ VIEWS.home=function(){
           <button class="btn btn-primary" style="flex:1" data-act="whatsnew">What's new</button></div></div>`:""}
     ${mesoCard}
     ${mesoVolumeCardHTML(meso, pos)}
+    ${cutieHomeHTML()}
     ${lastCard}
     <div class="card">
       <div class="row split"><div class="kicker">Cardio this week</div>
@@ -2939,7 +2965,7 @@ function renderWorkout(){
       <div class="fill" id="pfill" style="width:${total?Math.round(100*done/total):0}%"></div></div>
     <div class="row split" style="margin-bottom:12px">
       <span class="faint num" id="ptext">${done}/${total} sets${ro?"":` · ${mins} min`}</span>
-      <span class="faint num">${s.exercises.filter(e=>!e.skipped).length} exercises</span></div>
+      <span class="faint num">${s.exercises.filter(e=>!e.skipped).length} exercises${(edit && s.logId && cutieOn() && cutieWorkout(s.logId))?` · <button class="linkbtn num" data-cutie="workout" data-id="${s.logId}" style="color:#E0559C">💖 ${cutieWorkout(s.logId).total.toLocaleString()} pts</button>`:""}</span></div>
     <div id="excards" class="${ro?"readonly":""}">${s.exercises.map((ses,xi)=>exCardHTML(ses,xi)).join("")}</div>
     ${ro? `<button class="btn btn-ghost btn-block" data-a="quit" style="margin-top:6px">Close</button>`
         : `<div class="row">
@@ -4086,12 +4112,14 @@ function finishWorkout(){
     if(logged.length) S().logs.push(log);
     if(s.bonus){
       endBonus(); Store.save(); Store.flush();
+      if(cutieOn() && logged.length){ celebrate(log); return; }
       toast(FUN()?"Bonus banked 💪":"Bonus workout saved"); go("home"); return;
     }
     S().activeSession=null;
     Store.save(); Store.flush();
     if(logged.length) feedbackSurvey(log);
-    else { toast(FUN()?"Cardio logged 🫀":"Cardio logged"); go("home"); }
+    else { const cpts=cardioLogged.reduce((t,e)=>t+(+e.log.minutes||0),0)*CUTIE_PTS.cardioMin;
+      toast((FUN()?"Cardio logged 🫀":"Cardio logged")+(cutieOn()?` · +${cpts} Cutie Points`:"")); go("home"); }
   };
   if(logged.length) askDuration(guess, guess, finalize, sessionStartDate(s));
   else finalize(guess, sessionStartDate(s));        // cardio-only: no duration prompt
@@ -4129,10 +4157,10 @@ function feedbackSurvey(log){
         S().feedback.push(Object.assign({date:log.date, logId:log.id,
           difficulty:3,recovery:3,motivation:3,sleep:3,jointPain:1,fatigue:3}, ans));
         Store.save(); closeModal();
-        if(FUN()) celebrate(log); else { go("home"); toast("Session saved"); }
+        if(FUN()||cutieOn()) celebrate(log); else { go("home"); toast("Session saved"); }
       }
       if(e.target.closest("[data-skip]")){ closeModal();
-        if(FUN()) celebrate(log); else { go("home"); toast("Session saved"); } }
+        if(FUN()||cutieOn()) celebrate(log); else { go("home"); toast("Session saved"); } }
     };
   });
 }
@@ -4236,7 +4264,7 @@ function dayModal(iso, logs, cardio){
       const canEdit=logEditable(l);
       return `<div class="row" style="gap:8px">
       <button class="btn btn-ghost" style="flex:1;justify-content:flex-start" data-open="${l.id}">
-        ${esc(l.dayName)} · ${l.exercises.reduce((t,e)=>t+e.sets.length,0)} sets · W${l.week}
+        ${esc(l.dayName)} · ${l.exercises.reduce((t,e)=>t+e.sets.length,0)} sets · W${l.week}${cutieOn()?` · <span class="num" style="color:#E0559C">${(cutieWorkout(l.id)?.total||0).toLocaleString()} pts</span>`:""}
         <span class="pill" style="margin-left:auto">${canEdit?"Edit":"View"}</span></button>
       ${canEdit||l.bonus?`<button class="iconbtn" data-dellog="${l.id}" aria-label="Delete workout">✕</button>`:""}</div>`;}).join("")}
     ${cardio.map(c=>`<div class="row" style="gap:8px">
@@ -4339,7 +4367,7 @@ function returnMessage(days){
   const bank = days<=5? RETURN_MSGS_SHORT : days<=13? RETURN_MSGS_MID : RETURN_MSGS_LONG;
   return bank[Math.floor(Math.random()*bank.length)];
 }
-function cutieOn(){ return FUN() && (S().profile?.gender==="Female"); }
+function cutieOn(){ return (FUN() && (S().profile?.gender==="Female")) || !!(DEV.on && DEV.preview); }
 const CUTIE_TITLES=[
  "Gym Cutie",
  "Hot Mumma",
@@ -4427,15 +4455,226 @@ const CUTIE_MSGS=[
  "Serving protein-powered radiance 🥤",
  "Fit queen, reporting for duty 🫡",
  "That's a wrap, gorgeous 🎀"];
-function cutieScore(logs, meso){
-  // encouragement-only: workouts + streak + volume + cardio, never penalised.
-  const workouts=logs.length;
-  const streak=streakCount();
-  const vol=logs.reduce((t,l)=>t+l.exercises.reduce((a,e)=>a+e.sets.reduce((v,x)=>v+x.kg*x.reps,0),0),0);
-  const cardioMin=S().cardio.filter(c=>!meso||c.mesoId===meso.id).reduce((t,c)=>t+c.minutes,0);
-  return Math.round(workouts*100 + streak*50 + vol/50 + cardioMin*3);
+/* ---------- Cutie Points v2 (1.5.0). Full rules: CUTIE-POINTS.md ----------
+   Points are worked out from the logs every time and never stored, so editing
+   or deleting a workout corrects them and an import brings them back. Dev-mode
+   overrides live in their own storage key (DEV), never in the data or backups. */
+const CUTIE_PTS={workout:100, set:10, cardioMin:3, streakWeek:50};
+/** Points needed for each title in CUTIE_TITLES (same order). Set from Matt's
+    partner's real pace in Nov 2026 (~430 pts/week): starts at title 3, last
+    title about 9 months out. */
+const CUTIE_THRESHOLDS=[0,2000,5000,8000,10500,13000,15500,18000,20500,23000];
+function isoShift(iso, days){
+  const d=new Date(iso+"T12:00"); d.setDate(d.getDate()+days);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
-function cutieTitle(score){ return CUTIE_TITLES[Math.min(CUTIE_TITLES.length-1, Math.floor(score/1500))]; }
+/** Every workout's points, oldest first, plus cardio not attached to a workout.
+    In-workout cardio belongs to the first workout that day for the same meso
+    (or bonusOf); each cardio entry counts once. Streak: +50 on the first
+    scheduled (non-bonus) workout of a Mon-Sun week when the week before also
+    had one. Bonus workouts earn base, sets and cardio, not streak. */
+function cutieLedger(){
+  const st=S(), used=new Set();
+  const logs=st.logs.filter(l=>!l.skipped).slice()
+    .sort((a,b)=>a.date.localeCompare(b.date) || (a.loggedAt||0)-(b.loggedAt||0));
+  const weeks=new Set(logs.filter(l=>!l.bonus).map(l=>isoWeekStart(l.date)));
+  const paid=new Set();
+  const workouts=logs.map(l=>{
+    const sets=l.exercises.reduce((t,e)=>t+(e.sets||[]).filter(x=>x.done!==false && !isWarm(x)).length,0);
+    const owner=l.mesoId||l.bonusOf||null;
+    const cm=st.cardio.filter(c=>c.fromWorkout && !used.has(c.id) && c.date===l.date && (c.mesoId||null)===owner);
+    cm.forEach(c=>used.add(c.id));
+    const cardioMin=cm.reduce((t,c)=>t+(+c.minutes||0),0);
+    let streak=0;
+    if(!l.bonus){
+      const wk=isoWeekStart(l.date);
+      if(!paid.has(wk) && weeks.has(isoWeekStart(isoShift(wk,-7)))) streak=CUTIE_PTS.streakWeek;
+      paid.add(wk);
+    }
+    const w={kind:"workout", id:l.id, date:l.date, loggedAt:l.loggedAt||0, name:l.dayName||"Workout",
+      bonus:!!l.bonus, mesoId:owner, base:CUTIE_PTS.workout, sets, setPts:sets*CUTIE_PTS.set,
+      cardioMin, cardioPts:cardioMin*CUTIE_PTS.cardioMin, streak};
+    w.total=w.base+w.setPts+w.cardioPts+w.streak;
+    return w;
+  });
+  const extraCardio=st.cardio.filter(c=>!used.has(c.id))
+    .map(c=>({kind:"cardio", id:c.id, date:c.date, cardioMin:+c.minutes||0, total:(+c.minutes||0)*CUTIE_PTS.cardioMin}));
+  return {workouts, extraCardio};
+}
+function cutieTotals(){
+  const L=cutieLedger(), W=L.workouts;
+  const sum=(a,k)=>a.reduce((t,x)=>t+(x[k]||0),0);
+  const parts={workouts:sum(W,"base"), sets:sum(W,"setPts"),
+    cardio:sum(W,"cardioPts")+sum(L.extraCardio,"total"), streak:sum(W,"streak")};
+  const real=parts.workouts+parts.sets+parts.cardio+parts.streak;
+  const dp=devPoints();
+  return {total:dp??real, real, parts, ledger:L, count:W.length};
+}
+function cutieLevel(total){
+  let i=0; CUTIE_THRESHOLDS.forEach((t,k)=>{ if(total>=t) i=k; });
+  return {i, title:CUTIE_TITLES[i], next:CUTIE_TITLES[i+1]||null, nextAt:CUTIE_THRESHOLDS[i+1]??null};
+}
+function cutieTitle(score){ return cutieLevel(score).title; }
+/** Highest-scoring workouts; ties go to the most recent. */
+function cutieTop(n, list){
+  return [...list].sort((a,b)=>b.total-a.total || b.date.localeCompare(a.date) || b.loggedAt-a.loggedAt).slice(0,n);
+}
+function cutieWorkout(id){ return cutieLedger().workouts.find(w=>w.id===id)||null; }
+/** After a finish: is this workout a new all-time best, or the best of the
+    last 7 days? Never on the first ever workout; a weekly best needs another
+    workout in that window to beat. */
+function cutieBestCheck(id){
+  const W=cutieLedger().workouts, w=W.find(x=>x.id===id);
+  if(!w) return {w:null, best:null};
+  const others=W.filter(x=>x.id!==id);
+  if(!others.length) return {w, best:null};
+  if(w.total>Math.max(...others.map(x=>x.total))) return {w, best:"all"};
+  const from=isoShift(w.date,-7);
+  const recent=others.filter(x=>x.date>=from && x.date<=w.date);
+  if(recent.length && w.total>Math.max(...recent.map(x=>x.total))) return {w, best:"week"};
+  return {w, best:null};
+}
+/** One workout's points as lines (finish screen, workout header popup). */
+function cutieLinesHTML(w){
+  const ln=(l,p)=>`<div class="row split cutie-line"><span>${l}</span><b class="num">+${p}</b></div>`;
+  return `<div class="cutie-lines">${ln("Workout done",w.base)}${w.sets?ln(`${w.sets} working set${w.sets>1?"s":""}`,w.setPts):""}${
+    w.cardioMin?ln(`${w.cardioMin} min cardio`,w.cardioPts):""}${w.streak?ln("Streak week",w.streak):""}</div>`;
+}
+function cutieEarnedHTML(w, best){
+  if(!w) return "";
+  return `<div class="cutie-earned">
+    ${best==="all"?`<div class="cutie-best">New personal best glow ✨</div>`:best==="week"?`<div class="cutie-best wk">Best workout this week 💕</div>`:""}
+    <div class="num cutie-plus">+${w.total.toLocaleString()}</div><div class="faint">Cutie Points</div>
+    ${cutieLinesHTML(w)}</div>`;
+}
+function cutieWorkoutModal(id){
+  const w=cutieWorkout(id); if(!w) return;
+  modal(`<h2>${esc(w.name)} · ${fmtDate(w.date)}</h2>${cutieEarnedHTML(w,null)}
+    <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>Close</button>`,
+    m=>{ m.onclick=e=>{ if(e.target.closest("[data-ok]")) closeModal(); }; });
+}
+function cutieBreakdownModal(){
+  const T=cutieTotals(), p=T.parts, base=T.real||1;
+  const rows=[["Workouts",`${T.count} × ${CUTIE_PTS.workout}`,p.workouts],
+    ["Sets",`${CUTIE_PTS.set} per working set`,p.sets],
+    ["Cardio",`${CUTIE_PTS.cardioMin} per minute`,p.cardio],
+    ["Streak weeks",`${CUTIE_PTS.streakWeek} a week`,p.streak]];
+  modal(`<h2>Your Cutie Points</h2>
+    <div class="stack" style="margin-top:10px">${rows.map(([l,s,v])=>`<div>
+      <div class="row split"><span><b>${l}</b> <span class="faint">${s}</span></span><b class="num">${v.toLocaleString()}</b></div>
+      <div class="cutie-bar"><div style="width:${Math.round(100*v/base)}%"></div></div>
+      <div class="faint num" style="font-size:12px">${Math.round(100*v/base)}% of your points</div></div>`).join("")}</div>
+    <div class="row split" style="margin-top:12px"><b>Total</b><b class="num">${T.real.toLocaleString()}</b></div>
+    ${T.total!==T.real?`<p class="faint">Dev override showing ${T.total.toLocaleString()}.</p>`:""}
+    <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>Close</button>`,
+    m=>{ m.onclick=e=>{ if(e.target.closest("[data-ok]")) closeModal(); }; });
+}
+function cutieTopHTML(top, mBest){
+  if(!top.length) return "";
+  const medal=["🥇","🥈","🥉"];
+  return `<div class="kicker" style="margin-top:12px;color:#E0559C">Cutest workouts ever</div>
+    <div class="stack" style="margin-top:6px;gap:6px">${top.map((w,i)=>`<button class="cutie-top" data-cutie="open" data-id="${w.id}">
+      <span class="cutie-medal" aria-hidden="true">${medal[i]}</span>
+      <span style="flex:1;text-align:left">${esc(w.name)} · ${fmtDate(w.date)}<br><span class="faint num" style="font-size:12px">${w.sets} sets${w.cardioMin?` · ${w.cardioMin} min cardio`:""}</span></span>
+      <b class="num">${w.total.toLocaleString()}</b></button>`).join("")}</div>
+    ${mBest && !top.some(t=>t.id===mBest.id)?`<p class="faint num" style="margin:8px 0 0">Best this ${term("meso")}: ${esc(mBest.name)} · ${fmtDate(mBest.date)} · <b>${mBest.total.toLocaleString()}</b></p>`:""}`;
+}
+function cutieHomeHTML(){
+  if(!cutieOn()) return "";
+  const T=cutieTotals(); if(!T.count) return "";
+  return `<div class="card cutie-card">
+    <div class="row split"><div class="kicker" style="color:#E0559C">${esc(cutieTitle(T.total))}</div>
+      <button class="pill num cutie-pill" data-cutie="breakdown">💖 ${T.total.toLocaleString()} pts</button></div>
+    ${cutieTopHTML(cutieTop(3, T.ledger.workouts), null)}</div>`;
+}
+/* ---------- confetti (no library, offline) ---------- */
+function confetti(){
+  try{
+    if(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const c=document.createElement("canvas"), ctx=c.getContext && c.getContext("2d");
+    if(!ctx) return;
+    const dpr=window.devicePixelRatio||1, W=innerWidth, H=innerHeight;
+    c.className="confetti"; c.width=W*dpr; c.height=H*dpr; ctx.scale(dpr,dpr);
+    document.body.appendChild(c);
+    const cols=["#E0559C","#FF8FC7","#FFD1E8","#F5C542","#A78BD9","#FFFFFF"];
+    const P=Array.from({length:150},()=>({x:Math.random()*W, y:-20-Math.random()*H*.5,
+      vx:(Math.random()-.5)*4, vy:2+Math.random()*4, r:Math.random()*Math.PI, vr:(Math.random()-.5)*.3,
+      w:6+Math.random()*6, h:8+Math.random()*8, c:cols[Math.floor(Math.random()*cols.length)]}));
+    const end=Date.now()+2800;
+    const tick=()=>{
+      ctx.clearRect(0,0,W,H);
+      P.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.vy+=.06; p.r+=p.vr;
+        ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r); ctx.fillStyle=p.c;
+        ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h); ctx.restore(); });
+      if(Date.now()<end) requestAnimationFrame(tick); else c.remove();
+    };
+    requestAnimationFrame(tick);
+  }catch(_){}
+}
+/* ---------- dev mode: Settings > tap the version 7 times ----------
+   Sandboxed: everything lives in DEV (own localStorage key), never in the
+   training data, exports or backups. Turning it off deletes the key. */
+const DEV_KEY="liftdaddy_dev";
+let DEV=(()=>{ try{ return JSON.parse(localStorage.getItem(DEV_KEY))||{}; }catch(_){ return {}; } })();
+function devSave(){ try{ if(DEV.on) localStorage.setItem(DEV_KEY, JSON.stringify(DEV)); else localStorage.removeItem(DEV_KEY); }catch(_){} }
+function devPoints(){ return DEV.on && Number.isFinite(DEV.points)? DEV.points : null; }
+let _devTaps=0, _devTapAt=0;
+function devTap(){
+  const now=Date.now(); if(now-_devTapAt>1500) _devTaps=0; _devTapAt=now;
+  if(++_devTaps<7) return; _devTaps=0;
+  if(DEV.on){ DEV={}; toast("Dev mode off, overrides cleared"); }
+  else { DEV={on:true}; toast("Dev mode on"); }
+  devSave(); applyDevBadge(); go("settings");
+}
+function applyDevBadge(){
+  let b=document.getElementById("devbadge");
+  if(DEV.on && !b){ b=document.createElement("div"); b.id="devbadge"; b.textContent="DEV"; document.body.appendChild(b); }
+  if(!DEV.on && b) b.remove();
+}
+function devPanelHTML(){
+  if(!DEV.on) return "";
+  const T=cutieTotals();
+  const b=(k,l)=>`<button class="btn btn-ghost btn-sm" data-dev="${k}">${l}</button>`;
+  return `<div class="card dev-card"><h3>Dev mode</h3>
+    <p class="faint" style="margin:4px 0 10px">Testing only. Nothing here touches workouts or backups. Tap the version 7 times to turn off and clear.</p>
+    <label class="row" style="gap:10px"><input type="checkbox" data-dev="preview" ${DEV.preview?"checked":""} style="width:22px;height:22px"> Preview Cutie features</label>
+    <p class="num" style="margin:10px 0 6px">Points: real ${T.real.toLocaleString()} · showing <b>${T.total.toLocaleString()}</b> (${esc(cutieTitle(T.total))})</p>
+    <div class="row" style="gap:6px;flex-wrap:wrap">
+      <input id="devpts" type="number" inputmode="numeric" placeholder="Points" style="width:110px">
+      ${b("setpts","Set")}${b("add1000","+1,000")}${b("unlock","Unlock all")}${b("lock","Real points")}</div>
+    <div class="kicker" style="margin-top:12px">Fire a celebration</div>
+    <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">
+      ${b("confetti","Confetti")}${b("best","New best")}${b("week","Weekly best")}${b("finish","Finish screen")}</div>
+    <button class="btn btn-danger btn-block" style="margin-top:12px" data-dev="reset">Reset all dev overrides</button></div>`;
+}
+function devFake(){ return {name:"Test workout", date:todayISO(), base:100, sets:9, setPts:90, cardioMin:10, cardioPts:30, streak:50, total:270}; }
+function devFire(kind){
+  const best=kind==="best"?"all":kind==="week"?"week":null;
+  if(kind!=="confetti") modal(`${cutieEarnedHTML(devFake(), best)}
+    <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>Close</button>`,
+    m=>{ m.onclick=e=>{ if(e.target.closest("[data-ok]")) closeModal(); }; });
+  if(kind==="confetti"||kind==="best") confetti();
+}
+/* One delegated handler for cutie and dev controls on any screen. */
+document.addEventListener("click", e=>{
+  const c=e.target.closest("[data-cutie]");
+  if(c){
+    const k=c.dataset.cutie;
+    if(k==="breakdown"){ cutieBreakdownModal(); return; }
+    if(k==="open"){ startLogEdit(c.dataset.id, true); return; }
+    if(k==="workout"){ cutieWorkoutModal(c.dataset.id); return; }
+  }
+  const d=e.target.closest("[data-dev]"); if(!d || !DEV.on) return;
+  const k=d.dataset.dev;
+  if(k==="preview"){ DEV.preview=d.checked; devSave(); toast(DEV.preview?"Cutie preview on":"Cutie preview off"); return; }
+  if(k==="setpts"){ const v=parseInt($("#devpts")?.value,10); if(!Number.isFinite(v)||v<0){ toast("Enter a number"); return; } DEV.points=v; }
+  if(k==="add1000") DEV.points=(devPoints()??cutieTotals().real)+1000;
+  if(k==="unlock") DEV.points=CUTIE_THRESHOLDS[CUTIE_THRESHOLDS.length-1];
+  if(k==="lock") delete DEV.points;
+  if(k==="reset"){ DEV={on:true}; toast("Dev overrides cleared"); }
+  if(["confetti","best","week","finish"].includes(k)){ devFire(k); return; }
+  devSave(); go("settings");
+});
 function cutieMsg(){ return CUTIE_MSGS[Math.floor(Math.random()*CUTIE_MSGS.length)]; }
 const CUTIE_FOOTERS=[
  "You got this, babe 💕",
@@ -4539,16 +4778,18 @@ const CUTIE_FOOTERS=[
  "Unbothered, moisturised, mid-squat 🍑",
  "Certified fine and functional 💅"];
 function cutieFooter(){ return CUTIE_FOOTERS[Math.floor(Math.random()*CUTIE_FOOTERS.length)]; }
-function cutieCardHTML(logs, meso, pos){
+function cutieCardHTML(){
   if(!cutieOn()) return "";
-  const score=cutieScore(logs, meso);
-  return `<div class="card cutie-card">
-    <div class="row split"><div class="kicker" style="color:#E0559C">${cutieTitle(score)} points</div>
-      <span class="pill" style="background:rgba(224,85,156,.15);color:#E0559C">💖</span></div>
-    <div class="num" style="font-size:30px;font-weight:900;color:#E0559C">${score.toLocaleString()}</div>
+  const T=cutieTotals(), lv=cutieLevel(T.total), meso=activeMeso();
+  const mBest=meso? cutieTop(1, T.ledger.workouts.filter(w=>w.mesoId===meso.id))[0] : null;
+  return `<div class="card cutie-card" style="margin-bottom:14px">
+    <div class="row split"><div class="kicker" style="color:#E0559C">${esc(lv.title)} points</div>
+      <span class="pill" style="background:rgba(224,85,156,.15);color:#E0559C">💖${devPoints()!=null?" DEV":""}</span></div>
+    <button class="cutie-total num" data-cutie="breakdown" aria-label="Points breakdown">${T.total.toLocaleString()}</button>
     <div style="margin-top:4px;font-weight:600">${cutieMsg()}</div>
+    ${cutieTopHTML(cutieTop(3, T.ledger.workouts), mBest)}
     <canvas class="chart" id="cutiechart" style="margin-top:10px"></canvas>
-    <p class="faint" style="margin:6px 0 0">${cutieFooter()}</p></div>`;
+    <p class="faint" style="margin:6px 0 0">${cutieFooter()} · tap your total for the breakdown</p></div>`;
 }
 function drawCutie(logs, meso){
   if(!cutieOn()) return;
@@ -4795,7 +5036,6 @@ VIEWS.analytics=function(){
   const cardioAvg=Math.round(totals.cardioMin/spanWeeks);
 
   const blockBody = meso? `
-    ${cutieCardHTML(logs, meso, pos)}
     <div class="card"><div class="kicker">Sets per muscle · weekly</div>
       <div class="stack" style="margin-top:8px">
         ${(()=>{
@@ -4888,6 +5128,7 @@ VIEWS.analytics=function(){
     <select id="statscope" aria-label="What to show stats for" style="margin-bottom:12px">
       ${scopes.map(sc=>`<option value="${sc.id}" ${sc.id===_statScope?"selected":""}>${esc(sc.label)}</option>`).join("")}
     </select>
+    ${cutieCardHTML()}
     <div class="card" style="margin-bottom:14px">
       <div class="kicker">${esc(scope?scope.label:"Totals")}</div>
       ${(totals.workouts||totals.cardioMin)? `<div class="tot-grid">
@@ -5071,6 +5312,7 @@ VIEWS.settings=function(){
       <div class="row split" style="margin-top:6px"><span class="muted">Released</span><span class="faint num">${fmtDate(RELEASES[0].date)}</span></div>
       <button class="btn btn-ghost btn-block" style="margin-top:12px" data-a="whatsnew">What's new in ${APP_VERSION}</button>
     </div>
+    ${devPanelHTML()}
     <p class="faint" style="text-align:center">Lift Daddy · your pocket training buddy</p>`;
   const persist=()=>{
     s.unit=$("#unit").value; s.theme=$("#theme").value;
@@ -5109,6 +5351,7 @@ VIEWS.settings=function(){
     });
   });
   $("#view").onclick=e=>{
+    if(e.target.closest("#appver")){ devTap(); return; }
     const md=e.target.closest("[data-mode]");
     if(md){ s.mode=md.dataset.mode; Store.save(); go("settings"); renderNav(); return; }
     const a=e.target.closest("[data-a]")?.dataset.a; if(!a) return;
@@ -5154,6 +5397,7 @@ function applyTheme(){
   b.dataset.theme=s.theme;
   // Fun colour schemes only take effect in Fun mode; Serious stays neutral.
   b.dataset.fun=FUN()?"1":"0";
+  applyDevBadge();
   b.dataset.scheme=s.funScheme||"default";
 }
 window.LiftDaddy=window.IronMeso={Store, ProgressionEngine, ChartManager, HistoryIndex, go, version:SCHEMA_VERSION};
