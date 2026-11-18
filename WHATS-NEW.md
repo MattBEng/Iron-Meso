@@ -8,6 +8,6 @@ live in `RELEASES[0]` in `index.html`, and `TESTS_about.js` fails if the two dri
 apart. Update both when you ship, and add the engineering detail to
 `CHANGELOG.md` rather than here.
 
-## 1.9.1 — 2026-11-18
+## 1.9.2 — 2026-11-18
 
-- Daisy can now be tapped on the Train page too. After her fifth-tap trick she waddles to the other corner, and if you push your luck with the knife she leaves that page for a couple of minutes.
+- Daisy's tricks are easier to find: every third tap does something silly, and five quick taps gets her cross. Do that twice in 30 seconds and she leaves the page for a couple of minutes.

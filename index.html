@@ -809,8 +809,11 @@ STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|
    stored data and moves independently. RELEASES[0] must match WHATS-NEW.md —
    the app is one offline file, so the notes are embedded, not fetched.
    TESTS_about.js fails if the two drift apart. */
-const APP_VERSION = "1.9.1";
+const APP_VERSION = "1.9.2";
 const RELEASES = [
+  {v:"1.9.2", date:"2026-11-18", notes:[
+    "Daisy's tricks are easier to find: every third tap does something silly, and five quick taps gets her cross. Do that twice in 30 seconds and she leaves the page for a couple of minutes.",
+  ]},
   {v:"1.9.1", date:"2026-11-18", notes:[
     "Daisy can now be tapped on the Train page too. After her fifth-tap trick she waddles to the other corner, and if you push your luck with the knife she leaves that page for a couple of minutes.",
   ]},
@@ -5713,8 +5716,8 @@ const DUCK_POSES=["sit","stand","sleep","peek","waddle","skate"];
 /* Every page except Plans: a duck wandering about while a meso is being set up gets in the way. */
 const DUCK_VIEWS=["home","exercises","calendar","analytics","settings","workout"];
 /* On the Train tab it keeps to a bottom corner in a still pose. It can be tapped like
-   anywhere else; to stay out of the way it swaps corners after every fifth-tap trick,
-   and after the knife it leaves that page for two minutes.
+   anywhere else; to stay out of the way it swaps corners after the knife, and a second
+   knife within 30s sends it off that page for two minutes.
    There it reacts on its own when an exercise is finished: see duckCheer(). */
 const DUCK_TRAIN_POSES=["sit","stand","sleep"];
 const DUCK_CHEERS={
@@ -5729,7 +5732,13 @@ const DUCK_EGG_SAYS=["Oh! 🥚","…that wasn't me 🥚","Surprise 🥚","Breakf
 let _duckPose=null;
 /* Pages she has left in a huff (after the knife), view -> time she may come back. Not saved. */
 const _duckAway={};
-const DUCK_AWAY_MS=2*60*1000;
+/* Tap timings (1.9.2). */
+const DUCK_TRICK_EVERY=3;          // every 3rd tap: an egg or the flock
+const DUCK_KNIFE_TAPS=5;           // this many quick taps in a row: the knife
+const DUCK_QUICK_MS=1500;          // a tap counts as "quick" if it lands within this of the last one
+const DUCK_SULK_WINDOW=30*1000;    // a second knife within this of the first: she leaves the page
+const DUCK_AWAY_MS=2*60*1000;      // ...for this long
+const _duckKnifeAt={};             // view -> time of the last knife there
 /* Live for Cutie profiles (Fun mode + Female) since 1.9.0. Off in Serious mode, off
    for everyone else, and off when she picks "no pet" in Settings. */
 function duckOn(){ return !!(cutieOn() && petPick()); }
@@ -5772,14 +5781,13 @@ function duckTap(e){
   const say=t=>{ const b=document.createElement("div"); b.className="dk-say"; b.textContent=t; d.appendChild(b); setTimeout(()=>b.remove(), 1900); };
   // tap counting: every 5th tap does something silly; 10 quick ones in a row and it has had enough
   const now=Date.now();
-  d._streak=(now-(d._last||0)<1000)? (d._streak||0)+1 : 1; d._last=now; d._taps=(d._taps||0)+1;
   if(d.dataset.gesture==="stab") return;
-  if(d._streak>=10){ d._streak=0; duckStab(d); return; }
-  if(d._taps%5===0){
+  d._streak=(now-(d._last||0)<DUCK_QUICK_MS)? (d._streak||0)+1 : 1; d._last=now; d._taps=(d._taps||0)+1;
+  if(d._streak>=DUCK_KNIFE_TAPS){ d._streak=0; d._taps=0; duckStab(d); return; }
+  if(d._taps%DUCK_TRICK_EVERY===0){
     if(d.dataset.pose==="sleep"){ d.dataset.pose="sit"; d.querySelector(".dk-wrap").innerHTML=duckSVG("sit"); }
     const calm=window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if(calm || Math.random()<.5) duckEgg(d); else duckFlock(d);
-    setTimeout(()=>duckMove(d), 1600);                     // then she shuffles out of the way
     return;
   }
   if(d.dataset.pose==="sleep"){
@@ -5803,7 +5811,17 @@ function duckStab(d){
   d.querySelectorAll(".dk-say,.dk-heart").forEach(x=>x.remove());
   const b=document.createElement("div"); b.className="dk-say dk-say-long";
   b.textContent=DUCK_STAB_SAYS[Math.floor(Math.random()*DUCK_STAB_SAYS.length)]; d.appendChild(b);
-  clearTimeout(_duckCheerT); _duckCheerT=setTimeout(()=>duckLeave(d), 3200);
+  // first knife: she calms down and moves to the other corner. A second one on the
+  // same page within 30s: she has had enough and leaves the page for a while.
+  const v=currentView, again=Date.now()-(_duckKnifeAt[v]||0)<DUCK_SULK_WINDOW;
+  _duckKnifeAt[v]=Date.now();
+  clearTimeout(_duckCheerT);
+  d._again=again;
+  _duckCheerT=setTimeout(()=>duckStabEnd(d), 3200);
+}
+function duckStabEnd(d){
+  if(!d || !d.isConnected) return;
+  if(d._again) duckLeave(d); else { duckCheerEnd(); duckMove(d); }
 }
 /** Swap to the other bottom corner, so she isn't sitting on whatever was under her. */
 function duckMove(d){
@@ -5969,7 +5987,8 @@ document.addEventListener("click", e=>{
   if(["confetti","best","week","finish"].includes(k)){ devFire(k); return; }
   if(k.startsWith("dk")){
     if(!duckOn()){ toast("Turn on Cutie preview and the duck first"); return; }
-    for(const v in _duckAway) delete _duckAway[v];          // let her back for testing
+    for(const v in _duckAway) delete _duckAway[v];
+    for(const v in _duckKnifeAt) delete _duckKnifeAt[v];          // let her back for testing
     if(k==="dkskate"){ duckPlace("settings", "skate"); return; }
     let dd=document.getElementById("duck"); if(!dd){ duckPlace("settings"); dd=document.getElementById("duck"); }
     if(dd){ if(k==="dkegg") duckEgg(dd); if(k==="dkflock") duckFlock(dd); if(k==="dkknife") duckStab(dd); }

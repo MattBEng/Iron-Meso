@@ -9,6 +9,12 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.9.2 — 2026-11-18 (duck tap timings)
+- Knife was too hard to reach. Timings now constants by `_duckAway`: `DUCK_TRICK_EVERY` 3 (was 5),
+  `DUCK_KNIFE_TAPS` 5 (was 10), `DUCK_QUICK_MS` 1500 (was 1000), `DUCK_SULK_WINDOW` 30s, `DUCK_AWAY_MS` 2 min.
+- Tricks no longer move her. After the knife `duckStabEnd`: first time she moves corner (`duckMove`); a second
+  knife on the same page within 30s (`_duckKnifeAt[view]`) and she leaves the page (`duckLeave`). Test: `TESTS_duck.js` (85).
+
 ### v1.9.1 — 2026-11-18 (duck: tappable on Train, gets out of the way)
 - Bug: on Train the duck had `pointer-events:none` (`dk-notap`), so tapping her hit the card underneath. Removed;
   she is tappable everywhere. To stay out of the way: after each fifth-tap trick `duckMove` swaps her bl/br corner,

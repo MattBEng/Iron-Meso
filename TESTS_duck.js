@@ -128,40 +128,44 @@ run("duck", ()=>{
   ok("tapping a sleeping duck wakes it", duck().dataset.pose==="sit" && !!duck().querySelector(".dk-say"));
   force("sit");
   const acts=new Set();
-  for(let i=1;i<=80;i++){ const a=tap(3000); if(i%5) acts.add(a); }
+  for(let i=1;i<=80;i++){ const a=tap(3000); if(i%3) acts.add(a); }
   ok("slow taps do a mix of cute things", ["say","hop","spin","heart","wig"].every(a=>acts.has(a)), [...acts].join(","));
   ok("slow taps never bring out the knife", !acts.has("stab") && duck().dataset.gesture!=="stab");
   ok("the duck tap doesn't navigate or open anything", w.eval("currentView")==="home" && !$("#overlay").innerHTML.trim());
-  // every fifth tap: an egg, or the flock
+  // every third tap: an egg, or the flock (slow taps, so no knife)
   w.go("home"); force("sit"); w.Math.random=()=>0.1;
-  for(let i=0;i<4;i++) tap(3000);
-  ok("four taps: nothing special yet", !duck().querySelector(".dk-egg") && !$(".pet-rain"));
-  ok("fifth tap lays an egg", tap(3000)==="egg" && duck().querySelectorAll(".dk-egg").length===1);
-  for(let i=0;i<20;i++) tap(3000);
+  for(let i=0;i<2;i++) tap(3000);
+  ok("two taps: nothing special yet", !duck().querySelector(".dk-egg") && !$(".pet-rain"));
+  ok("third tap lays an egg", tap(3000)==="egg" && duck().querySelectorAll(".dk-egg").length===1);
+  const spot0=duck().dataset.spot;
+  for(let i=0;i<12;i++) tap(3000);
   ok("at most three eggs", duck().querySelectorAll(".dk-egg").length===3);
+  ok("tricks don't move her", duck().dataset.spot===spot0);
   w.go("home"); force("sit"); w.Math.random=()=>0.9;
-  for(let i=0;i<4;i++) tap(3000);
+  for(let i=0;i<2;i++) tap(3000);
   ok("…or ducks rain down the screen", tap(3000)==="flock" && $$(".pet-rain i").length===18);
   w.Math.random=rnd;
   w.go("analytics");
   ok("eggs and the flock are gone on the next page", !duck().querySelector(".dk-egg") && !$(".pet-rain"));
-  // after the fifth-tap trick she moves to the other corner, out of the way
+  // five quick taps: the knife
   w.go("home"); force("sit");
   const corner=duck().dataset.spot;
-  for(let i=0;i<5;i++) tap(3000);
-  ev("duckMove")(duck());
-  ok("after the fifth-tap trick she swaps corners", ["bl","br"].includes(corner) && duck().dataset.spot!==corner && ["bl","br"].includes(duck().dataset.spot));
-  ok("…and faces the right way for that corner", duck().classList.contains("dk-flip")===(duck().dataset.spot==="br"));
-  // ten quick taps
-  w.go("home"); force("sit");
-  for(let i=0;i<9;i++) tap(200);
-  ok("nine quick taps: still friendly", duck().dataset.gesture!=="stab");
-  tap(200);
-  ok("ten quick taps: cross, with a little knife", duck().dataset.gesture==="stab" && !!duck().querySelector(".dk-stab .dk-knife"));
+  for(let i=0;i<4;i++) tap(1400);
+  ok("four quick taps: still friendly", duck().dataset.gesture!=="stab");
+  tap(1400);
+  ok("five taps under 1.5s apart: cross, with a little knife", duck().dataset.gesture==="stab" && !!duck().querySelector(".dk-stab .dk-knife"));
   ok("…and a line to match", /🔪/.test(duck().querySelector(".dk-say").textContent));
   const before=duck().querySelector(".dk-wrap").innerHTML; tap(200); tap(200);
   ok("tapping it while cross does nothing more", duck().querySelector(".dk-wrap").innerHTML===before);
-  const d0=duck(); ev("duckLeave")(d0);
+  ev("duckStabEnd")(duck());
+  ok("first knife: she calms down and moves to the other corner", !duck().dataset.gesture && ["bl","br"].includes(corner) && duck().dataset.spot!==corner);
+  ok("…facing the right way for that corner", duck().classList.contains("dk-flip")===(duck().dataset.spot==="br"));
+  ok("…and is still on the page", !!duck() && !duck().classList.contains("dk-leave"));
+  // a second knife within 30 seconds: she leaves the page
+  clock+=10000;
+  for(let i=0;i<5;i++) tap(500);
+  ok("second knife within 30s", duck().dataset.gesture==="stab");
+  const d0=duck(); ev("duckStabEnd")(d0);
   ok("then she storms off", d0.classList.contains("dk-leave") && /I'm out/.test(d0.textContent));
   d0.remove();
   w.go("analytics"); w.go("home");
@@ -170,9 +174,15 @@ run("duck", ()=>{
   ok("other pages still have her", !!duck());
   clock+=2*60*1000+1000; w.go("home");
   ok("she's back on that page after two minutes", !!duck());
+  // a second knife after 30 seconds only moves her again
   force("sit");
-  for(let i=0;i<9;i++) tap(200); tap(2500);
-  ok("a pause in the middle resets the count", duck().dataset.gesture!=="stab");
+  for(let i=0;i<5;i++) tap(500); ev("duckStabEnd")(duck());
+  clock+=31000;
+  for(let i=0;i<5;i++) tap(500); ev("duckStabEnd")(duck());
+  ok("a second knife after 30s just moves her again", !!duck() && !duck().classList.contains("dk-leave"));
+  force("sit");
+  for(let i=0;i<4;i++) tap(1400); tap(1600);
+  ok("a gap over 1.5s resets the count", duck().dataset.gesture!=="stab");
   w.Date.now=realNow;
 
   // ---------- only the duck is live; the other birds are hidden work in progress ----------
