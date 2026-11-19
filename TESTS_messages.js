@@ -21,7 +21,7 @@ run("message banks", ()=>{
   // ---------- THE FILE PARSES ----------
   const txt=fs.readFileSync(path.join(dir,"MESSAGES.txt"),"utf8");
   const sections=[...txt.matchAll(/^\[(.+)\]$/gm)].map(m=>m[1]);
-  ok("all nine sections present", sections.length===9, sections.length);
+  ok("all sections present", sections.length===10, sections.length);
   ok("every message sits under a heading",
      txt.split(/\r?\n/).findIndex(l=>l.trim() && !l.startsWith("#") && !/^\[/.test(l))
        > txt.split(/\r?\n/).findIndex(l=>/^\[/.test(l)));

@@ -8,6 +8,8 @@ live in `RELEASES[0]` in `index.html`, and `TESTS_about.js` fails if the two dri
 apart. Update both when you ship, and add the engineering detail to
 `CHANGELOG.md` rather than here.
 
-## 1.9.3 — 2026-11-19
+## 1.10.0 — 2026-11-19
 
-- Meso volume on Home now updates as you tick sets, and a grey tail on each bar shows what today's workout still adds. The numbers are gone so it reads cleaner.
+- Daisy can dress up: sunglasses, a backwards hat, a big sun hat, a floral dress and a wizard's cape, unlocked with your titles. Pick one for her head and one outfit in Settings.
+- New things Daisy sometimes does as you earn titles: lounging with a drink, a bubble bath and tiny dumbbells.
+- Bonus workout now offers Catch up (muscles behind on sets), Recovered (pick what feels fresh, skips your next workout's muscles) or Build my own.

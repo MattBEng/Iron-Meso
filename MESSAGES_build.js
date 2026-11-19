@@ -23,6 +23,7 @@ const SECTIONS={
   "CUTIE FOOTERS":                  "CUTIE_FOOTERS",
   "BADGE NAMES":                    "BADGE_NAMES",
   "TITLE LINES":                    "TITLE_LINES",
+  "DAILY LINES":                    "DAILY_LINES",
 };
 
 function parse(){

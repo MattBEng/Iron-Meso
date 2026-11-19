@@ -9,6 +9,13 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.10.0 — 2026-11-19 (duck add-ons, bonus picker, daily line)
+
+- **Duck add-ons:** `PET_ADDONS` now has `slot` = head / outfit / act. Worn items (shades@1, cap@2, sunhat@4, dress@5, cape@9) are drawn by `petSVG(pose, skin, wear)` in every pose via `head()`/`body()`; choice saved in `settings.petWear={head,outfit}`, read by `petWear()`, picked with `[data-wear]` buttons in the pet card. Acts (skate@3, lounge@6, bath@7 Certified Powerpuff, lift@8) are new poses in `DUCK_POSES`, gated by `addonOn()` like skate. Dev buttons Dumbbells/Lounge/Bath.
+- **Bonus picker:** `confirmBonusWorkout()` is now a 3-option sheet. Catch up = `bonusCatchUpPlan()` (target x share of workouts done minus sets done, gap >=2, top 3, up to 4 sets). Recovered = `bonusRecoveredPicker()`, muscles from this meso minus `bonusTiredMuscles()` (next workout + logged in last 48h), 3 sets each, max 4. Exercises come from the meso's own slots via `bonusPool()`, built by `bonusExercise()`. `startBonusWorkout(plan, label)`; blank still works with no args.
+- **Daily line:** `[DAILY LINES]` in MESSAGES.txt -> `DAILY_LINES`. `dailyLineHTML()` on Home top, one line per date (hash). Only Fun mode, Cutie off, and dev toggle `DEV.daily` for now.
+- **Why:** Matt approved #2, #3, #5 from the future-updates doc.
+
 ### v1.9.3 — 2026-11-19 (live meso volume)
 
 - **What:** Home "Meso volume" card. `mesoVolume()` now adds a `left` count per muscle. With a workout open (`activeSession` for this meso or its bonus), ticked working sets count straight away and unticking takes them back; unticked sets show as a grey tail. With no workout open, the next planned day (`mesoPosition().day`, ramped sets) shows as the grey tail.

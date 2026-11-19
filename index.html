@@ -343,6 +343,12 @@ body[data-fun="1"]:is([data-scheme="cherry"],[data-scheme="lavender"],[data-sche
 #duck[data-spot="bl"] .dk-say{left:0;transform:none;animation-name:dkSayE}
 #duck.dk-leave{transition:transform .8s ease-in,opacity .8s ease-in;transform:translateY(90px);opacity:0;pointer-events:none}
 #duck[data-pose="skate"]{animation-duration:9s}
+svg.dk{overflow:visible}
+#duck .dk-lift .dk-curl{transform-box:fill-box;transform-origin:80% 100%;animation:dkCurl 1.1s ease-in-out infinite}
+@keyframes dkCurl{0%,100%{transform:rotate(0)}50%{transform:rotate(-28deg)}}
+#duck .dk-bath .dk-float{animation:dkFloat 2.4s ease-in-out infinite}
+@keyframes dkFloat{0%{transform:translateY(0);opacity:1}100%{transform:translateY(-14px);opacity:0}}
+@media (prefers-reduced-motion: reduce){#duck .dk-curl,#duck .dk-float{animation:none}}
 #duck .dk-skate{animation:dkWobble 1.3s ease-in-out infinite;transform-origin:50% 100%}
 #duck .dk-skate .dk-rider{animation:dkLean 1.3s ease-in-out infinite;transform-box:fill-box;transform-origin:50% 100%}
 #duck .dk-skate .dk-arm{transform-box:fill-box;transform-origin:100% 100%;animation:dkTail .65s ease-in-out infinite}
@@ -810,8 +816,13 @@ STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|
    stored data and moves independently. RELEASES[0] must match WHATS-NEW.md —
    the app is one offline file, so the notes are embedded, not fetched.
    TESTS_about.js fails if the two drift apart. */
-const APP_VERSION = "1.9.3";
+const APP_VERSION = "1.10.0";
 const RELEASES = [
+  {v:"1.10.0", date:"2026-11-19", notes:[
+    "Daisy can dress up: sunglasses, a backwards hat, a big sun hat, a floral dress and a wizard's cape, unlocked with your titles. Pick one for her head and one outfit in Settings.",
+    "New things Daisy sometimes does as you earn titles: lounging with a drink, a bubble bath and tiny dumbbells.",
+    "Bonus workout now offers Catch up (muscles behind on sets), Recovered (pick what feels fresh, skips your next workout's muscles) or Build my own.",
+  ]},
   {v:"1.9.3", date:"2026-11-19", notes:[
     "Meso volume on Home now updates as you tick sets, and a grey tail on each bar shows what today's workout still adds. The numbers are gone so it reads cleaner.",
   ]},
@@ -1997,6 +2008,19 @@ function mesoVolume(meso){
     .map(m=>({muscle:m, sets:actual[m]||0, left:left[m]||0, target:target[m]||0}))
     .sort((a,b)=>(b.sets-a.sets)||(b.target-a.target)||a.muscle.localeCompare(b.muscle));
 }
+/* Daily line (men's Fun mode, dev preview for now): one line a day on Home,
+   from [DAILY LINES] in MESSAGES.txt. Same line all day, changes at midnight. */
+function dailyLineOn(){ return FUN() && !cutieOn() && !!(DEV.on && DEV.daily); }
+function dailyLine(dateISO){
+  const d=dateISO||todayISO(); let h=0;
+  for(const c of d) h=(h*31+c.charCodeAt(0))>>>0;
+  return DAILY_LINES.length? DAILY_LINES[h%DAILY_LINES.length] : "";
+}
+function dailyLineHTML(){
+  if(!dailyLineOn()) return "";
+  const t=dailyLine(); if(!t) return "";
+  return `<div class="card daily-card"><div class="kicker">Today</div><p style="margin:6px 0 0;font-size:17px;font-weight:700;line-height:1.35">${esc(t)}</p></div>`;
+}
 function mesoVolumeCardHTML(meso, pos){
   const rows=mesoVolume(meso).filter(r=>r.sets>0||r.left>0);
   if(!rows.length) return "";
@@ -2089,6 +2113,7 @@ VIEWS.home=function(){
         <div class="row" style="margin-top:12px">
           <button class="btn btn-ghost" style="flex:1" data-act="seenupdate">Dismiss</button>
           <button class="btn btn-primary" style="flex:1" data-act="whatsnew">What's new</button></div></div>`:""}
+    ${dailyLineHTML()}
     ${mesoCard}
     ${mesoVolumeCardHTML(meso, pos)}
     ${cutieHomeHTML()}
@@ -4421,27 +4446,106 @@ function workoutMenu(){
 function confirmBonusWorkout(){
   const s=S().activeSession; if(!s || s.bonus) return;
   const logged=(s.exercises||[]).reduce((n,e)=>n+(e.sets||[]).filter(x=>x.done).length,0);
-  modal(`<h2>Start a bonus workout?</h2>
-    <p class="muted">You'll get a blank workout to add exercises to. <b>${esc(s.dayName)}</b> is put on hold and will be next once the bonus is finished or discarded.${
-      logged?` Your ${logged} logged set${logged>1?"s":""} on ${esc(s.dayName)} are kept.`:""}</p>
-    <p class="faint">Bonus sets count in stats and history but don't change your ${term("meso")} targets.</p>
+  modal(`<h2>Bonus workout</h2>
+    <p class="muted"><b>${esc(s.dayName)}</b> is put on hold and stays next.${
+      logged?` Your ${logged} logged set${logged>1?"s":""} on it are kept.`:""} Bonus sets count in stats but don't change your ${term("meso")} targets.</p>
     <div class="stack" style="margin-top:14px">
-      <button class="btn btn-ghost" data-bw="no">Cancel</button>
-      <button class="btn btn-primary" data-bw="yes">Start bonus</button></div>`, m=>{
+      <button class="btn btn-ghost bonus-opt" data-bw="catch" style="text-align:left"><b>Catch up</b><span class="faint" style="display:block;font-size:13px">Muscles behind on sets this ${term("meso")}</span></button>
+      <button class="btn btn-ghost bonus-opt" data-bw="rec" style="text-align:left"><b>Recovered</b><span class="faint" style="display:block;font-size:13px">Pick what feels fresh. Skips what's in your next workout</span></button>
+      <button class="btn btn-ghost bonus-opt" data-bw="yes" style="text-align:left"><b>Build my own</b><span class="faint" style="display:block;font-size:13px">Blank page, add exercises yourself</span></button>
+      <button class="btn btn-ghost" data-bw="no">Cancel</button></div>`, m=>{
     m.onclick=ev=>{ const v=ev.target.closest("[data-bw]")?.dataset.bw; if(!v) return;
-      closeModal(); if(v==="yes") startBonusWorkout(); };
+      closeModal();
+      if(v==="yes") startBonusWorkout();
+      if(v==="catch") bonusCatchUp();
+      if(v==="rec") bonusRecoveredPicker(); };
   });
 }
-function startBonusWorkout(){
+/** Exercises this meso uses for each muscle (first slot wins), cardio excluded. */
+function bonusPool(meso){
+  const pool={};
+  (meso?.days||[]).forEach(d=>d.exercises.forEach(sl=>{
+    if(sl.cardio || isCardioEx(sl.exerciseId)) return;
+    const ex=exById(sl.exerciseId); if(!ex || ex.muscle==="Cardio") return;
+    (pool[ex.muscle] ??= []).some(x=>x.exerciseId===sl.exerciseId) || pool[ex.muscle].push(sl);
+  }));
+  return pool;
+}
+/** Muscles behind where they should be by now: planned total x share of
+    workouts done, minus sets done. Biggest gap first. */
+function bonusCatchUpPlan(meso){
+  const pos=mesoPosition(meso), share=pos.total? pos.done/pos.total : 0, pool=bonusPool(meso);
+  return mesoVolume(meso).map(r=>({muscle:r.muscle, gap:Math.round(r.target*share)-r.sets}))
+    .filter(r=>r.gap>=2 && pool[r.muscle]).sort((a,b)=>b.gap-a.gap).slice(0,3)
+    .map(r=>({slot:pool[r.muscle][0], sets:Math.min(4, r.gap)}));
+}
+function bonusCatchUp(){
+  const meso=activeMeso(), plan=meso? bonusCatchUpPlan(meso) : [];
+  if(!plan.length){
+    modal(`<h2>You're on track</h2><p class="muted">No muscle is behind on sets right now. Try Recovered, or build your own.</p>
+      <div class="stack" style="margin-top:14px"><button class="btn btn-primary" data-ok>OK</button></div>`,
+      m=>{ m.onclick=e=>{ if(e.target.closest("[data-ok]")){ closeModal(); confirmBonusWorkout(); } }; });
+    return;
+  }
+  startBonusWorkout(plan, "Catch up");
+}
+/** Muscles in the next (parked) workout, or trained in the last 2 days. */
+function bonusTiredMuscles(){
+  const st=S(), out=new Set(), cutoff=Date.now()-2*864e5;
+  (st.activeSession?.exercises||[]).forEach(e=>{ const ex=exById(e.exerciseId); if(ex) out.add(ex.muscle); });
+  st.logs.filter(l=>!l.skipped && (l.loggedAt||0)>=cutoff).forEach(l=>l.exercises.forEach(e=>{
+    if((e.sets||[]).some(x=>x.done)){ const ex=exById(e.exerciseId); if(ex) out.add(ex.muscle); } }));
+  return out;
+}
+function bonusRecoveredPicker(){
+  const meso=activeMeso(), pool=bonusPool(meso), tired=bonusTiredMuscles();
+  const muscles=Object.keys(pool).sort((a,b)=>a.localeCompare(b));
+  const fresh=muscles.filter(m=>!tired.has(m));
+  if(!fresh.length){
+    modal(`<h2>Nothing fresh</h2><p class="muted">Everything is either in your next workout or trained in the last 2 days. Rest up, or build your own.</p>
+      <div class="stack" style="margin-top:14px"><button class="btn btn-primary" data-ok>OK</button></div>`,
+      m=>{ m.onclick=e=>{ if(e.target.closest("[data-ok]")){ closeModal(); confirmBonusWorkout(); } }; });
+    return;
+  }
+  modal(`<h2>What feels recovered?</h2>
+    <p class="muted">Untick anything still sore. Muscles in your next workout are left out.</p>
+    <div class="stack" style="margin-top:10px">${fresh.map(m=>`<label class="row" style="gap:10px"><input type="checkbox" data-rm="${esc(m)}" checked style="width:22px;height:22px"> ${esc(m)}</label>`).join("")}</div>
+    <div class="stack" style="margin-top:14px">
+      <button class="btn btn-primary" data-rb="go">Start bonus</button>
+      <button class="btn btn-ghost" data-rb="no">Back</button></div>`, m=>{
+    m.onclick=ev=>{ const v=ev.target.closest("[data-rb]")?.dataset.rb; if(!v) return;
+      const picked=[...m.querySelectorAll("[data-rm]:checked")].map(x=>x.dataset.rm);
+      if(v==="go" && !picked.length){ toast("Tick at least one"); return; }
+      closeModal();
+      if(v==="no"){ confirmBonusWorkout(); return; }
+      startBonusWorkout(picked.slice(0,4).map(mu=>({slot:pool[mu][0], sets:3})), "Recovered");
+    };
+  });
+}
+/** A bonus exercise built like a scheduled one: suggestion, ghost rows. */
+function bonusExercise(slot, nSets){
+  const sug=ProgressionEngine.suggest(slot.exerciseId, slot.reps, slot.rir);
+  const exRef=exById(slot.exerciseId);
+  const isBW=!!(exRef && exRef.equipment==="Bodyweight"), isTimed=!!(exRef && exRef.timed);
+  const kg=sug? sug.kg : 0, repTarget=(sug && sug.bodyweight)? sug.reps : slot.reps;
+  return {slotId:null, exerciseId:slot.exerciseId, bodyweight:isBW, timed:isTimed,
+    target:{sets:nSets, reps:repTarget, rir:slot.rir, rest:slot.rest, notes:"", secs:isTimed?(slot.secs||30):undefined},
+    suggestion:isTimed? null : sug, notes:"", skipped:false, rowsReady:true,
+    sets: isTimed? buildTimedRows(nSets, slot.secs||30, slot.rir)
+        : isBW? buildSetRows(nSets, 0, repTarget, slot.rir)
+            : buildGhostRows(slot.exerciseId, nSets, kg, slot.reps, slot.rir, sug, false)};
+}
+function startBonusWorkout(plan, label){
   const st=S(), cur=st.activeSession, meso=activeMeso();
   if(!cur || cur.bonus) return;
   stopRest();
   st.parkedSession=cur;
   st.activeSession={
     id:uid(), bonus:true, bonusOf:meso?meso.id:null, mesoId:null,
-    week:cur.week, dayIdx:cur.dayIdx, dayId:null, dayName:"Bonus workout",
+    week:cur.week, dayIdx:cur.dayIdx, dayId:null, dayName:label? "Bonus: "+label : "Bonus workout",
     nextName:cur.dayName, mesoName:meso?meso.name:"",
-    date:todayISO(), startedAt:Date.now(), notes:"", deload:false, exercises:[]
+    date:todayISO(), startedAt:Date.now(), notes:"", deload:false,
+    exercises:(plan||[]).map(p=>bonusExercise(p.slot, p.sets))
   };
   Store.save(); Store.flush();
   go("workout");
@@ -5635,8 +5739,12 @@ const PETS=[
   {wip:1, id:"duchess", name:"Duchess", kind:"royal swan",  at:8, b:"#FFFDF8", w:"#EEF1FA", k:"#FF8A3D", f:"#4A3F52", x:"crown"},
   {wip:1, id:"goldie",  name:"Goldie",  kind:"golden goose",at:9, b:"#FFD24A", w:"#FFB81F", k:"#FF8A3D", f:"#FF8A3D", x:"sparkle"},
 ];
-function petSVG(pose, skin){
+/* What the duck is wearing right now (one head item, one outfit). Set by duckSVG
+   from settings.petWear; empty for pet previews in Settings. */
+let _petWear={};
+function petSVG(pose, skin, wear){
   skin=skin||PETS[0];
+  const W=wear||{};
   const INK="#352f3d";
   const O=`stroke="${INK}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"`;
   const B=`fill="${skin.b}"`, H=`fill="${skin.h||skin.b}"`, WG=`fill="${skin.w}"`, K=`fill="${skin.k}"`, F=`fill="${skin.f}"`;
@@ -5650,11 +5758,24 @@ function petSVG(pose, skin){
   const extra= skin.x==="crown"? `<path d="M36.6 9.200l.6-6.400l3.2 3.400l2.4-4.600l2.4 4.600l3.2-3.400l.6 6.400z" fill="#FFD24A" ${O}/>`
     : skin.x==="crest"? `<path d="M36.5 9.500c-3-2.5-3.5-6-1.5-8c2 1.5 3 3.5 3.5 6c.5-3 2.5-5 5-5c.5 2.5 0 5-2 7z" ${WG} ${O}/>`
     : skin.x==="sparkle"? `<g fill="#fff" stroke="${INK}" stroke-width="1.2" stroke-linejoin="round"><path d="M33 5l1.2 2.800l2.8 1.200l-2.8 1.200l-1.2 2.800l-1.2-2.800l-2.8-1.200l2.8-1.200z"/></g>` : "";
-  const head=(eye,bk,more)=>`<path d="M34.6 37C33 29 33.6 25 35.6 22.2A9.4 9.4 0 1 1 49.6 23C48 27 47.6 32 48 38" ${H} ${O}/>${extra}${blush}${eye}${bk||beak}${more||""}`;
+  const SHADES=`<g><path d="M40.4 12.2h9.600l-.8 4.400c-.4 1.4-1.8 2-3.2 2h-2.400c-1.6 0-3-1-3.2-2.600z" fill="${INK}" ${O}/><path d="M40.4 13l-5-1.6" fill="none" ${O}/><path d="M43 13.600l2 .1" stroke="#fff" stroke-width="1.2" stroke-linecap="round"/></g>`;
+  const HATS={
+    shades:"",
+    cap:`<g class="dk-hat"><path d="M34.200 10.800c.6-5.600 5-8.400 9.200-8.200c4.400.2 7.600 3.400 7.400 8z" fill="#4FA3FF" ${O}/><path d="M34.600 10.600l-8.200 1.600c-1 .4-1 2 .4 2.200l8.400-1z" fill="#2F7FD6" ${O}/><circle cx="43" cy="2.800" r="1.400" fill="#2F7FD6"/></g>`,
+    sunhat:`<g class="dk-hat"><ellipse cx="42.500" cy="8.800" rx="15" ry="3.400" fill="#F7E2A8" ${O}/><path d="M35.400 8.400c0-4.600 3.200-7 7.200-7s7.200 2.400 7.200 7z" fill="#F7E2A8" ${O}/><path d="M35.600 7.200h14" stroke="#FF7AB6" stroke-width="2.400"/><circle cx="36.400" cy="6.600" r="2" fill="#FF7AB6" ${O}/></g>`
+  };
+  const hat=W.head? (HATS[W.head]||"") : "";
+  const head=(eye,bk,more)=>`<path d="M34.6 37C33 29 33.6 25 35.6 22.2A9.4 9.4 0 1 1 49.6 23C48 27 47.6 32 48 38" ${H} ${O}/>${extra}${blush}${W.head==="shades"&&eye? SHADES : eye}${bk||beak}${more||""}${hat}`;
   const tail=`<path class="dk-tail" d="M14.5 39.5c-5.5-3-6.5-7.5-4.5-10.5c3 3.5 6.5 5 10.5 5.5z" ${B} ${O}/>`;
   const wing=`<path class="dk-wing" d="M21 41.5c6-5 13-5 18.5-.5c-2.5 8-10 11-17 7.500c-2-2-2.5-4.5-1.5-7z" ${WG} ${O}/>`;
   const chest=(cy,ry)=>skin.chest? `<ellipse cx="40.5" cy="${cy+1.5}" rx="6.5" ry="${ry-4}" fill="${skin.chest}"/>` : "";
-  const body=(cy,ry)=>`<ellipse cx="30" cy="${cy}" rx="18.5" ry="${ry}" ${B} ${O}/>${chest(cy,ry)}`;
+  const flowers=(cy)=>[[18,cy+4],[26,cy+8],[34,cy+5],[41,cy+8],[22,cy+9.5]].map(([x,y])=>`<g transform="translate(${x},${y})"><circle r="1.700" fill="#FFF6DD"/><circle r=".800" fill="#F6A21E"/></g>`).join("");
+  const outfit=(cy,ry)=> W.outfit==="dress"
+      ? `<path class="dk-dress" d="M11.800 ${cy+.5}h36.400c-.4 ${ry*.7}-8.400 ${ry+.6}-18.200 ${ry+.6}s-17.800-${ry*.3}-18.200-${ry+.6-ry*.4}z" fill="#FF8FB8" ${O}/>${flowers(cy)}`
+    : W.outfit==="cape"
+      ? `<path class="dk-cape" d="M38 ${cy-ry+1}c-8-1-17 0-24 4c-3 5-4.400 10-3.400 ${ry+2}c6 3 14 3 21 0z" fill="#6B4FD8" ${O}/><g fill="#FFD24A"><path d="M18 ${cy-1}l.8 1.800l1.800.8l-1.800.8l-.8 1.800l-.8-1.800l-1.800-.8l1.800-.8z"/><circle cx="24" cy="${cy+6}" r="1"/><circle cx="15" cy="${cy+6}" r=".8"/></g>`
+    : "";
+  const body=(cy,ry)=>`<ellipse cx="30" cy="${cy}" rx="18.5" ry="${ry}" ${B} ${O}/>${chest(cy,ry)}${outfit(cy,ry)}`;
   const leg=(x,c)=>`<g class="${c}"><path d="M${x} 49v8" fill="none" stroke="${INK}" stroke-width="5" stroke-linecap="round"/><path d="M${x} 49v8" fill="none" stroke="${skin.f}" stroke-width="2.2" stroke-linecap="round"/>
       <path d="M${x-4.5} 60.5c0-3 2-4.5 4.5-4.5s6.5 1.5 7.5 4.500z" ${F} ${O}/></g>`;
   const wrap=(cls,inner)=>{ const s=skin.s||1; return `<svg viewBox="0 0 64 64" class="dk dk-${cls}">${s===1? inner : `<g transform="translate(${32*(1-s)},${62*(1-s)}) scale(${s})">${inner}</g>`}</svg>`; };
@@ -5690,6 +5811,24 @@ function petSVG(pose, skin){
     const arm=`<path class="dk-arm" d="M22 42c-6-2-10-6-11-11c3-1.5 6.5 0 9 3c3 3 5 6 8 7z" ${WG} ${O}/>`;
     return wrap("skate", `${board}<g class="dk-rider" transform="translate(0,-5.5)">${standing(head(eyeOpen), arm)}</g>`);
   }
+  /* add-on: tiny dumbbells. A little curl, over and over. */
+  if(pose==="lift"){
+    const db=`<g class="dk-db"><rect x="-6" y="-1" width="12" height="2" rx="1" fill="${INK}"/><rect x="-7.500" y="-3.800" width="3.400" height="7.600" rx="1.200" fill="#FF7AB6" ${O}/><rect x="4.100" y="-3.800" width="3.400" height="7.600" rx="1.200" fill="#FF7AB6" ${O}/></g>`;
+    const arm=`<g class="dk-curl"><path d="M23 40c-4-4-6-9-5-14c2-2 5-1.500 6 1c1 4 2 8 4 11z" ${WG} ${O}/><g transform="translate(18,24) rotate(-20)">${db}</g></g>`;
+    return wrap("lift", standing(head(eyeOpen,null,`<path d="M42.400 11.400l5 1.400" fill="none" ${O}/>`), arm));
+  }
+  /* add-on: relax lounge. Deck chair, a drink with a little umbrella. */
+  if(pose==="lounge"){
+    const chair=`<g class="dk-chair"><path d="M6 61l10-24M58 61l-8-12" stroke="#9A6240" stroke-width="2.600" stroke-linecap="round"/><path d="M12 36l-4 16l44 2l4-6z" fill="#FFB3D1" ${O}/><path d="M11 40l42 10M9.500 46l43 6" stroke="#FFF6DD" stroke-width="2.200"/></g>`;
+    const drink=`<g class="dk-drink" transform="translate(56,36)"><path d="M-3 0h6l-1 7h-4z" fill="#FFD24A" ${O}/><path d="M0 0l3-8" stroke="${INK}" stroke-width="1.200"/><path d="M-2-8c2-3 8-3 10 0z" fill="#4FA3FF" ${O}/></g>`;
+    return wrap("lounge", `${chair}<g transform="translate(-2,-3) rotate(-8 30 44)">${tail}${body(44,13.500)}${head(W.head==="shades"? eyeOpen : eyeShut)}${wing}</g>${drink}`);
+  }
+  /* add-on: bubble bath. Just her head and the bubbles. */
+  if(pose==="bath"){
+    const tub=`<g class="dk-tub"><path d="M6 44h52c0 9-6 14-14 14h-24c-8 0-14-5-14-14z" fill="#FFFDF8" ${O}/><path d="M14 57l-2 5M50 57l2 5" stroke="${INK}" stroke-width="2.600" stroke-linecap="round"/></g>`;
+    const bub=`<g class="dk-bubbles" fill="#EAF6FF" stroke="${INK}" stroke-width="1.400">${[[10,42,5],[18,40,6],[27,42,5],[52,41,6],[58,43,4],[45,43,4]].map(([x,y,r])=>`<circle cx="${x}" cy="${y}" r="${r}"/>`).join("")}<circle class="dk-float" cx="20" cy="26" r="2.500"/><circle class="dk-float" cx="12" cy="18" r="1.800"/></g>`;
+    return wrap("bath", `<g transform="translate(-6,6)">${head(eyeShut)}</g>${tub}${bub}`);
+  }
   /* tapped too many times, too fast: cross, and holding a very small knife. Still cute. */
   if(pose==="stab"){
     const brow=`<path d="M41.2 10.400l6.4 2.6" fill="none" stroke="${skin.e?"#fff":INK}" stroke-width="2.6" stroke-linecap="round"/>`;
@@ -5719,12 +5858,24 @@ function petPick(){
   const un=petsLive().filter(petUnlocked);
   return un[un.length-1]||null;
 }
-function duckSVG(pose){ return petSVG(pose, petPick()||PETS[0]); }
+function duckSVG(pose){ return petSVG(pose, petPick()||PETS[0], petWear()); }
+/** What she's wearing: one head item and one outfit, each only if unlocked. */
+function petWear(){
+  const w=S().settings.petWear||{}, out={};
+  ["head","outfit"].forEach(slot=>{ const a=PET_ADDONS.find(x=>x.id===w[slot] && x.slot===slot); if(a && addonUnlocked(a)) out[slot]=a.id; });
+  return out;
+}
 function petsCardHTML(){
   if(!cutieOn()) return "";                       // Cutie only: never in Serious mode
   const cur=petPick(), vis=cutieVisibleMax(), live=petsLive(), many=live.length>1;
   const hidden=live.filter(p=>p.at>vis).length, sw='style="width:24px;height:24px;flex:0 0 auto"';
-  const addons=PET_ADDONS.filter(a=>a.at<=vis).map(a=>{ const ok=addonUnlocked(a); return `
+  const wear=petWear();
+  const wearRow=(slot,label)=>{ const items=PET_ADDONS.filter(a=>a.slot===slot && a.at<=vis); if(!items.length) return "";
+    return `<div class="faint" style="margin:10px 0 6px;font-size:13px">${label}</div><div class="row" style="gap:6px;flex-wrap:wrap">
+      <button class="btn btn-sm ${wear[slot]?"btn-ghost":"btn-primary"}" data-wear="${slot}:" ${cur?"":"disabled"}>None</button>
+      ${items.map(a=>{ const ok=addonUnlocked(a); return `<button class="btn btn-sm ${wear[slot]===a.id?"btn-primary":"btn-ghost"}" data-wear="${slot}:${a.id}" ${ok&&cur?"":"disabled"}>${a.emoji} ${ok? esc(a.name) : "🔒 "+esc(CUTIE_TITLES[a.at])}</button>`; }).join("")}</div>`; };
+  const wearHTML=wearRow("head","On her head")+wearRow("outfit","Outfit");
+  const addons=PET_ADDONS.filter(a=>a.slot==="act" && a.at<=vis).map(a=>{ const ok=addonUnlocked(a); return `
     <label class="pet-row ${ok?"":"locked"}"><span class="pet-ico">${a.emoji}</span>
       <span style="flex:1"><b>${esc(a.name)}</b><span class="faint" style="display:block;font-size:13px">${ok? esc(a.blurb) : "🔒 Unlocks at "+esc(CUTIE_TITLES[a.at])}</span></span>
       <input type="checkbox" data-addon="${a.id}" ${ok && addonOn(a.id)?"checked":""} ${ok && cur?"":"disabled"} ${sw}></label>`; }).join("");
@@ -5740,10 +5891,12 @@ function petsCardHTML(){
     :`<label class="pet-row"><span class="pet-ico pet-ico-svg">${petSVG("sit", live[0])}</span>
       <span style="flex:1"><b>Show ${esc(live[0].name)}</b><span class="faint" style="display:block;font-size:13px">On every page except Plans</span></span>
       <input type="checkbox" data-petshow ${cur?"checked":""} ${sw}></label>`}
-    ${addons?`<div class="kicker" style="margin-top:14px">Her things</div>${addons}`:""}
+    ${wearHTML?`<div class="kicker" style="margin-top:14px">Dress her up</div>${wearHTML}`:""}
+    ${addons?`<div class="kicker" style="margin-top:14px">Things she does</div>${addons}`:""}
     ${more?`<p class="faint" style="margin:10px 0 0">She picks up more as you earn titles 👀</p>`:""}</div>`;
 }
-const DUCK_POSES=["sit","stand","sleep","peek","waddle","skate"];
+const DUCK_POSES=["sit","stand","sleep","peek","waddle","skate","lift","lounge","bath"];
+const DUCK_ACTS=["skate","lift","lounge","bath"];
 /* Every page except Plans: a duck wandering about while a meso is being set up gets in the way. */
 const DUCK_VIEWS=["home","exercises","calendar","analytics","settings","workout"];
 /* On the Train tab it keeps to a bottom corner in a still pose. It can be tapped like
@@ -5775,8 +5928,18 @@ const _duckKnifeAt={};             // view -> time of the last knife there
 function duckOn(){ return !!(cutieOn() && petPick()); }
 /* Add-ons: things the duck picks up as titles are earned. Each can be switched
    off in Settings (settings.petAddons[id]===false). More to come. */
+/* slot: "head" / "outfit" are worn (one of each, picked in Settings);
+   "act" are things she sometimes does (random pose, each can be switched off). */
 const PET_ADDONS=[
-  {id:"skate", name:"Skateboard", emoji:"🛹", at:3, blurb:"Now and then she skates across the page"},
+  {id:"shades",   slot:"head",   name:"Sunglasses",     emoji:"🕶️", at:1, blurb:"Too cool"},
+  {id:"cap",      slot:"head",   name:"Backwards hat",  emoji:"🧢", at:2, blurb:"Gym bro energy"},
+  {id:"skate",    slot:"act",    name:"Skateboard",     emoji:"🛹", at:3, blurb:"Now and then she skates across the page"},
+  {id:"sunhat",   slot:"head",   name:"Big sun hat",    emoji:"👒", at:4, blurb:"Sun safe and fabulous"},
+  {id:"dress",    slot:"outfit", name:"Floral dress",   emoji:"👗", at:5, blurb:"Pretty in pink"},
+  {id:"lounge",   slot:"act",    name:"Relax lounge",   emoji:"🏖️", at:6, blurb:"Sometimes she kicks back with a drink"},
+  {id:"bath",     slot:"act",    name:"Bubble bath",    emoji:"🛁", at:7, blurb:"Sometimes she's in the tub"},
+  {id:"lift",     slot:"act",    name:"Tiny dumbbells", emoji:"🏋️", at:8, blurb:"Sometimes she gets a set in"},
+  {id:"cape",     slot:"outfit", name:"Wizard's cape",  emoji:"🧙", at:9, blurb:"Magic"},
 ];
 function addonUnlocked(a){ return cutieUnlockedIdx()>=a.at; }
 function addonOn(id){
@@ -5791,7 +5954,7 @@ function duckPlace(view, force){
   if(!duckOn() || !DUCK_VIEWS.includes(view)) return;
   if((_duckAway[view]||0)>Date.now()) return;              // still sulking on this page
   const train=view==="workout";
-  const poses=(train? DUCK_TRAIN_POSES : DUCK_POSES).filter(p=>p!==_duckPose && (p!=="skate" || addonOn("skate")));
+  const poses=(train? DUCK_TRAIN_POSES : DUCK_POSES).filter(p=>p!==_duckPose && (!DUCK_ACTS.includes(p) || addonOn(p)));
   const pose=_duckPose=force||poses[Math.floor(Math.random()*poses.length)];
   const d=document.createElement("div");
   d.id="duck"; d.dataset.pose=pose; d.setAttribute("role","button"); d.setAttribute("aria-label",(petPick()||PETS[0]).name);
@@ -5958,6 +6121,7 @@ function devPanelHTML(){
   return `<div class="card dev-card"><h3>Dev mode</h3>
     <p class="faint" style="margin:4px 0 10px">Testing only. Nothing here touches workouts or backups. Tap the version 7 times to turn off and clear.</p>
     <label class="row" style="gap:10px"><input type="checkbox" data-dev="preview" ${DEV.preview?"checked":""} style="width:22px;height:22px"> Preview Cutie features</label>
+    <label class="row" style="gap:10px;margin-top:8px"><input type="checkbox" data-dev="daily" ${DEV.daily?"checked":""} style="width:22px;height:22px"> Daily line on Home (Fun mode, not Cutie)</label>
     <label class="row" style="gap:10px;margin-top:8px"><input type="checkbox" data-dev="allpets" ${DEV.allPets?"checked":""} style="width:22px;height:22px"> Show unfinished pets (the other birds)</label>
     <p class="num" style="margin:10px 0 6px">Points: real ${T.real.toLocaleString()} · showing <b>${T.total.toLocaleString()}</b> (${esc(cutieTitle(T.total))})</p>
     <div class="row" style="gap:6px;flex-wrap:wrap">
@@ -5968,7 +6132,7 @@ function devPanelHTML(){
       ${b("title","Title unlock")}${b("finale","Goddess finale")}${b("reveal","Secret reveal")}${b("badge","Badge")}${b("confetti","Confetti")}${b("best","New best")}${b("week","Weekly best")}${b("finish","Finish screen")}</div>
     <div class="kicker" style="margin-top:12px">Duck (needs Cutie preview on)</div>
     <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">
-      ${b("dkskate","Skate")}${b("dkegg","Egg")}${b("dkflock","Flock")}${b("dkknife","Knife")}</div>
+      ${b("dkskate","Skate")}${b("dklift","Dumbbells")}${b("dklounge","Lounge")}${b("dkbath","Bath")}${b("dkegg","Egg")}${b("dkflock","Flock")}${b("dkknife","Knife")}</div>
     <button class="btn btn-danger btn-block" style="margin-top:12px" data-dev="reset">Reset all dev overrides</button></div>`;
 }
 function devFake(){ return {name:"Test workout", date:todayISO(), base:100, sets:9, setPts:90, cardioMin:10, cardioPts:30, streak:50,
@@ -5999,6 +6163,15 @@ document.addEventListener("click", e=>{
     if(currentView==="settings") go("settings"); else duckPlace(currentView);
     return;
   }
+  const wb=e.target.closest("[data-wear]");
+  if(wb && cutieOn()){
+    const [slot,id]=wb.dataset.wear.split(":"), a=PET_ADDONS.find(x=>x.id===id);
+    if(id && !(a && a.slot===slot && addonUnlocked(a))) return;
+    (S().settings.petWear ??= {})[slot]=id||""; Store.save();
+    toast(a? `${a.name} on 💕` : "Taken off");
+    if(currentView==="settings") go("settings"); else duckPlace(currentView);
+    return;
+  }
   const ab=e.target.closest("[data-addon]");
   if(ab && cutieOn()){
     const a=PET_ADDONS.find(x=>x.id===ab.dataset.addon); if(!a || !addonUnlocked(a)) return;
@@ -6008,6 +6181,7 @@ document.addEventListener("click", e=>{
   }
   const d=e.target.closest("[data-dev]"); if(!d || !DEV.on) return;
   const k=d.dataset.dev;
+  if(k==="daily"){ DEV.daily=d.checked; devSave(); toast(DEV.daily?"Daily line on":"Daily line off"); return; }
   if(k==="allpets"){ DEV.allPets=d.checked; devSave(); toast(DEV.allPets?"Unfinished pets shown":"Unfinished pets hidden"); go("settings"); return; }
   if(k==="preview"){ DEV.preview=d.checked; devSave(); devSchemeCheck(); toast(DEV.preview?"Cutie preview on":"Cutie preview off"); return; }
   if(k==="setpts"){ const v=parseInt($("#devpts")?.value,10); if(!Number.isFinite(v)||v<0){ toast("Enter a number"); return; } DEV.points=v; }
@@ -6021,6 +6195,7 @@ document.addEventListener("click", e=>{
     for(const v in _duckAway) delete _duckAway[v];
     for(const v in _duckKnifeAt) delete _duckKnifeAt[v];          // let her back for testing
     if(k==="dkskate"){ duckPlace("settings", "skate"); return; }
+    if(k==="dklift"||k==="dklounge"||k==="dkbath"){ duckPlace("settings", k.slice(2)); return; }
     let dd=document.getElementById("duck"); if(!dd){ duckPlace("settings"); dd=document.getElementById("duck"); }
     if(dd){ if(k==="dkegg") duckEgg(dd); if(k==="dkflock") duckFlock(dd); if(k==="dkknife") duckStab(dd); }
     return;
@@ -6032,6 +6207,37 @@ document.addEventListener("click", e=>{
   devSave(); devSchemeCheck(); go("settings");
 });
 function cutieMsg(){ return CUTIE_MSGS[Math.floor(Math.random()*CUTIE_MSGS.length)]; }
+const DAILY_LINES=[
+ "Aragorn didn't check if he felt like it before he charged the Black Gate. Get up.",
+ "Boromir held the line with three arrows in him. You can hold a bar for eight reps.",
+ "The fellowship walked to Mordor. You only have to walk to the gym.",
+ "Nobody is coming to save you. Get up and go.",
+ "Discipline is doing it when you don't feel like it. Today is one of those days.",
+ "You don't rise to the occasion. You fall to your training. So train.",
+ "Get up, you soft lump. The weights don't lift themselves.",
+ "The couch has never built anyone. Move.",
+ "Waste no more time arguing what a good man should be. Be one. (Marcus Aurelius)",
+ "We suffer more in imagination than in reality. (Seneca)",
+ "No man is free who is not master of himself. (Epictetus)",
+ "The impediment to action advances action. What stands in the way becomes the way. (Marcus Aurelius)",
+ "Difficulties strengthen the mind, as labour does the body. (Seneca)",
+ "First say to yourself what you would be, then do what you have to do. (Epictetus)",
+ "At dawn, when you'd rather stay in bed, remember you were born to do the work. (Marcus Aurelius)",
+ "Sam carried Frodo up the mountain. Carry yourself to one workout.",
+ "The beacons are lit. Answer them.",
+ "Your future self is watching. Don't let him down.",
+ "Good. Tired? Good. Go anyway.",
+ "Comfort is a slow poison. Go and get uncomfortable.",
+ "Every rep you skip, someone else is doing.",
+ "Be the man your kids think you are.",
+ "The weight is honest. It doesn't care about your excuses.",
+ "Stop negotiating with yourself. Go.",
+ "It's not about motivation. It's about showing up.",
+ "Pain is temporary. Quitting lasts forever.",
+ "The hard part is the first step out the door. Take it.",
+ "You've survived every bad day so far. One more session won't kill you.",
+ "Hold the line. One more workout.",
+ "Earn your rest."];
 const TITLE_LINES=[
  "Hot Mumma | Hot Mumma energy only 🔥",
  "Hot Mumma | Mums who lift hit different 💪",

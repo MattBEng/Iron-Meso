@@ -6,7 +6,7 @@
    The CACHE name carries a build stamp; changing the deployed sw.js (which
    happens automatically on each build below) invalidates old caches on activate.
 */
-const BUILD = "20261119090000";
+const BUILD = "20261119120000";
 const CACHE = "liftdaddy-" + BUILD;
 const SHELL = ["./", "./index.html"];
 
