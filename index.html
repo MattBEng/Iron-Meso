@@ -797,7 +797,8 @@ const STARTER_EXERCISES = [
  ["DB Shrug","Traps","Dumbbell"],["Cable Shrug","Traps","Cable"],["Smith Shrug","Traps","Smith"],
  ["Reverse Wrist Curl","Forearms","Dumbbell"],["Farmer Carry","Forearms","Dumbbell"],
  ["Kettlebell Halo","Shoulders","Kettlebell"],["Kettlebell Press","Shoulders","Kettlebell"],
- ["Pallof Press","Abs","Cable"]
+ ["Pallof Press","Abs","Cable"],
+ ["Dead Bug","Abs","Bodyweight"],["Hanging Knee Raise","Abs","Bodyweight"]
 ].map(([name,mg,eq])=>({id:"b_"+name.toLowerCase().replace(/[^a-z]+/g,"_"),name,muscle:mg,equipment:eq,notes:"",builtin:true,fav:false}));
 // assisted movement: more weight = easier, engine inverts progression
 // cardio exercises — logged as duration + HR, never counted as lifting volume
@@ -816,8 +817,12 @@ STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|
    stored data and moves independently. RELEASES[0] must match WHATS-NEW.md —
    the app is one offline file, so the notes are embedded, not fetched.
    TESTS_about.js fails if the two drift apart. */
-const APP_VERSION = "1.10.0";
+const APP_VERSION = "1.11.0";
 const RELEASES = [
+  {v:"1.11.0", date:"2026-11-19", notes:[
+    "Templates: new \"Lisa's New Meso\", a 4-day full-body block. Find it under Templates and tap Activate or Duplicate. Notes on each exercise cover the warm-up, rep ranges and when to go up.",
+    "Dead Bug and Hanging Knee Raise added to the exercise library.",
+  ]},
   {v:"1.10.0", date:"2026-11-19", notes:[
     "Daisy can dress up: sunglasses, a backwards hat, a big sun hat, a floral dress and a wizard's cape, unlocked with your titles. Pick one for her head and one outfit in Settings.",
     "New things Daisy sometimes does as you earn titles: lounging with a drink, a bubble bath and tiny dumbbells.",
@@ -940,7 +945,7 @@ const RELEASES = [
 ];
 
 /* ---------------- storage ---------------- */
-const SCHEMA_VERSION = 8;
+const SCHEMA_VERSION = 9;
 /** Sequential migrations: MIGRATIONS[n] upgrades a state at version n to n+1. */
 const MIGRATIONS = {
   1: st => {              // v1 -> v2: guarantee arrays/fields added after launch
@@ -989,6 +994,15 @@ const MIGRATIONS = {
     (st.exercises||[]).forEach(e=>{
       if(!e.timed && /\bassisted\b/i.test(e.name||"")) e.assisted=true;
     });
+    return st;
+  },
+  8: st => {              // v8 -> v9: add "Lisa's New Meso" template (once)
+    // The library top-up in load() runs after migrate(), so add any missing
+    // built-in exercises first, or the template's new lifts (Dead Bug,
+    // Hanging Knee Raise) would be dropped.
+    const have=new Set((st.exercises||[]).map(e=>e.id));
+    STARTER_EXERCISES.forEach(e=>{ if(!have.has(e.id)) st.exercises.push(e); });
+    seedLisaTemplate(st);
     return st;
   },
 };
@@ -1052,6 +1066,7 @@ class StorageManager{
       activeMesoId:null, activeSession:null, parkedSession:null, editSession:null,
     };
     seedTemplates(base);       // fresh installs get the starter templates too
+    seedLisaTemplate(base);
     return base;
   }
   load(){
@@ -2376,6 +2391,43 @@ function seedTemplates(st){
     ]),
   ];
   st.mesocycles.push(...templates);
+}
+
+/* "Lisa's New Meso" (1.11.0): a 4-day full-body block written for Matt's wife
+   from her own notes (lower back that tweaks after hard leg work, a left
+   shoulder that clicks on backward circles, ab separation, a 5-min Tabata bike
+   she loves, Pallof press for a medical reason). Archived like the starters.
+   Seeded once (st._lisaSeeded) on fresh installs and by migration 8. */
+function seedLisaTemplate(st){
+  if(st._lisaSeeded) return;
+  const byName=nm=>{ const e=st.exercises.find(x=>x.name.toLowerCase()===nm.toLowerCase()); return e?e.id:null; };
+  const L=(name,sets,reps,rir,notes="",rest=90)=>{ const id=byName(name); return id?{id:uid(),exerciseId:id,sets,reps,rir,rest,notes}:null; };
+  const TABATA=()=>{ const id=byName("Stationary Bike"); return id?{id:uid(),exerciseId:id,cardio:true,minutes:5,targetHR:null,
+    notes:"Tabata: 20 s hard, 10 s easy, 8 rounds."}:null; };
+  const WARM="Warm up first: band pull-aparts 2x15, band external rotations 2x12 each side, arm circles FORWARDS only (backwards makes the left shoulder click). ";
+  const PALLOF=()=>L("Pallof Press",2,10,2,"10 to 12 each side. Keep it every session.");
+  const day=(name,ex)=>({id:uid(),name,exercises:ex.filter(Boolean)});
+  st.mesocycles.push({id:uid(), name:"Lisa's New Meso", weeks:4, deload:true, split:"Custom", archived:true, rampSets:false,
+    notes:"Start the day after your period ends. Weeks 1-2: push for extra reps (RIR 2). Week 3: hold the weights (RIR 2-3). "+
+      "Week 4 is the easy week (the app's deload): fewer sets, RIR 3+, a 20-min session counts. "+
+      "Reps: 8-12, legs 10-15; add the smallest weight step once every set hits the top. Legs only go up at 15 reps with 3 in the tank, "+
+      "and keep the same weight if your back is sore the next day. If your stomach domes or ridges on core work, swap to dead bugs.",
+    days:[
+      day("Day 1",[L("Machine Hip Thrust",3,10,2,WARM+"8 to 12 reps.",120), L("Leg Extension",2,12,3,"10 to 15 reps, 3 in the tank."),
+        L("Lat Pulldown",3,10,2,"8 to 12 reps."), L("Machine Chest Press",3,10,2,"New: start with a weight that leaves 3 reps."), PALLOF(), TABATA()]),
+      day("Day 2",[L("Bulgarian Split Squat",2,10,3,WARM+"8 to 12 each leg. Bodyweight first, then dumbbells. 3 in the tank.",120),
+        L("Seated Leg Curl",3,12,3,"10 to 15 reps."), L("Assisted Pull-Up",3,10,2,"8 to 12 reps."),
+        L("Push-Up",2,10,2,"On the handles. Stop 2 reps short of failing."), L("DB Curl",2,12,2,"10 to 15 reps."),
+        PALLOF(), L("Dead Bug",2,8,2,"8 each side, slow, lower back flat."), TABATA()]),
+      day("Day 3",[L("45\u00B0 Back Raise",2,12,3,WARM+"Back extension: bodyweight, slow, squeeze glutes. 10 to 15 reps."),
+        L("Seated Leg Curl",2,12,3,"Superset with the leg extension below. 10 to 15 reps."), L("Leg Extension",2,12,3,"Superset with the leg curl above."),
+        L("Neutral-Grip Pulldown",3,10,2,"Close or neutral grip. 8 to 12 reps."), L("Pec Dec Flye",2,12,2,"Chest fly: moderate stretch only, not deep. 10 to 15 reps."),
+        L("Overhead Cable Extension",2,12,2,"10 to 15 reps."), PALLOF(), TABATA()]),
+      day("Day 4",[L("Machine Hip Thrust",3,10,2,WARM+"8 to 12 reps.",120), L("Leg Extension",2,12,3,"10 to 15 reps."),
+        L("Assisted Pull-Up",3,10,2,"8 to 12 reps."), L("Machine Chest Press",2,10,2,"8 to 12 reps."),
+        L("Rear Delt Fly",2,12,2,"12 to 15 reps."), PALLOF(), L("Hanging Knee Raise",2,10,2,"8 to 12 reps. Knees, not straight legs, for now."), TABATA()]),
+    ]});
+  st._lisaSeeded=true;
 }
 
 const SPLITS={

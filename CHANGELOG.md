@@ -9,6 +9,16 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.11.0 — 2026-11-19 (Lisa's New Meso template)
+
+- **What:** new archived template "Lisa's New Meso", built by `seedLisaTemplate(st)` (next to `seedTemplates`). 4 days, 4 weeks, deload on, ramp off. Every day: warm-up note on the first lift, Pallof Press 2x10, 5-min Stationary Bike cardio slot (Tabata note). Slot notes carry rep ranges, RIR, stretch and doming cautions. Back extension uses "45° Back Raise", chest fly uses "Pec Dec Flye", close-grip pulldown uses "Neutral-Grip Pulldown".
+- **Library:** added Dead Bug and Hanging Knee Raise (Abs, Bodyweight).
+- **Seeding:** fresh installs via `defaults()`. Existing installs via new migration 8 (`SCHEMA_VERSION` 8 -> 9), which tops up missing built-in exercises first, because the `load()` top-up runs after `migrate()` and the new lifts would be dropped. Guarded by `st._lisaSeeded`, so a deleted template stays deleted.
+- **Tests:** `TESTS_lisameso.js` (fresh + migrated v8 state, no slot dropped, no duplicate on reload, delete sticks).
+- **Why:** Matt asked for Lisa's plan (Project doc `lisas-new-meso.md`) as a template.
+
+---
+
 ### v1.10.0 — 2026-11-19 (duck add-ons, bonus picker, daily line)
 
 - **Duck add-ons:** `PET_ADDONS` now has `slot` = head / outfit / act. Worn items (shades@1, cap@2, sunhat@4, dress@5, cape@9) are drawn by `petSVG(pose, skin, wear)` in every pose via `head()`/`body()`; choice saved in `settings.petWear={head,outfit}`, read by `petWear()`, picked with `[data-wear]` buttons in the pet card. Acts (skate@3, lounge@6, bath@7 Certified Powerpuff, lift@8) are new poses in `DUCK_POSES`, gated by `addonOn()` like skate. Dev buttons Dumbbells/Lounge/Bath.
