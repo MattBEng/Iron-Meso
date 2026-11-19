@@ -826,8 +826,12 @@ STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|
    stored data and moves independently. RELEASES[0] must match WHATS-NEW.md —
    the app is one offline file, so the notes are embedded, not fetched.
    TESTS_about.js fails if the two drift apart. */
-const APP_VERSION = "1.13.0";
+const APP_VERSION = "1.13.1";
 const RELEASES = [
+  {v:"1.13.1", date:"2026-11-20", notes:[
+    "Pulling down to refresh now keeps you on the tab you were on, instead of jumping to Train.",
+    "Ticking things in More (like Daisy's outfits) no longer scrolls you back to the top.",
+  ]},
   {v:"1.13.0", date:"2026-11-20", notes:[
     "Band exercises: pick the band colour (Yellow, Red, Green, Blue, Black) instead of a weight. It starts on the band you used last time.",
     "Warm-up exercises: tick \"All sets are warm-ups\" in an exercise's settings. Every set starts as a warm-up and doesn't count toward volume, stats or progression.",
@@ -1874,7 +1878,11 @@ let currentView="home";
 function go(view, ...args){
   const name=view.split("/")[0];
   if(!VIEWS[name]){ console.warn("Unknown view:", name); return; }
+  // 1.13.1: re-drawing More (settings) after a tick keeps your place instead
+  // of jumping to the top. Any other navigation still starts at the top.
+  const keepY=(name==="settings" && currentView==="settings" && !args.length)? (window.scrollY||0) : 0;
   currentView=name;
+  try{ localStorage.setItem("liftdaddy_view", name); }catch(_){}
   // rest timer is global now and intentionally persists across views
   try{ window.scrollTo(0,0); }catch(_){}
   try{ VIEWS[name](...args); }
@@ -1887,6 +1895,22 @@ function go(view, ...args){
   syncHistory(name);
   renderNav();
   try{ duckPlace(name); }catch(_){}
+  if(keepY){ try{ window.scrollTo(0,keepY); }catch(_){} }
+}
+/* 1.13.1: a refresh (pull down) reopens the tab you were on. A fresh launch
+   still opens Train when a workout is open, else Home. Only main tabs are
+   restored; screens that need an id (a plan editor, one exercise) fall back. */
+const RESTORABLE_VIEWS=["home","mesos","workout","history","exercises","analytics","calendar","settings"];
+function startView(reloaded, last, hasSession){
+  if(reloaded && RESTORABLE_VIEWS.includes(last)) return last;
+  return hasSession? "workout" : "home";
+}
+function wasReload(){
+  try{
+    const nav=performance.getEntriesByType && performance.getEntriesByType("navigation")[0];
+    if(nav) return nav.type==="reload";
+    return !!(performance.navigation && performance.navigation.type===1);
+  }catch(_){ return false; }
 }
 /** Keep a single synthetic history entry per non-home view, and a base entry
     for home, so the hardware back button maps to in-app navigation instead of
@@ -7286,7 +7310,7 @@ if("serviceWorker" in navigator && /^https?:$/.test(location.protocol)
 })();
 window.addEventListener("error", e=>{ console.error(e.error||e.message); });
 applyTheme();
-go(S().activeSession? "workout":"home");
+go(startView(wasReload(), (()=>{ try{ return localStorage.getItem("liftdaddy_view"); }catch(_){ return null; } })(), !!S().activeSession));
 </script>
 </body>
 </html>

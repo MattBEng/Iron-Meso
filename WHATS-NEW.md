@@ -8,9 +8,7 @@ live in `RELEASES[0]` in `index.html`, and `TESTS_about.js` fails if the two dri
 apart. Update both when you ship, and add the engineering detail to
 `CHANGELOG.md` rather than here.
 
-## 1.13.0 — 2026-11-20
+## 1.13.1 — 2026-11-20
 
-- Band exercises: pick the band colour (Yellow, Red, Green, Blue, Black) instead of a weight. It starts on the band you used last time.
-- Warm-up exercises: tick "All sets are warm-ups" in an exercise's settings. Every set starts as a warm-up and doesn't count toward volume, stats or progression.
-- New exercises: Band Pull-Apart, Band External Rotation and Arm Circles.
-- Lisa's New Meso (both versions) now starts each day with a warm-up of arm circles, band pull-aparts and band external rotations. Notes are now just about each exercise.
+- Pulling down to refresh now keeps you on the tab you were on, instead of jumping to Train.
+- Ticking things in More (like Daisy's outfits) no longer scrolls you back to the top.

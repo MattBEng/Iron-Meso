@@ -9,6 +9,15 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.13.1 — 2026-11-20 (refresh keeps tab, More keeps scroll)
+
+- **Refresh:** boot always did `go(activeSession? "workout":"home")`, and opening Train creates a session, so a pull-to-refresh on Home landed on Train. `go()` now saves the tab name in localStorage key `liftdaddy_view`; boot calls `startView(wasReload(), saved, hasSession)`. On a reload (Navigation Timing type "reload") it reopens the saved tab if it's in `RESTORABLE_VIEWS`; a fresh launch behaves as before.
+- **More scroll:** `go()` always scrolled to the top, and every tick in Settings re-renders with `go("settings")`. Now when re-drawing settings from settings (no args) it restores `scrollY` after the render. Every other navigation still starts at the top.
+- **Tests:** `TESTS_reloadview.js`.
+- **Why:** Matt: refresh jumped to Train; ticking Daisy's outfits jumped to the top each time.
+
+---
+
 ### v1.13.0 — 2026-11-20 (band exercises, warm-up slots)
 
 - **Band equipment:** `EQUIP` gains "Band". `BANDS` = Yellow, Red, Green, Blue, Black (lightest to heaviest). `repsOnly(ex)` (Bodyweight or Band) replaces the old `equipment==="Bodyweight"` checks in the progression engine, session build, retarget, upgradeSession, add-exercise and bonus builders, so bands progress by reps with kg 0. Session exercises carry `band:true`; set rows render `bandSelectHTML()` (`data-f="band"`, coloured left border) instead of the BW cell, and store `set.band`. `fillBands()` (called from `upgradeSession`) starts each row on last session's band at the same warm-up/working position, else the last band used, else Yellow. Picking a band updates later unlogged rows. Last-time hint shows "last Red ×15". Column header reads "Band" and the first-time line reads "Band — aim for N good reps."
