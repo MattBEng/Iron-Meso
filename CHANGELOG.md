@@ -9,6 +9,28 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.13.0 — 2026-11-20 (band exercises, warm-up slots)
+
+- **Band equipment:** `EQUIP` gains "Band". `BANDS` = Yellow, Red, Green, Blue, Black (lightest to heaviest). `repsOnly(ex)` (Bodyweight or Band) replaces the old `equipment==="Bodyweight"` checks in the progression engine, session build, retarget, upgradeSession, add-exercise and bonus builders, so bands progress by reps with kg 0. Session exercises carry `band:true`; set rows render `bandSelectHTML()` (`data-f="band"`, coloured left border) instead of the BW cell, and store `set.band`. `fillBands()` (called from `upgradeSession`) starts each row on last session's band at the same warm-up/working position, else the last band used, else Yellow. Picking a band updates later unlogged rows. Last-time hint shows "last Red ×15". Column header reads "Band" and the first-time line reads "Band — aim for N good reps."
+- **Warm-up slots:** slot flag `warmup`, set by "All sets are warm-ups" in the slot editor. Session build marks every row `type:"warmup"` via `warmRows()` and uses `slot.sets` (no ramp, no deload halving). Warm-up slots are skipped in `mesoVolume` (target and grey "left"), `bonusPool`, and the stats target-per-muscle. Workout card and meso day list show "Warm-up ·".
+- **Library:** Band Pull-Apart, Band External Rotation (Shoulders, Band), Arm Circles (Shoulders, Bodyweight).
+- **Lisa templates:** shared warm-up text removed from slot notes. `lisaKit()` now has `WARMUP()` = Arm Circles 1x10 (forwards only note), Band Pull-Apart 2x15, Band External Rotation 2x12, prepended to every day of both templates.
+- **Migration 10** (`SCHEMA_VERSION` 10 -> 11): tops up library, then `refreshLisaTemplates()` swaps in the new days for any Lisa template that has no logs, isn't the open workout, has no warm-up slots yet, and still matches the seeded lifts/sets/reps. Anything edited or used is left alone.
+- **Tests:** `TESTS_band.js` (new); `TESTS_lisameso.js` updated for the warm-up slots.
+- **Why:** Matt found the warm-up text on every first lift confusing; asked for a real warm-up with a band colour picker.
+
+---
+
+### v1.12.0 — 2026-11-20 (Lisa's New Meso, 3-day version)
+
+- **What:** second archived template "Lisa's New Meso (3 day)", built by `seedLisa3Template(st)`. Same 4-week block, notes, warm-up, Pallof and 5-min bike as the 4-day one. Days: (1) hip thrust, leg ext, lat pulldown, chest press, rear delt fly; (2) Bulgarian split squat, leg curl, assisted pull-up, push-up, DB curl, dead bug; (3) back raise, hip thrust, leg curl + leg ext superset, neutral-grip pulldown 2 sets, pec dec, overhead cable ext. Hanging knee raise dropped to keep day 3 a sane length.
+- **Refactor:** shared helpers moved into `lisaKit(st)`; 4-day output unchanged.
+- **Seeding:** fresh installs via `defaults()`; existing installs via new migration 9 (`SCHEMA_VERSION` 9 -> 10), guarded by `st._lisa3Seeded`.
+- **Tests:** `TESTS_lisameso.js` extended: 3-day on fresh, v8 and v9 installs, no duplicate of the 4-day, deletes stick.
+- **Why:** Matt first asked for 3 days; the 4-day came from Lisa's notes. Both kept.
+
+---
+
 ### v1.11.0 — 2026-11-19 (Lisa's New Meso template)
 
 - **What:** new archived template "Lisa's New Meso", built by `seedLisaTemplate(st)` (next to `seedTemplates`). 4 days, 4 weeks, deload on, ramp off. Every day: warm-up note on the first lift, Pallof Press 2x10, 5-min Stationary Bike cardio slot (Tabata note). Slot notes carry rep ranges, RIR, stretch and doming cautions. Back extension uses "45° Back Raise", chest fly uses "Pec Dec Flye", close-grip pulldown uses "Neutral-Grip Pulldown".

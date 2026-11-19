@@ -631,6 +631,7 @@ ul.whatsnew li{margin:0 0 7px;font-size:14px;line-height:1.45;color:var(--text)}
 .stat-sec>summary::after{content:"\25BE";font-size:15px;transition:transform .15s}
 .stat-sec:not([open])>summary::after{transform:rotate(-90deg)}
 .spm-val{width:52px;text-align:right;font-size:13px;font-weight:700;flex:0 0 auto}
+.bandsel{font-size:13px;padding-left:6px;padding-right:4px}
 .bwcell{display:flex;align-items:center;justify-content:center;background:var(--raised);border-radius:var(--r-xs,8px);font-weight:800;color:var(--muted);font-size:13px}
 .repcell{position:relative}
 .pred-unknown{color:var(--muted)!important;font-weight:700}
@@ -731,7 +732,14 @@ const epley=(w,r)=>r>0? w*(1+r/30):0;
 
 const MUSCLES = ["Cardio","Chest","Back","Shoulders","Biceps","Triceps","Quads","Hamstrings","Glutes","Calves","Abs","Forearms","Traps"];
 const LOWER = new Set(["Quads","Hamstrings","Glutes","Calves"]);
-const EQUIP = ["Barbell","Dumbbell","Machine","Cable","Bodyweight","Smith","Kettlebell","Other"];
+const EQUIP = ["Barbell","Dumbbell","Machine","Cable","Bodyweight","Smith","Kettlebell","Band","Other"];
+/* 1.13.0: resistance bands. A Band exercise logs a band colour instead of kg
+   and progresses by reps, like bodyweight. Lightest to heaviest. */
+const BANDS = [["Yellow","#F2C94C"],["Red","#E24B4A"],["Green","#4CAF50"],["Blue","#378ADD"],["Black","#2C2C2A"]];
+function isBandEx(ex){ return !!ex && ex.equipment==="Band"; }
+/** Logged as reps only (no kg): bodyweight and band exercises. */
+function repsOnly(ex){ return !!ex && (ex.equipment==="Bodyweight" || ex.equipment==="Band"); }
+function bandHex(n){ const b=BANDS.find(b=>b[0]===n); return b? b[1] : "transparent"; }
 
 /* ---------------- starter exercise database ---------------- */
 const STARTER_EXERCISES = [
@@ -798,7 +806,8 @@ const STARTER_EXERCISES = [
  ["Reverse Wrist Curl","Forearms","Dumbbell"],["Farmer Carry","Forearms","Dumbbell"],
  ["Kettlebell Halo","Shoulders","Kettlebell"],["Kettlebell Press","Shoulders","Kettlebell"],
  ["Pallof Press","Abs","Cable"],
- ["Dead Bug","Abs","Bodyweight"],["Hanging Knee Raise","Abs","Bodyweight"]
+ ["Dead Bug","Abs","Bodyweight"],["Hanging Knee Raise","Abs","Bodyweight"],
+ ["Band Pull-Apart","Shoulders","Band"],["Band External Rotation","Shoulders","Band"],["Arm Circles","Shoulders","Bodyweight"]
 ].map(([name,mg,eq])=>({id:"b_"+name.toLowerCase().replace(/[^a-z]+/g,"_"),name,muscle:mg,equipment:eq,notes:"",builtin:true,fav:false}));
 // assisted movement: more weight = easier, engine inverts progression
 // cardio exercises — logged as duration + HR, never counted as lifting volume
@@ -817,8 +826,17 @@ STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|
    stored data and moves independently. RELEASES[0] must match WHATS-NEW.md —
    the app is one offline file, so the notes are embedded, not fetched.
    TESTS_about.js fails if the two drift apart. */
-const APP_VERSION = "1.11.0";
+const APP_VERSION = "1.13.0";
 const RELEASES = [
+  {v:"1.13.0", date:"2026-11-20", notes:[
+    "Band exercises: pick the band colour (Yellow, Red, Green, Blue, Black) instead of a weight. It starts on the band you used last time.",
+    "Warm-up exercises: tick \"All sets are warm-ups\" in an exercise's settings. Every set starts as a warm-up and doesn't count toward volume, stats or progression.",
+    "New exercises: Band Pull-Apart, Band External Rotation and Arm Circles.",
+    "Lisa's New Meso (both versions) now starts each day with a warm-up of arm circles, band pull-aparts and band external rotations. Notes are now just about each exercise.",
+  ]},
+  {v:"1.12.0", date:"2026-11-20", notes:[
+    "Templates: new \"Lisa's New Meso (3 day)\", the same plan squeezed into 3 full-body days. The 4-day version is still there.",
+  ]},
   {v:"1.11.0", date:"2026-11-19", notes:[
     "Templates: new \"Lisa's New Meso\", a 4-day full-body block. Find it under Templates and tap Activate or Duplicate. Notes on each exercise cover the warm-up, rep ranges and when to go up.",
     "Dead Bug and Hanging Knee Raise added to the exercise library.",
@@ -945,7 +963,7 @@ const RELEASES = [
 ];
 
 /* ---------------- storage ---------------- */
-const SCHEMA_VERSION = 9;
+const SCHEMA_VERSION = 11;
 /** Sequential migrations: MIGRATIONS[n] upgrades a state at version n to n+1. */
 const MIGRATIONS = {
   1: st => {              // v1 -> v2: guarantee arrays/fields added after launch
@@ -1003,6 +1021,20 @@ const MIGRATIONS = {
     const have=new Set((st.exercises||[]).map(e=>e.id));
     STARTER_EXERCISES.forEach(e=>{ if(!have.has(e.id)) st.exercises.push(e); });
     seedLisaTemplate(st);
+    return st;
+  },
+  9: st => {              // v9 -> v10: add "Lisa's New Meso (3 day)" template (once)
+    const have=new Set((st.exercises||[]).map(e=>e.id));
+    STARTER_EXERCISES.forEach(e=>{ if(!have.has(e.id)) st.exercises.push(e); });
+    seedLisa3Template(st);
+    return st;
+  },
+  10: st => {             // v10 -> v11: Lisa templates get warm-up slots (1.13.0)
+    // Library first (band exercises), then swap the days of any Lisa template
+    // that is still exactly as seeded: not logged, not open, slots unchanged.
+    const have=new Set((st.exercises||[]).map(e=>e.id));
+    STARTER_EXERCISES.forEach(e=>{ if(!have.has(e.id)) st.exercises.push(e); });
+    refreshLisaTemplates(st);
     return st;
   },
 };
@@ -1067,6 +1099,7 @@ class StorageManager{
     };
     seedTemplates(base);       // fresh installs get the starter templates too
     seedLisaTemplate(base);
+    seedLisa3Template(base);
     return base;
   }
   load(){
@@ -1541,7 +1574,7 @@ class ProgressionEngine{
     // can't modulate bodyweight week to week, so the target rep count rises when
     // you beat it with reps in reserve. (Loaded bodyweight — weighted pull-ups —
     // falls through to normal weight progression.)
-    const bodyweight = !!(ex && ex.equipment==="Bodyweight") && lastKg===0;
+    const bodyweight = repsOnly(ex) && lastKg===0;
     if(bodyweight){
       const avgReps=Math.round(work.reduce((t,s)=>t+s.reps,0)/work.length);
       // What was actually ASKED last time — the plan's target is fixed for the
@@ -1983,7 +2016,7 @@ function mesoVolume(meso){
   for(let wk=1; wk<=meso.weeks; wk++){
     const deload=isDeload(meso,wk);
     meso.days.forEach(d=>d.exercises.forEach(sl=>{
-      if(sl.cardio || isCardioEx(sl.exerciseId)) return;
+      if(sl.cardio || sl.warmup || isCardioEx(sl.exerciseId)) return;
       const ex=exById(sl.exerciseId); if(!ex || ex.muscle==="Cardio") return;
       target[ex.muscle]=(target[ex.muscle]||0)+rampedSets(meso, sl, wk, deload);
     }));
@@ -2013,7 +2046,7 @@ function mesoVolume(meso){
     if(pos && pos.day && !pos.finished){
       const deload=isDeload(meso,pos.week);
       pos.day.exercises.forEach(sl=>{
-        if(sl.cardio || isCardioEx(sl.exerciseId)) return;
+        if(sl.cardio || sl.warmup || isCardioEx(sl.exerciseId)) return;
         const ex=exById(sl.exerciseId); if(!ex || ex.muscle==="Cardio") return;
         addLeft(ex.muscle, rampedSets(meso, sl, pos.week, deload));
       });
@@ -2397,37 +2430,85 @@ function seedTemplates(st){
    from her own notes (lower back that tweaks after hard leg work, a left
    shoulder that clicks on backward circles, ab separation, a 5-min Tabata bike
    she loves, Pallof press for a medical reason). Archived like the starters.
-   Seeded once (st._lisaSeeded) on fresh installs and by migration 8. */
-function seedLisaTemplate(st){
-  if(st._lisaSeeded) return;
+   Seeded once (st._lisaSeeded) on fresh installs and by migration 8.
+   The 3-day version (1.12.0) shares lisaKit() and is seeded by migration 9. */
+function lisaKit(st){
   const byName=nm=>{ const e=st.exercises.find(x=>x.name.toLowerCase()===nm.toLowerCase()); return e?e.id:null; };
   const L=(name,sets,reps,rir,notes="",rest=90)=>{ const id=byName(name); return id?{id:uid(),exerciseId:id,sets,reps,rir,rest,notes}:null; };
   const TABATA=()=>{ const id=byName("Stationary Bike"); return id?{id:uid(),exerciseId:id,cardio:true,minutes:5,targetHR:null,
     notes:"Tabata: 20 s hard, 10 s easy, 8 rounds."}:null; };
-  const WARM="Warm up first: band pull-aparts 2x15, band external rotations 2x12 each side, arm circles FORWARDS only (backwards makes the left shoulder click). ";
+  // warm-up slots (1.13.0): every set starts as a Warm-up, not counted as training
+  const WU=(name,sets,reps,notes)=>{ const s=L(name,sets,reps,3,notes,30); if(s) s.warmup=true; return s; };
+  const WARMUP=()=>[WU("Arm Circles",1,10,"Forwards only. Backwards makes the left shoulder click."),
+    WU("Band Pull-Apart",2,15,"Arms straight, squeeze your shoulder blades."),
+    WU("Band External Rotation",2,12,"12 each side. Elbow tucked to your side.")];
   const PALLOF=()=>L("Pallof Press",2,10,2,"10 to 12 each side. Keep it every session.");
   const day=(name,ex)=>({id:uid(),name,exercises:ex.filter(Boolean)});
+  return {L,TABATA,WARMUP,PALLOF,day};
+}
+function seedLisaTemplate(st){
+  if(st._lisaSeeded) return;
+  const {L,TABATA,WARMUP,PALLOF,day}=lisaKit(st);
   st.mesocycles.push({id:uid(), name:"Lisa's New Meso", weeks:4, deload:true, split:"Custom", archived:true, rampSets:false,
     notes:"Start the day after your period ends. Weeks 1-2: push for extra reps (RIR 2). Week 3: hold the weights (RIR 2-3). "+
       "Week 4 is the easy week (the app's deload): fewer sets, RIR 3+, a 20-min session counts. "+
       "Reps: 8-12, legs 10-15; add the smallest weight step once every set hits the top. Legs only go up at 15 reps with 3 in the tank, "+
       "and keep the same weight if your back is sore the next day. If your stomach domes or ridges on core work, swap to dead bugs.",
     days:[
-      day("Day 1",[L("Machine Hip Thrust",3,10,2,WARM+"8 to 12 reps.",120), L("Leg Extension",2,12,3,"10 to 15 reps, 3 in the tank."),
+      day("Day 1",[...WARMUP(), L("Machine Hip Thrust",3,10,2,"8 to 12 reps.",120), L("Leg Extension",2,12,3,"10 to 15 reps, 3 in the tank."),
         L("Lat Pulldown",3,10,2,"8 to 12 reps."), L("Machine Chest Press",3,10,2,"New: start with a weight that leaves 3 reps."), PALLOF(), TABATA()]),
-      day("Day 2",[L("Bulgarian Split Squat",2,10,3,WARM+"8 to 12 each leg. Bodyweight first, then dumbbells. 3 in the tank.",120),
+      day("Day 2",[...WARMUP(), L("Bulgarian Split Squat",2,10,3,"8 to 12 each leg. Bodyweight first, then dumbbells. 3 in the tank.",120),
         L("Seated Leg Curl",3,12,3,"10 to 15 reps."), L("Assisted Pull-Up",3,10,2,"8 to 12 reps."),
         L("Push-Up",2,10,2,"On the handles. Stop 2 reps short of failing."), L("DB Curl",2,12,2,"10 to 15 reps."),
         PALLOF(), L("Dead Bug",2,8,2,"8 each side, slow, lower back flat."), TABATA()]),
-      day("Day 3",[L("45\u00B0 Back Raise",2,12,3,WARM+"Back extension: bodyweight, slow, squeeze glutes. 10 to 15 reps."),
+      day("Day 3",[...WARMUP(), L("45\u00B0 Back Raise",2,12,3,"Back extension: bodyweight, slow, squeeze glutes. 10 to 15 reps."),
         L("Seated Leg Curl",2,12,3,"Superset with the leg extension below. 10 to 15 reps."), L("Leg Extension",2,12,3,"Superset with the leg curl above."),
         L("Neutral-Grip Pulldown",3,10,2,"Close or neutral grip. 8 to 12 reps."), L("Pec Dec Flye",2,12,2,"Chest fly: moderate stretch only, not deep. 10 to 15 reps."),
         L("Overhead Cable Extension",2,12,2,"10 to 15 reps."), PALLOF(), TABATA()]),
-      day("Day 4",[L("Machine Hip Thrust",3,10,2,WARM+"8 to 12 reps.",120), L("Leg Extension",2,12,3,"10 to 15 reps."),
+      day("Day 4",[...WARMUP(), L("Machine Hip Thrust",3,10,2,"8 to 12 reps.",120), L("Leg Extension",2,12,3,"10 to 15 reps."),
         L("Assisted Pull-Up",3,10,2,"8 to 12 reps."), L("Machine Chest Press",2,10,2,"8 to 12 reps."),
         L("Rear Delt Fly",2,12,2,"12 to 15 reps."), PALLOF(), L("Hanging Knee Raise",2,10,2,"8 to 12 reps. Knees, not straight legs, for now."), TABATA()]),
     ]});
   st._lisaSeeded=true;
+}
+/* Replace an untouched Lisa template's days with the current version. "Untouched"
+   = no logs, not the open workout, and the same lifts/sets/reps as seeded. */
+function refreshLisaTemplates(st){
+  const fresh={exercises:st.exercises, mesocycles:[]};
+  seedLisaTemplate(fresh); seedLisa3Template(fresh);
+  const sig=m=>m.days.map(d=>d.exercises.filter(x=>!x.warmup).map(x=>`${x.exerciseId}:${x.sets||0}:${x.reps||0}:${x.minutes||0}`).join(",")).join("|");
+  fresh.mesocycles.forEach(f=>{
+    const m=(st.mesocycles||[]).find(x=>x.name===f.name);
+    if(!m || m.days.some(d=>d.exercises.some(x=>x.warmup))) return;
+    if((st.logs||[]).some(l=>l.mesoId===m.id || l.bonusOf===m.id)) return;
+    if(st.activeSession && st.activeSession.mesoId===m.id) return;
+    if(sig(m)!==sig(f)) return;
+    m.days=f.days; m.notes=f.notes;
+  });
+}
+function seedLisa3Template(st){
+  if(st._lisa3Seeded) return;
+  const {L,TABATA,WARMUP,PALLOF,day}=lisaKit(st);
+  st.mesocycles.push({id:uid(), name:"Lisa's New Meso (3 day)", weeks:4, deload:true, split:"Custom", archived:true, rampSets:false,
+    notes:"Start the day after your period ends. Weeks 1-2: push for extra reps (RIR 2). Week 3: hold the weights (RIR 2-3). "+
+      "Week 4 is the easy week (the app's deload): fewer sets, RIR 3+, a 20-min session counts. "+
+      "Reps: 8-12, legs 10-15; add the smallest weight step once every set hits the top. Legs only go up at 15 reps with 3 in the tank, "+
+      "and keep the same weight if your back is sore the next day. If your stomach domes or ridges on core work, swap to dead bugs.",
+    days:[
+      day("Day 1",[...WARMUP(), L("Machine Hip Thrust",3,10,2,"8 to 12 reps.",120), L("Leg Extension",2,12,3,"10 to 15 reps, 3 in the tank."),
+        L("Lat Pulldown",3,10,2,"8 to 12 reps."), L("Machine Chest Press",3,10,2,"New: start with a weight that leaves 3 reps."),
+        L("Rear Delt Fly",2,12,2,"12 to 15 reps."), PALLOF(), TABATA()]),
+      day("Day 2",[...WARMUP(), L("Bulgarian Split Squat",2,10,3,"8 to 12 each leg. Bodyweight first, then dumbbells. 3 in the tank.",120),
+        L("Seated Leg Curl",3,12,3,"10 to 15 reps."), L("Assisted Pull-Up",3,10,2,"8 to 12 reps."),
+        L("Push-Up",2,10,2,"On the handles. Stop 2 reps short of failing."), L("DB Curl",2,12,2,"10 to 15 reps."),
+        PALLOF(), L("Dead Bug",2,8,2,"8 each side, slow, lower back flat."), TABATA()]),
+      day("Day 3",[...WARMUP(), L("45\u00B0 Back Raise",2,12,3,"Back extension: bodyweight, slow, squeeze glutes. 10 to 15 reps."),
+        L("Machine Hip Thrust",3,10,2,"8 to 12 reps.",120),
+        L("Seated Leg Curl",2,12,3,"Superset with the leg extension below. 10 to 15 reps."), L("Leg Extension",2,12,3,"Superset with the leg curl above."),
+        L("Neutral-Grip Pulldown",2,10,2,"Close or neutral grip. 8 to 12 reps."), L("Pec Dec Flye",2,12,2,"Chest fly: moderate stretch only, not deep. 10 to 15 reps."),
+        L("Overhead Cable Extension",2,12,2,"10 to 15 reps."), PALLOF(), TABATA()]),
+    ]});
+  st._lisa3Seeded=true;
 }
 
 const SPLITS={
@@ -2523,7 +2604,7 @@ function editMeso(id){
           const ex=exById(x.exerciseId);
           const cardio=x.cardio || isCardioEx(x.exerciseId);
           const meta=cardio? `${x.tabataOn&&x.tabata?`Tabata ${x.tabata.rounds}×${x.tabata.work}/${x.tabata.rest}s · `:""}${x.minutes||20} min${x.targetHR?` · target ${x.targetHR}bpm`:""}${x.notes?" · "+esc(x.notes):""}`
-                           : `${x.sets}×${x.reps} · ${rirTxt(x.rir)} · rest ${x.rest}s${x.notes?" · "+esc(x.notes):""}`;
+                           : `${x.warmup?"Warm-up · ":""}${x.sets}×${x.reps} · ${rirTxt(x.rir)} · rest ${x.rest}s${x.notes?" · "+esc(x.notes):""}`;
           return `<div class="setline dragrow" draggable="true" data-ex="${di}:${xi}">
             <span class="draghandle">⠿</span>
             <div class="grow" style="flex:1;min-width:0">
@@ -2674,6 +2755,9 @@ function editSlot(slot, done){
         : `<input id="si" type="number" min="0" max="5" value="${slot.rir}">`}</div>
     </div>
     <label>Rest (seconds)</label><input id="st" type="number" min="0" step="15" value="${slot.rest}">
+    <label style="display:flex;align-items:center;gap:10px;text-transform:none;font-size:15px;margin-top:14px">
+      <input type="checkbox" id="swu" style="width:22px;height:22px" ${slot.warmup?"checked":""}> All sets are warm-ups</label>
+    <div class="faint" style="font-size:13px">Not counted in volume, stats or progression</div>
     <label>Notes</label><input id="sn" value="${esc(slot.notes||"")}" placeholder="${timed?"Tempo, cue…":"Tempo, grip, cue…"}">
     <button class="btn btn-primary btn-block" style="margin-top:16px" data-ok>Done</button>`, mEl=>{
     mEl.onclick=e=>{ if(!e.target.closest("[data-ok]")) return;
@@ -2682,6 +2766,7 @@ function editSlot(slot, done){
       else slot.reps=clamp(+$("#sr",mEl).value||10,1,50);
       slot.rir=clamp(+$("#si",mEl).value||0,0,5);
       slot.rest=clamp(+$("#st",mEl).value||120,0,900);
+      slot.warmup=$("#swu",mEl).checked;
       slot.notes=$("#sn",mEl).value;
       closeModal(); done();
     };
@@ -2903,7 +2988,7 @@ function retargetSessionExercise(ses, newId, edit){
   const keptReps=ses.target?.reps || 10;
   ses.exerciseId=newId;
   ses.holdWeight=false;
-  delete ses.bodyweight; delete ses.timed; delete ses.cardio;
+  delete ses.bodyweight; delete ses.band; delete ses.timed; delete ses.cardio;
   delete ses.log; delete ses.done; delete ses.cardioId;
   if(isCardioEx(newId)){
     ses.cardio=true; ses.done=false; ses.sets=[]; ses.suggestion=null;
@@ -2919,9 +3004,9 @@ function retargetSessionExercise(ses, newId, edit){
     return ses;
   }
   const sug=edit? null : ProgressionEngine.suggest(newId, keptReps, rir);
-  const isBW=!!(ex && ex.equipment==="Bodyweight");
+  const isBW=repsOnly(ex);
   const reps=(sug && sug.bodyweight)? sug.reps : keptReps;
-  ses.bodyweight=isBW; ses.timed=false; ses.suggestion=sug;
+  ses.bodyweight=isBW; ses.band=isBandEx(ex); ses.timed=false; ses.suggestion=sug;
   ses.target={sets:n, reps, rir, rest, notes};
   ses.sets= isBW? buildSetRows(n, 0, reps, rir)
                 : buildGhostRows(newId, n, sug? sug.kg : 0, reps, rir, sug, false);
@@ -2939,7 +3024,7 @@ function upgradeSession(s){
     // to Bodyweight after this session was first built)
     if(e.bodyweight===undefined && !e.cardio){
       const ex=exById(e.exerciseId);
-      e.bodyweight = !!(ex && ex.equipment==="Bodyweight");
+      e.bodyweight = repsOnly(ex);
     }
     if(e.timed===undefined && !e.cardio){
       const ex=exById(e.exerciseId);
@@ -2951,10 +3036,11 @@ function upgradeSession(s){
     if(lib){
       const wantCardio=isCardioEx(e.exerciseId);
       const wantTimed=!e.cardio && !!lib.timed;
-      const wantBW=!e.cardio && lib.equipment==="Bodyweight";
+      const wantBW=!e.cardio && repsOnly(lib);
       const mismatch = (!!e.cardio!==wantCardio) || (!e.cardio && (!!e.timed!==wantTimed || !!e.bodyweight!==wantBW));
       if(mismatch && !(e.sets||[]).some(x=>x.done) && !e.done)
         retargetSessionExercise(e, e.exerciseId, !!e._edit);
+      if(!e.cardio){ e.band=isBandEx(lib); if(e.band) fillBands(e); }
     }
     if(e.rowsReady) return;
     const done=(e.sets||[]).map(x=>({...x, done:true}));
@@ -2991,22 +3077,23 @@ VIEWS.workout=function(){
         }
         const sug=ProgressionEngine.suggest(slot.exerciseId, slot.reps, slot.rir);
         const exRef=exById(slot.exerciseId);
-        const isBW = !!(exRef && exRef.equipment==="Bodyweight");
+        const isBW = repsOnly(exRef);
         const isTimed = !!(exRef && exRef.timed);
         let kg=sug? sug.kg : 0;
         // reps target: bodyweight uses the engine's rep suggestion, else the slot's
         const repTarget = (sug && sug.bodyweight)? sug.reps : slot.reps;
         // volume ramp (per-exercise, per-muscle ceiling, lands in final real week)
-        let nSets=rampedSets(meso, slot, pos.week, deload);
+        // warm-up slots keep their own set count: no ramp, no deload halving
+        let nSets=slot.warmup? slot.sets : rampedSets(meso, slot, pos.week, deload);
         if(deload && sug && !isBW){ kg=deloadKg(sug, exRef); }
-        return {slotId:slot.id, exerciseId:slot.exerciseId, bodyweight:isBW, timed:isTimed,
+        return {slotId:slot.id, exerciseId:slot.exerciseId, bodyweight:isBW, band:isBandEx(exRef), warmup:!!slot.warmup, timed:isTimed,
           target:{sets:nSets, reps:repTarget, rir:slot.rir, rest:slot.rest, notes:slot.notes,
             secs: isTimed? (slot.secs||30) : undefined},
           suggestion: isTimed? null : (deload&&sug&&!isBW? {...sug, kg, diff:kg-sug.lastKg, reason:FUN()?"Recovery week — lighter and shorter on purpose.":(exRef&&exRef.assisted?"Deload — same assistance as last time, half the sets.":"Deload — ~60% load, half the sets.")} : sug),
           notes:"", skipped:false, rowsReady:true,
-          sets: isTimed? buildTimedRows(nSets, slot.secs||30, slot.rir)
+          sets: warmRows(isTimed? buildTimedRows(nSets, slot.secs||30, slot.rir)
                 : isBW? buildSetRows(nSets, 0, repTarget, slot.rir)
-                    : buildGhostRows(slot.exerciseId, nSets, kg, slot.reps, slot.rir, sug, deload)};
+                    : buildGhostRows(slot.exerciseId, nSets, kg, slot.reps, slot.rir, sug, deload), slot.warmup)};
       })
     };
     Store.save(); Store.flush();
@@ -3032,7 +3119,7 @@ function exCardHTML(ses, xi){
   <div class="card excard ${allDone?"done-card":""} ${ses.skipped?"skipped-card":""}" data-card="${xi}">
     <div class="exhead">
       <div><div class="exname">${esc(ex.name)}</div>
-        <div class="exsub num">${ses.timed?`Hold · target ${t.sets}×${t.secs||30}s`:`${esc(ex.equipment)} · target ${t.sets}×${t.reps}${(()=>{
+        <div class="exsub num">${ses.warmup?"Warm-up · ":""}${ses.timed?`Hold · target ${t.sets}×${t.secs||30}s`:`${esc(ex.equipment)} · target ${t.sets}×${t.reps}${(()=>{
           // ghosts can ask for more than the plan (last week's reps + 1); say so
           // rather than showing a target the rows don't match
           const exps=[...new Set((ses.sets||[]).filter(x=>!x.done).map(x=>x.expReps).filter(v=>v>0))];
@@ -3065,11 +3152,11 @@ function exCardHTML(ses, xi){
          : (()=>{ const prev=exerciseHistory(ses.exerciseId)[0];
              if(prev && prev.sets.length)
                return `<div class="sugline num"><b>Last time: ${prev.sets.map(x=>`${dispW(x.kg)}${unitLabel()}×${x.reps}${x.type&&x.type!=="normal"?` ${x.type.toUpperCase()}`:""}`).join(" · ")}</b> · no suggestion from those sets — pick your load.</div>`;
-             return `<div class="faint" style="margin:6px 0 0">${ses.bodyweight?`Bodyweight — aim for ${t.reps} good reps.`:(FUN()?`First time — find a weight where ${t.reps} reps feels ${feelWord(t.rir).toLowerCase()}.`:`First time — find your ${t.reps}-rep @${t.rir}RIR load.`)}</div>`; })()}
+             return `<div class="faint" style="margin:6px 0 0">${ses.bodyweight?`${ses.band?"Band":"Bodyweight"} — aim for ${t.reps} good reps.`:(FUN()?`First time — find a weight where ${t.reps} reps feels ${feelWord(t.rir).toLowerCase()}.`:`First time — find your ${t.reps}-rep @${t.rir}RIR load.`)}</div>`; })()}
     <div class="setgrid" data-grid="${xi}">
       ${ses.timed
         ? `<span></span><span class="h">Hold</span><span class="h">Seconds</span><span class="h">${term("rirHead")}</span><span class="h">Log</span>`
-        : `<span></span><span class="h">Weight (${unitLabel()})</span><span class="h">Reps</span><span class="h">${term("rirHead")}</span><span class="h">Log</span>`}
+        : `<span></span><span class="h">${ses.band?"Band":`Weight (${unitLabel()})`}</span><span class="h">Reps</span><span class="h">${term("rirHead")}</span><span class="h">Log</span>`}
       ${(()=>{ const prev=prevSessionSets(ses.exerciseId);
           return ses.sets.map((x,si)=>setRowHTML(ses,xi,x,si)+lastHintHTML(ses,x,si,prev)).join(""); })()}
     </div>
@@ -3168,6 +3255,7 @@ function lastHintHTML(ses, x, si, prev){
   const p=prev.filter(r=>isWarm(r)===warm)[pos];
   if(!p) return `<div class="lasthint"></div>`;
   const txt = ses.timed ? `${p.secs??"?"}s`
+            : ses.band ? `${p.band||"band"} ×${p.reps}`
             : ses.bodyweight && !p.kg ? `×${p.reps}`
             : `${dispW(p.kg)}×${p.reps}`;
   return `<div class="lasthint num">last ${txt}${p.type&&p.type!=="normal"?` ${SET_TYPES[p.type]?.badge||""}`:""}</div>`;
@@ -3183,6 +3271,25 @@ function realignWorkingGhosts(ses){
   const fresh=buildGhostRows(ses.exerciseId, working.length, sug.kg, t.reps, t.rir, sug, false);
   working.forEach((r,i)=>{ if(r.done || r.touched || !fresh[i]) return;
     r.reps=fresh[i].reps; r.expReps=fresh[i].expReps; });
+}
+/** Warm-up slots: every row starts as a Warm-up set (W badge, not counted). */
+function warmRows(rows, on){ if(on) rows.forEach(r=>{ r.type="warmup"; }); return rows; }
+/* Band rows start on the band used last time (same warm-up/working position),
+   else the last band used, else the row above, else the lightest. */
+function fillBands(ses){
+  const prev=prevSessionSets(ses.exerciseId)||[];
+  const lastBand=[...prev].reverse().find(p=>p.band)?.band;
+  ses.sets.forEach((x,si)=>{
+    if(x.band) return;
+    const warm=isWarm(x);
+    const pos=ses.sets.slice(0,si).filter(r=>isWarm(r)===warm).length;
+    const p=prev.filter(r=>isWarm(r)===warm)[pos];
+    x.band=(p&&p.band) || lastBand || (si>0 && ses.sets[si-1].band) || BANDS[0][0];
+  });
+}
+function bandSelectHTML(x, id, si){
+  return `<select class="bandsel" data-f="band" data-set="${id}" style="border-left:8px solid ${bandHex(x.band)}" aria-label="Set ${si+1} band">
+      ${BANDS.map(([n])=>`<option value="${n}" ${x.band===n?"selected":""}>${n}</option>`).join("")}</select>`;
 }
 function setRowHTML(ses, xi, x, si){
   const id=`${xi}:${si}`;
@@ -3201,7 +3308,9 @@ function setRowHTML(ses, xi, x, si){
   }
   const bw2=bw;
   return `<button class="sn" data-setmenu="${id}" aria-label="Set ${si+1} options"><span class="dots">⋮</span>${si+1}</button>
-    ${bw2
+    ${ses.band
+      ? bandSelectHTML(x, id, si)
+      : bw2
       ? `<div class="bwcell" aria-label="Bodyweight">BW</div>`
       : `<input type="number" inputmode="decimal" step="any" value="${show?dispW(x.kg):""}" placeholder="${dispW(x.kg)}" data-f="kg" data-set="${id}" aria-label="Set ${si+1} weight, expected ${dispW(x.kg)}">`}
     <div class="repcell">${setTypeBadge(x.type)}<input type="number" inputmode="numeric" class="${(!show&&x.predReps===null)?"pred-unknown":""}" value="${show?x.reps:""}" placeholder="${x.predReps===null?"??":x.reps}" data-f="reps" data-set="${id}" aria-label="Set ${si+1} reps${x.predReps===null&&!show?" — no suggestion, weight change too large":", expected "+x.reps}"></div>
@@ -3766,6 +3875,11 @@ function bindWorkout(){
     if(!el) return;
     const [xi,si]=parse(el);
     const set=s.exercises[xi]?.sets[si]; if(!set) return;
+    if(el.dataset.f==="band"){
+      // later sets not yet logged follow the band you just picked
+      s.exercises[xi].sets.forEach((r,i)=>{ if(i>=si && (i===si || !r.done)) r.band=el.value; });
+      save(); refreshCard(xi); return;
+    }
     set.rir=clamp(parseInt(el.value)||0,0,5);
     save();
   };
@@ -3919,7 +4033,7 @@ function bindWorkout(){
           mkSlot=()=>({id:uid(), exerciseId:exId, sets:3, reps:0, rir:2, secs:30, rest:S().settings.restDefault, notes:""});
         } else {
           const exRef=exById(exId);
-          const isBW=!!(exRef && exRef.equipment==="Bodyweight");
+          const isBW=repsOnly(exRef);
           // judge it against how the meso programs this lift, if it does (else 10 @ RIR 2)
           const pm=mesoById(s.mesoId||s.bonusOf)||activeMeso();
           const ps=pm && pm.days.flatMap(d=>d.exercises).find(x=>x.exerciseId===exId && !x.cardio && x.reps>0);
@@ -3927,7 +4041,7 @@ function bindWorkout(){
           const sug=edit? null : ProgressionEngine.suggest(exId, pReps, pRIR);
           const nSets=edit?1:3;
           const repTarget=(sug && sug.bodyweight)? sug.reps : pReps;
-          inst={slotId:null, exerciseId:exId, bodyweight:isBW,
+          inst={slotId:null, exerciseId:exId, bodyweight:isBW, band:isBandEx(exRef),
             target:{sets:nSets, reps:repTarget, rir:pRIR, rest:S().settings.restDefault, notes:""},
             suggestion:sug, notes:"", skipped:false, rowsReady:true, _edit:edit,
             sets:buildSetRows(nSets, (isBW?0:(sug?sug.kg:0)), repTarget, pRIR)};
@@ -4517,7 +4631,7 @@ function confirmBonusWorkout(){
 function bonusPool(meso){
   const pool={};
   (meso?.days||[]).forEach(d=>d.exercises.forEach(sl=>{
-    if(sl.cardio || isCardioEx(sl.exerciseId)) return;
+    if(sl.cardio || sl.warmup || isCardioEx(sl.exerciseId)) return;
     const ex=exById(sl.exerciseId); if(!ex || ex.muscle==="Cardio") return;
     (pool[ex.muscle] ??= []).some(x=>x.exerciseId===sl.exerciseId) || pool[ex.muscle].push(sl);
   }));
@@ -4578,9 +4692,9 @@ function bonusRecoveredPicker(){
 function bonusExercise(slot, nSets){
   const sug=ProgressionEngine.suggest(slot.exerciseId, slot.reps, slot.rir);
   const exRef=exById(slot.exerciseId);
-  const isBW=!!(exRef && exRef.equipment==="Bodyweight"), isTimed=!!(exRef && exRef.timed);
+  const isBW=repsOnly(exRef), isTimed=!!(exRef && exRef.timed);
   const kg=sug? sug.kg : 0, repTarget=(sug && sug.bodyweight)? sug.reps : slot.reps;
-  return {slotId:null, exerciseId:slot.exerciseId, bodyweight:isBW, timed:isTimed,
+  return {slotId:null, exerciseId:slot.exerciseId, bodyweight:isBW, band:isBandEx(exRef), timed:isTimed,
     target:{sets:nSets, reps:repTarget, rir:slot.rir, rest:slot.rest, notes:"", secs:isTimed?(slot.secs||30):undefined},
     suggestion:isTimed? null : sug, notes:"", skipped:false, rowsReady:true,
     sets: isTimed? buildTimedRows(nSets, slot.secs||30, slot.rir)
@@ -6605,7 +6719,7 @@ VIEWS.analytics=function(){
   let partialWeek=null;
   if(meso){
     meso.days.forEach(d=>d.exercises.forEach(sl=>{
-      if(sl.cardio) return;                         // cardio is minutes, not sets
+      if(sl.cardio || sl.warmup) return;            // cardio is minutes, warm-ups aren't training
       const ex=exById(sl.exerciseId);
       if(ex && ex.muscle!=="Cardio") targetPerMuscle[ex.muscle]=(targetPerMuscle[ex.muscle]||0)+(sl.sets||0);
     }));

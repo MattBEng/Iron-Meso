@@ -330,12 +330,16 @@ Each of these cost real debugging time. Don't re-learn them.
 - **jsdom does not fire `popstate` asynchronously** by default, which hid a real
   back-button bug. Override `history.back` in tests that care.
 - **DOM nodes go stale** after any action that re-renders a card. Re-query.
-- **Fresh installs seed archived starter templates** (`seedTemplates` plus
-  `seedLisaTemplate`), so `mesocycles[0]` is not your test meso — call
+- **Fresh installs seed archived starter templates** (`seedTemplates`,
+  `seedLisaTemplate`, `seedLisa3Template`), so `mesocycles[0]` is not your test meso — call
   `clearTemplates()`.
 - **New built-in exercises used by a template seeded in a migration** must be
   added inside that migration: the `load()` library top-up runs after
   `migrate()`, so the slot would resolve to null and be dropped.
+- **Reps-only equipment is Bodyweight OR Band.** Use `repsOnly(ex)`, never
+  `equipment==="Bodyweight"`, or band exercises get kg rows.
+- **Warm-up slots (`slot.warmup`) are not training.** Anything that sums planned
+  sets per muscle must skip them, like it skips cardio.
 - **Top-level `const` used during `Store` construction** throws (TDZ): the
   store is built before later consts are initialised. Inline the value.
 - **Adding an exercise opens the target editor**, so test flows must dismiss it.
