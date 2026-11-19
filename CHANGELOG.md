@@ -9,6 +9,12 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.9.3 — 2026-11-19 (live meso volume)
+
+- **What:** Home "Meso volume" card. `mesoVolume()` now adds a `left` count per muscle. With a workout open (`activeSession` for this meso or its bonus), ticked working sets count straight away and unticking takes them back; unticked sets show as a grey tail. With no workout open, the next planned day (`mesoPosition().day`, ramped sets) shows as the grey tail.
+- **Card:** removed the per-muscle numbers on the right, kept one colour for all bars, no target marker. Scale = biggest done + left. New CSS `.spm-left`.
+- **Why:** Matt asked for live volume with a dark grey preview of today, without clutter.
+
 ### v1.9.2 — 2026-11-18 (duck tap timings)
 - Knife was too hard to reach. Timings now constants by `_duckAway`: `DUCK_TRICK_EVERY` 3 (was 5),
   `DUCK_KNIFE_TAPS` 5 (was 10), `DUCK_QUICK_MS` 1500 (was 1000), `DUCK_SULK_WINDOW` 30s, `DUCK_AWAY_MS` 2 min.

@@ -17,11 +17,13 @@ run("home meso volume", ()=>{
   ],{weeks:5,deload:true,rampSets:false});
   const rows=()=>[...$$('[data-act="volstats"] .spm-row')].map(r=>({
     m:r.querySelector(".spm-label").textContent,
-    v:r.querySelector(".spm-val").textContent,
-    w:parseFloat(r.querySelector(".spm-fill").style.width)}));
+    w:parseFloat(r.querySelector(".spm-fill").style.width),
+    g:parseFloat(r.querySelector(".spm-left").style.width)}));
+  const vol=()=>Object.fromEntries(w.mesoVolume(w.activeMeso()).map(x=>[x.muscle,x]));
 
   w.go("home");
-  ok("no card until something is logged", !$('[data-act="volstats"]'));
+  ok("before anything is logged, card shows today's plan as grey only",
+     rows().length===2 && rows().every(x=>x.w===0 && x.g===100), JSON.stringify(rows()));
 
   // the user's example: chest 18, quads 9 (plus a warm-up that must not count)
   [1,2,3].forEach(i=>st().logs.push({id:"L"+i,mesoId:"m",week:i,dayId:"d",dayName:"Day",
@@ -33,12 +35,29 @@ run("home meso volume", ()=>{
     {exerciseId:"b_back_squat",target:{},sets:sets(20)}]});
   save(); w.go("home");
 
-  const r=rows();
-  ok("chest totals 18 across the meso", r[0].m==="Chest" && r[0].v==="18", JSON.stringify(r));
-  ok("quads totals 9 (warm-ups, skips, other mesos excluded)", r[1].m==="Quads" && r[1].v==="9", JSON.stringify(r));
+  const r=rows(), v=vol();
+  ok("chest totals 18 across the meso", v.Chest.sets===18, JSON.stringify(v));
+  ok("quads totals 9 (warm-ups, skips, other mesos excluded)", v.Quads.sets===9, JSON.stringify(v));
   ok("most sets listed first", r[0].m==="Chest");
-  ok("top muscle fills the bar", r[0].w===100, r[0].w);
-  ok("quads at half of chest", r[1].w===50, r[1].w);
+  const L0=v.Chest.left;
+  ok("next planned day shows as grey", L0>0 && v.Quads.left===L0, JSON.stringify(v));
+  ok("biggest done + grey fills the bar", Math.abs(r[0].w+r[0].g-100)<0.2, JSON.stringify(r[0]));
+  ok("no numbers on the right", $$('[data-act="volstats"] .spm-val').length===0);
+  ok("all bars one colour", new Set([...$$('[data-act="volstats"] .spm-fill')].map(e=>e.style.background)).size===1);
+
+  // open the workout: ticks count live, untick takes it back
+  w.go("workout"); w.go("home");
+  const ses=st().activeSession;
+  ok("open workout: nothing ticked, all grey", vol().Chest.sets===18 && vol().Chest.left===L0, JSON.stringify(vol().Chest));
+  const bench=ses.exercises.find(e=>e.exerciseId==="b_barbell_bench_press");
+  const work=bench.sets.filter(s=>!(s.type==="warmup"||s.warmup));
+  work[0].done=true; save();
+  ok("tick a set: done +1, grey -1", vol().Chest.sets===19 && vol().Chest.left===L0-1, JSON.stringify(vol().Chest));
+  work[0].done=false; save();
+  ok("untick: back to where it was", vol().Chest.sets===18 && vol().Chest.left===L0, JSON.stringify(vol().Chest));
+  bench.skipped=true; save();
+  ok("skipped exercise drops its grey", vol().Chest.left===0, JSON.stringify(vol().Chest));
+  st().activeSession=null; save(); w.go("home");
   ok("cardio not listed", !r.some(x=>x.m==="Cardio"));
   ok("no target ticks", $$('[data-act="volstats"] .spm-target').length===0);
   ok("header shows progress through the meso",

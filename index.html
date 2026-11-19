@@ -616,6 +616,7 @@ ul.whatsnew li{margin:0 0 7px;font-size:14px;line-height:1.45;color:var(--text)}
 .spm-label{width:84px;font-size:13px;color:var(--muted);font-weight:600;flex:0 0 auto}
 .spm-track{flex:1;height:18px;background:var(--raised);border-radius:6px;position:relative;overflow:hidden}
 .spm-fill{height:100%;border-radius:6px;transition:width .3s}
+.spm-left{height:100%;background:#5b6068;opacity:.7;border-radius:0 6px 6px 0;transition:width .3s}
 .spm-target{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--text);opacity:.55}
 .stat-sec{margin:0 0 4px}
 .stat-sec>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;
@@ -809,8 +810,11 @@ STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|
    stored data and moves independently. RELEASES[0] must match WHATS-NEW.md —
    the app is one offline file, so the notes are embedded, not fetched.
    TESTS_about.js fails if the two drift apart. */
-const APP_VERSION = "1.9.2";
+const APP_VERSION = "1.9.3";
 const RELEASES = [
+  {v:"1.9.3", date:"2026-11-19", notes:[
+    "Meso volume on Home now updates as you tick sets, and a grey tail on each bar shows what today's workout still adds. The numbers are gone so it reads cleaner.",
+  ]},
   {v:"1.9.2", date:"2026-11-18", notes:[
     "Daisy's tricks are easier to find: every third tap does something silly, and five quick taps gets her cross. Do that twice in 30 seconds and she leaves the page for a couple of minutes.",
   ]},
@@ -1964,26 +1968,52 @@ function mesoVolume(meso){
       const n=(e.sets||[]).filter(s=>s.done && !isWarm(s)).length;
       if(n) actual[ex.muscle]=(actual[ex.muscle]||0)+n;
     }));
-  return [...new Set([...Object.keys(target),...Object.keys(actual)])]
-    .map(m=>({muscle:m, sets:actual[m]||0, target:target[m]||0}))
+  // Today: ticked sets in the open workout count live (untick takes them back);
+  // sets still to do show as the grey "left" extension. No workout open yet:
+  // the next planned day shows as grey so you see what today adds.
+  const left={}, ses=S().activeSession;
+  const addLeft=(muscle,n)=>{ if(n>0) left[muscle]=(left[muscle]||0)+n; };
+  if(ses && (ses.mesoId===meso.id || ses.bonusOf===meso.id)){
+    (ses.exercises||[]).forEach(e=>{
+      if(e.cardio) return;
+      const ex=exById(e.exerciseId); if(!ex || ex.muscle==="Cardio") return;
+      const work=(e.sets||[]).filter(s=>!isWarm(s));
+      const n=work.filter(s=>s.done).length;
+      if(n) actual[ex.muscle]=(actual[ex.muscle]||0)+n;
+      if(!e.skipped) addLeft(ex.muscle, work.filter(s=>!s.done).length);
+    });
+  } else if(!ses){
+    const pos=mesoPosition(meso);
+    if(pos && pos.day && !pos.finished){
+      const deload=isDeload(meso,pos.week);
+      pos.day.exercises.forEach(sl=>{
+        if(sl.cardio || isCardioEx(sl.exerciseId)) return;
+        const ex=exById(sl.exerciseId); if(!ex || ex.muscle==="Cardio") return;
+        addLeft(ex.muscle, rampedSets(meso, sl, pos.week, deload));
+      });
+    }
+  }
+  return [...new Set([...Object.keys(target),...Object.keys(actual),...Object.keys(left)])]
+    .map(m=>({muscle:m, sets:actual[m]||0, left:left[m]||0, target:target[m]||0}))
     .sort((a,b)=>(b.sets-a.sets)||(b.target-a.target)||a.muscle.localeCompare(b.muscle));
 }
 function mesoVolumeCardHTML(meso, pos){
-  const rows=mesoVolume(meso).filter(r=>r.sets>0);
+  const rows=mesoVolume(meso).filter(r=>r.sets>0||r.left>0);
   if(!rows.length) return "";
-  // Bars compare muscles to each other: the most-trained muscle fills the bar,
-  // the rest scale against it (Chest 18 = full, Quads 9 = half).
-  const max=rows[0].sets;
+  // Bars compare muscles to each other: the biggest done + still-to-do total
+  // fills the bar, the rest scale against it. One colour for every muscle;
+  // the grey tail is what today's workout still adds. No numbers, no marker.
+  const max=Math.max(...rows.map(r=>r.sets+r.left))||1;
+  const anyLeft=rows.some(r=>r.left>0);
   return `<div class="card volcard" data-act="volstats" style="cursor:pointer">
     <div class="row split"><div class="kicker">${term("Meso")} volume</div>
       <span class="faint num" style="font-size:12px">${pos.finished?"Complete":`Wk ${pos.week} of ${meso.weeks}`} · ${pos.done} of ${pos.total} workouts</span></div>
     <div style="margin-top:6px">
     ${rows.map(r=>`<div class="spm-row">
         <span class="spm-label">${esc(r.muscle)}</span>
-        <div class="spm-track"><div class="spm-fill" style="width:${Math.round(100*r.sets/max)}%;background:var(--accent)"></div></div>
-        <span class="spm-val num">${r.sets}</span></div>`).join("")}
+        <div class="spm-track" style="display:flex"><div class="spm-fill" style="width:${(100*r.sets/max).toFixed(1)}%;background:var(--accent)${r.left?";border-radius:6px 0 0 6px":""}"></div><div class="spm-left" style="width:${(100*r.left/max).toFixed(1)}%"></div></div></div>`).join("")}
     </div>
-    <p class="faint" style="margin:6px 0 0;font-size:11px">Total sets so far this ${term("meso")} · tap for full stats</p></div>`;
+    <p class="faint" style="margin:6px 0 0;font-size:11px">Total sets so far this ${term("meso")}${anyLeft?" · grey is still to do today":""} · tap for full stats</p></div>`;
 }
 VIEWS.home=function(){
   const st=S(), meso=activeMeso(), pos=mesoPosition(meso);
@@ -4232,6 +4262,7 @@ const REST_OVER_MSGS=[
  "Rest's up — go be that girl 💫",
  "Time to grind, gorgeous 💪",
  "Break over — sparkle and squat ✨",
+ "Damn gurl — You're begging to be held down with that attitude 🥵",
  "Rest done — let's get sweaty and cute 💦",
  "Come on, cupcake — next set 🧁",
  "Rest over — flex now, flaunt later 💅",

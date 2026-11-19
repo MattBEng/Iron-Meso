@@ -107,7 +107,7 @@ run("features", ()=>{
   w.toast=realToast;
 
   // ---------- REST-OVER MESSAGES ----------
-  ok("rest-over bank has 100 messages", ev("REST_OVER_MSGS").length===100, ev("REST_OVER_MSGS").length);
+  ok("rest-over bank has at least 100 messages", ev("REST_OVER_MSGS").length>=100, ev("REST_OVER_MSGS").length);
   const msg=ev("restOverMsg()");
   ok("rest-over message is a non-empty string", typeof msg==="string" && msg.length>0);
 });

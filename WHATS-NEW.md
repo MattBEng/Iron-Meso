@@ -8,6 +8,6 @@ live in `RELEASES[0]` in `index.html`, and `TESTS_about.js` fails if the two dri
 apart. Update both when you ship, and add the engineering detail to
 `CHANGELOG.md` rather than here.
 
-## 1.9.2 — 2026-11-18
+## 1.9.3 — 2026-11-19
 
-- Daisy's tricks are easier to find: every third tap does something silly, and five quick taps gets her cross. Do that twice in 30 seconds and she leaves the page for a couple of minutes.
+- Meso volume on Home now updates as you tick sets, and a grey tail on each bar shows what today's workout still adds. The numbers are gone so it reads cleaner.
