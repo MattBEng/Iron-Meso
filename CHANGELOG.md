@@ -9,6 +9,25 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.14.0 — 2026-11-20 (outfit animations)
+
+- **What:** five new poses in `petSVG`: `wink` (sunglasses slide down, wink, back up, glint), `capflip` (cap spins up and lands), `daisies` (bends via `.dk-top`, picks daisies, holds the bunch, one tucked in the sun hat, gust lifts the hat), `twirl` (two spins via `.dk-spinner` scaleX, dress flares, hearts, curtsy), `wizard` (runs across like the skate, cape flying, wand with sparkles, says "Oculus Reparo! ✨"). One-shot CSS animations (`1 both`), reduced-motion turns them off.
+- **Pool:** `WEAR_ANIMS` maps item -> pose. `wornPoses(train)` returns the poses for what she's wearing (from `petWear()`, so locked items never count); `duckPlace` adds them to the random pool, so every move has equal odds and the no-repeat rule makes hat and outfit take turns. Train excludes `wizard`. `wizard` uses the walk spot (`dkWalk`, 6s).
+- **Tap:** `duckTap` adds "wear" to its random reactions when she's wearing something (not mid-walk); plays one of her worn moves in place (`data-still` stops the running legs), with its line if it has one.
+- **duckSVG** always draws the item for an outfit pose (dev buttons can play one she isn't wearing). Dev panel: Wink, Cap flip, Daisies, Twirl, Wizard buttons.
+- **Tests:** `TESTS_duckwear.js`. Docs: `CUTIE-POINTS.md` duck section.
+- **Why:** Matt: every accessory should unlock its own animation; random, evenly weighted, hat and outfit alternate.
+
+---
+
+### v1.13.2 — 2026-11-20 (skateboard wheels)
+
+- **What:** the duck sits at `bottom:64px`, but the nav bar is a little taller than that, so it covered the bottom of the skateboard and the wheels (they also sat mostly behind the board's thick outline). Skate pose now sits at `bottom:72px` (`#duck[data-pose="skate"]`), and the wheels are bigger and lower (cy 62, r 2.8) so they clearly hang under the board.
+- **Tests:** `TESTS_skate.js`.
+- **Why:** Matt: the skateboard looked like a snowboard.
+
+---
+
 ### v1.13.1 — 2026-11-20 (refresh keeps tab, More keeps scroll)
 
 - **Refresh:** boot always did `go(activeSession? "workout":"home")`, and opening Train creates a session, so a pull-to-refresh on Home landed on Train. `go()` now saves the tab name in localStorage key `liftdaddy_view`; boot calls `startView(wasReload(), saved, hasSession)`. On a reload (Navigation Timing type "reload") it reopens the saved tab if it's in `RESTORABLE_VIEWS`; a fresh launch behaves as before.

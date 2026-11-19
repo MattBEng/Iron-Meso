@@ -244,8 +244,13 @@ workouts (bonus workouts count toward the plan they were done in).
   taps and she gets cross and pulls out a tiny knife for a few seconds.
 - On the Train tab she sits bottom-left and can't be tapped. When an exercise is finished she reacts: strong,
   tired or cool. Hard exercises mostly get the tired one.
-- **Add-ons unlock with titles.** So far: the skateboard at Strong Sweetheart (she sometimes skates across the
-  page). The rest of the ladder is still to be decided.
+- **Add-ons unlock with titles.** Wearables (one hat, one outfit, picked in More): sunglasses, backwards cap,
+  sun hat, floral dress, wizard's cape. Acts (things she sometimes does): skateboard, lounge, bubble bath, tiny
+  dumbbells. Where new items go on the title ladder is still to be decided.
+- **Each wearable has its own animation (1.14.0):** sunglasses = wink, cap = cap flip, sun hat = picks daisies,
+  dress = twirl, cape = wizard run with a wand ("Oculus Reparo!"). It joins her random moves only while she's
+  wearing it, with the same odds as every other move; hat and outfit both join, so they take turns. A tap can
+  set one off too. On Train only the on-the-spot ones (no cape run).
 - More > Your duck: switch her off, or switch individual add-ons off.
 - Nine other birds are drawn but unfinished and hidden (dev panel: "Show unfinished pets").
 

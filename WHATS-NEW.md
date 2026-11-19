@@ -8,7 +8,7 @@ live in `RELEASES[0]` in `index.html`, and `TESTS_about.js` fails if the two dri
 apart. Update both when you ship, and add the engineering detail to
 `CHANGELOG.md` rather than here.
 
-## 1.13.1 — 2026-11-20
+## 1.14.0 — 2026-11-20
 
-- Pulling down to refresh now keeps you on the tab you were on, instead of jumping to Train.
-- Ticking things in More (like Daisy's outfits) no longer scrolls you back to the top.
+- Daisy's outfits now come with their own moves: a wink with the sunglasses, a cap flip, picking daisies in the sun hat, a twirl in the dress, and a wizard run with a wand in the cape.
+- She does them at random alongside her other moves, only while she's wearing that item, and a tap can set one off too. With a hat and an outfit on she takes turns.
