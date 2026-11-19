@@ -367,13 +367,15 @@ body[data-fun="1"]:is([data-scheme="cherry"],[data-scheme="lavender"],[data-sche
 @keyframes dkTuck{0%,52%{opacity:0;transform:translateY(4px)}58%,100%{opacity:1;transform:translateY(0)}}
 @keyframes dkGust{0%,68%{transform:translate(0,0) rotate(0)}74%{transform:translate(-1px,-5px) rotate(-16deg)}80%{transform:translate(0,-3px) rotate(-8deg)}86%,100%{transform:translate(0,0) rotate(0)}}
 @keyframes dkWind{0%,64%{opacity:0;transform:translateX(4px)}70%,82%{opacity:.8;transform:translateX(-4px)}88%,100%{opacity:0;transform:translateX(-8px)}}
-#duck .dk-twirl .dk-spinner{transform-box:view-box;transform-origin:32px 56px;animation:dkTwirl 4.4s ease-in-out 1 both}
-#duck .dk-twirl .dk-dress{transform-box:fill-box;transform-origin:50% 0;animation:dkFlare 4.4s ease-in-out 1 both}
-#duck .dk-twirl .dk-hearts path{opacity:0;transform-box:fill-box;animation:dkHeart 4.4s ease-out 1 both}
+#duck .dk-twirl .dk-top{transform-box:view-box;transform-origin:30px 52px;animation:dkCurtsy 4.6s ease-in-out 1 both}
+#duck .dk-twirl .dk-dress{transform-box:fill-box;transform-origin:50% 0;animation:dkSway 4.6s ease-in-out 1 both}
+#duck .dk-twirl .dk-breeze{opacity:0;animation:dkBreeze 4.6s ease-in-out 1 both}
+#duck .dk-twirl .dk-hearts path{opacity:0;transform-box:fill-box;animation:dkHeart 4.6s ease-out 1 both}
 #duck .dk-twirl .dk-h2{animation-delay:.25s!important}#duck .dk-twirl .dk-h3{animation-delay:.5s!important}
-@keyframes dkTwirl{0%,8%{transform:scaleX(1)}18%{transform:scaleX(-1)}28%{transform:scaleX(1)}38%{transform:scaleX(-1)}48%,62%{transform:scaleX(1)}72%{transform:translateY(3px) scaleX(1)}84%,100%{transform:translateY(0) scaleX(1)}}
-@keyframes dkFlare{0%,8%{transform:scaleX(1)}18%,40%{transform:scaleX(1.18)}50%,100%{transform:scaleX(1)}}
-@keyframes dkHeart{0%,40%{opacity:0;transform:translateY(4px) scale(.6)}50%{opacity:1;transform:translateY(0) scale(1)}80%{opacity:1;transform:translateY(-6px)}100%{opacity:0;transform:translateY(-10px)}}
+@keyframes dkSway{0%,4%{transform:skewX(0) scale(1)}12%{transform:skewX(-22deg) scale(1.1,1.08)}20%{transform:skewX(10deg) scale(1.06,1.04)}28%{transform:skewX(-20deg) scale(1.1,1.08)}36%{transform:skewX(9deg) scale(1.05,1.03)}44%{transform:skewX(-8deg)}52%,100%{transform:skewX(0) scale(1)}}
+@keyframes dkBreeze{0%,2%{opacity:0;transform:translateX(6px)}10%,40%{opacity:.7;transform:translateX(-2px)}50%,100%{opacity:0;transform:translateX(-8px)}}
+@keyframes dkCurtsy{0%,54%{transform:translate(0,-4px) rotate(0)}64%,76%{transform:translate(0,-1px) rotate(9deg)}86%,100%{transform:translate(0,-4px) rotate(0)}}
+@keyframes dkHeart{0%,60%{opacity:0;transform:translateY(4px) scale(.6)}68%{opacity:1;transform:translateY(0) scale(1)}88%{opacity:1;transform:translateY(-6px)}100%{opacity:0;transform:translateY(-10px)}}
 #duck[data-pose="wizard"]{animation-duration:6s}
 #duck .dk-wizard .dk-leg1{animation:dkStep .22s ease-in-out infinite}
 #duck .dk-wizard .dk-leg2{animation:dkStep .22s ease-in-out infinite -.11s}
@@ -871,8 +873,11 @@ STARTER_EXERCISES.forEach(e=>{ if(/^assisted /i.test(e.name) || /assisted (pull|
    stored data and moves independently. RELEASES[0] must match WHATS-NEW.md —
    the app is one offline file, so the notes are embedded, not fetched.
    TESTS_about.js fails if the two drift apart. */
-const APP_VERSION = "1.14.0";
+const APP_VERSION = "1.14.1";
 const RELEASES = [
+  {v:"1.14.1", date:"2026-11-20", notes:[
+    "Daisy's dress move is now a breeze ruffling her skirt and a curtsy, instead of the spin.",
+  ]},
   {v:"1.14.0", date:"2026-11-20", notes:[
     "Daisy's outfits now come with their own moves: a wink with the sunglasses, a cap flip, picking daisies in the sun hat, a twirl in the dress, and a wizard run with a wand in the cape.",
     "She does them at random alongside her other moves, only while she's wearing that item, and a tap can set one off too. With a hat and an outfit on she takes turns.",
@@ -6046,6 +6051,7 @@ function petSVG(pose, skin, wear){
     return wrap("cool", standing(head("",null,shades), wing));
   }
 
+
   /* ---- worn-item animations (1.14.0): one per wearable, played at random like the acts ---- */
   const headBare=(eyeHTML,more)=>`<path d="M34.6 37C33 29 33.6 25 35.6 22.2A9.4 9.4 0 1 1 49.6 23C48 27 47.6 32 48 38" ${H} ${O}/>${extra}${blush}${eyeHTML}${beak}${more||""}`;
   const daisy=(x,y,s)=>`<g transform="translate(${x},${y}) scale(${s||1})"><g fill="#fff" stroke="${INK}" stroke-width=".7"><circle cx="0" cy="-2" r="1.5"/><circle cx="1.9" cy="-.6" r="1.5"/><circle cx="1.2" cy="1.6" r="1.5"/><circle cx="-1.2" cy="1.6" r="1.5"/><circle cx="-1.9" cy="-.6" r="1.5"/></g><circle r="1.2" fill="#F6C21E"/></g>`;
@@ -6066,10 +6072,11 @@ function petSVG(pose, skin, wear){
     const wind=`<g class="dk-wind" fill="none" stroke="${INK}" stroke-width="1.3" stroke-linecap="round" opacity=".7"><path d="M62 4h-9q-2 0-2 2"/><path d="M63 10h-7"/></g>`;
     return wrap("daisies", `${standing(head(eyeOpen,null,tuck), wing)}${ground}${bunch}${wind}`);
   }
-  /* dress: a twirl with the skirt flaring, hearts, then a curtsy */
+  /* dress: the skirt sways in a breeze, then a curtsy and hearts (1.14.1: no spin) */
   if(pose==="twirl"){
     const hearts=`<g class="dk-hearts" fill="#FF6FA8" stroke="${INK}" stroke-width=".8"><path class="dk-h1" d="M10 20c-2-3 2-5 3-2c1-3 5-1 3 2l-3 3z"/><path class="dk-h2" d="M52 30c-2-3 2-5 3-2c1-3 5-1 3 2l-3 3z"/><path class="dk-h3" d="M18 8c-2-3 2-5 3-2c1-3 5-1 3 2l-3 3z"/></g>`;
-    return wrap("twirl", `<g class="dk-spinner">${standing(head(eyeOpen), wing)}</g>${hearts}`);
+    const breeze=`<g class="dk-breeze" fill="none" stroke="${INK}" stroke-width="1.3" stroke-linecap="round" opacity=".7"><path d="M62 40h-8q-2 0-2 2"/><path d="M63 47h-7"/><path d="M60 53h-5"/></g>`;
+    return wrap("twirl", `<g class="dk-spinner">${standing(head(eyeOpen), wing)}</g>${breeze}${hearts}`);
   }
   /* cape: runs across fast, cape flying out behind, wand up with sparkles */
   if(pose==="wizard"){
