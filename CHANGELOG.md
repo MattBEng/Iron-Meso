@@ -9,6 +9,13 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.14.1 — 2026-11-20 (dress move: breeze and curtsy)
+
+- **What:** the `twirl` pose no longer spins (the scaleX flip made her look flat). Now a breeze (`.dk-breeze` wind lines) sways the skirt (`dkSway`, skewX on `.dk-dress`), then she curtsies (`dkCurtsy` tilts `.dk-top` only, so her feet stay planted) and hearts float up. Pose name unchanged.
+- **Why:** Matt: the spin looked 2D and broke the fourth wall.
+
+---
+
 ### v1.14.0 — 2026-11-20 (outfit animations)
 
 - **What:** five new poses in `petSVG`: `wink` (sunglasses slide down, wink, back up, glint), `capflip` (cap spins up and lands), `daisies` (bends via `.dk-top`, picks daisies, holds the bunch, one tucked in the sun hat, gust lifts the hat), `twirl` (two spins via `.dk-spinner` scaleX, dress flares, hearts, curtsy), `wizard` (runs across like the skate, cape flying, wand with sparkles, says "Oculus Reparo! ✨"). One-shot CSS animations (`1 both`), reduced-motion turns them off.
