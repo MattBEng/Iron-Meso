@@ -15,6 +15,11 @@ run("outfit animations", ()=>{
     ok(`${p} draws, with its item`, svg.includes("dk-"+p) && (id==="shades"? svg.includes("dk-shd") : id==="dress"? svg.includes("dk-dress") : id==="cape"? svg.includes("dk-cape") : svg.includes("dk-hat")));
   });
 
+  // 1.14.2: the dress hangs below the body (it used to be a band over her bottom)
+  const dsvg=ev(`petSVG("stand", PETS[0], {outfit:"dress"})`);
+  const hemY=+((dsvg.match(/51\.500 ([\d.]+)q/)||[])[1]);   // skirt hem y (standing body: cy 43, ry 12 -> bottom 55)
+  ok("dress skirt hangs past the body (body bottom 55)", hemY>55, hemY);
+  ok("dress has the strap and sash", (dsvg.match(/#FF8FB8/g)||[]).length>=2 && dsvg.includes("#E0567F"));
   st().settings.petWear={}; save();
   ok("nothing worn: no outfit moves", ev("wornPoses(false)").length===0);
   st().settings.petWear={head:"sunhat", outfit:"cape"}; save();

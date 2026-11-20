@@ -9,6 +9,15 @@ history back into `PROJECT-NOTES.md`.
 
 ---
 
+### v1.14.2 — 2026-11-20 (dress redrawn, breeze flap)
+
+- **Dress art:** the old dress was a band over the bottom half of the body (read as undies). Now `outfit()` draws a `<g class="dk-dress">`: shoulder strap, bodice from mid-body, A-line skirt that hangs 2 units past the body over the tops of the legs, scalloped hem (`dressHem()`), darker sash, bow at the back, daisy print (`dressFlowers()`). Shows in every pose she wears it.
+- **Dress move:** `twirl` pose is now just the breeze: wind lines plus `dkFlap` (skewX/scale on `.dk-dress`, origin at the top), then it settles. Curtsy and hearts removed. Waddling: `dkSwish` on the skirt.
+- **Tests:** `TESTS_duckwear.js` checks the skirt hangs below the body.
+- **Why:** Matt: curtsy no good, dress looked like undies; wants it to hang and flap like a dress. Picked from a preview.
+
+---
+
 ### v1.14.1 — 2026-11-20 (dress move: breeze and curtsy)
 
 - **What:** the `twirl` pose no longer spins (the scaleX flip made her look flat). Now a breeze (`.dk-breeze` wind lines) sways the skirt (`dkSway`, skewX on `.dk-dress`), then she curtsies (`dkCurtsy` tilts `.dk-top` only, so her feet stay planted) and hearts float up. Pose name unchanged.

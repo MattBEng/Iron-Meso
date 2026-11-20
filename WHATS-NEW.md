@@ -8,6 +8,7 @@ live in `RELEASES[0]` in `index.html`, and `TESTS_about.js` fails if the two dri
 apart. Update both when you ship, and add the engineering detail to
 `CHANGELOG.md` rather than here.
 
-## 1.14.1 — 2026-11-20
+## 1.14.2 — 2026-11-20
 
-- Daisy's dress move is now a breeze ruffling her skirt and a curtsy, instead of the spin.
+- Daisy's dress is redrawn as a proper dress: a strap, a skirt that hangs down over her legs, a sash and a bow.
+- Her dress move is now a breeze that makes the skirt flap and billow. It swishes when she waddles too.
